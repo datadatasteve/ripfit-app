@@ -1,0 +1,68 @@
+{
+  "name": "ripfit-backend",
+  "version": "1.0.0",
+  "description": "Backend API for RipFit fitness tracking application",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "test": "jest --coverage",
+    "test:watch": "jest --watch",
+    "migrate": "node database/migrate.js",
+    "migrate:rollback": "node database/rollback.js",
+    "seed": "node database/seeds/index.js",
+    "lint": "eslint src/**/*.js",
+    "format": "prettier --write 'src/**/*.js'"
+  },
+  "keywords": [
+    "fitness",
+    "workout-tracker",
+    "express",
+    "postgresql",
+    "rest-api"
+  ],
+  "author": "Rip",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "pg": "^8.11.3",
+    "pg-hstore": "^2.3.4",
+    "dotenv": "^16.3.1",
+    "bcrypt": "^5.1.1",
+    "jsonwebtoken": "^9.0.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "express-rate-limit": "^7.1.5",
+    "express-validator": "^7.0.1",
+    "morgan": "^1.10.0",
+    "winston": "^3.11.0",
+    "multer": "^1.4.5-lts.1",
+    "csv-parser": "^3.0.0",
+    "json2csv": "^6.0.0-alpha.2",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
+    "passport-apple": "^2.0.2",
+    "passport-jwt": "^4.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2",
+    "jest": "^29.7.0",
+    "supertest": "^6.3.3",
+    "eslint": "^8.56.0",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-plugin-import": "^2.29.1",
+    "prettier": "^3.1.1",
+    "@types/jest": "^29.5.11"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "coverageDirectory": "coverage",
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/app.js"
+    ],
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ]
+  }
+}
