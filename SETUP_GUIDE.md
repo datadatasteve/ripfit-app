@@ -7,7 +7,7 @@ Welcome to your RipFit project! This guide will help you get started.
 Your project structure is ready with:
 
 ### Backend (Node.js/Express)
-- Complete database schema (16 tables)
+- Complete database schema (20 tables)
 - Express server with middleware configured
 - Database connection setup
 - Migration system ready
@@ -23,7 +23,6 @@ Your project structure is ready with:
 
 ### Docker
 - PostgreSQL database container
-- PgAdmin web interface (optional)
 - Pre-configured environment
 
 ### Documentation
@@ -121,11 +120,6 @@ docker-compose logs postgres
 - User: ripfit_user  
 - Password: ripfit_password
 
-**Optional PgAdmin (database GUI):**
-- URL: http://localhost:5050
-- Email: admin@ripfit.local
-- Password: admin
-
 ---
 
 ### 4. Backend Setup
@@ -148,6 +142,8 @@ npm run migrate
 # You should see:
 # → Running 001_initial_schema.sql...
 # ✓ Completed 001_initial_schema.sql
+# → Running 002_nutrition_tables.sql...
+# ✓ Completed 002_nutrition_tables.sql
 # ✓ All migrations completed successfully!
 
 # Start development server
@@ -204,7 +200,7 @@ docker exec -it ripfit-db psql -U ripfit_user -d ripfit_dev
 
 # Inside PostgreSQL:
 \dt
-# Should list all 16 tables
+# Should list all 20 tables
 
 # Exit with:
 \q
@@ -224,9 +220,10 @@ docker exec -it ripfit-db psql -U ripfit_user -d ripfit_dev
 Before moving forward, review these files:
 
 ### Database Layer
-- [ ] `backend/database/migrations/001_initial_schema.sql` - All 16 tables
-- [ ] `docs/database-schema.md` - Full schema documentation
-- [ ] Verify migrations run successfully
+- [ ] `backend/database/migrations/001_initial_schema.sql` - Original 16 tables
+- [ ] `backend/database/migrations/002_nutrition_tables.sql` - 4 nutrition tables
+- [ ] `docs/database-schema.md` - Full schema documentation (20 tables)
+- [ ] Verify both migrations run successfully
 
 ### Backend Structure
 - [ ] `backend/src/app.js` - Main Express application
@@ -242,7 +239,7 @@ Before moving forward, review these files:
 - [ ] `frontend/vite.config.js` - Vite configuration
 
 ### Docker
-- [ ] `docker-compose.yml` - PostgreSQL and PgAdmin services
+- [ ] `docker-compose.yml` - PostgreSQL service
 - [ ] Containers running: `docker ps`
 
 ### Documentation
@@ -317,43 +314,104 @@ npm install
 The framework is ready. Here's the suggested build order:
 
 ### Phase 1 - Core Features (Start Here)
-1. **Authentication Routes** (`backend/src/routes/auth.js`)
+
+**Week 1: Database Imports & Authentication**
+
+1. **Import Exercise Database** (`backend/database/seeds/import-exercises.js`)
+   - Fetch from wger API (~400 exercises)
+   - Parse and insert into database
+   - One-time script, ~5-10 minutes
+
+2. **Import Nutrition Database** (`backend/database/seeds/import-foods.js`)
+   - Fetch from USDA FoodData Central
+   - Use curated subset (~10k common foods)
+   - One-time script, ~30-60 minutes
+
+3. **Authentication Routes** (`backend/src/routes/auth.js`)
    - User registration
    - Login (email/password)
    - JWT token generation
 
-2. **React Auth Components** (`frontend/src/components/auth/`)
+4. **React Auth Components** (`frontend/src/components/auth/`)
    - Login form
    - Signup form
    - Protected routes
 
-3. **Exercise Library** (`backend/src/routes/exercises.js`)
-   - List exercises
-   - Search/filter
-   - Create custom exercises
-   - Import from wger API
+**Week 2: Nutrition Tracking Backend**
 
-4. **Basic Workout Logging** (`backend/src/routes/workouts.js`)
-   - Create workout
-   - Log sets
-   - View workout history
+5. **Food Search API** (`backend/src/routes/foods.js`)
+   - GET /foods (search with autocomplete)
+   - GET /foods/:id (food details)
+   - POST /foods (create custom food)
 
-### Phase 2 - Routines & Planning
-5. **Workout Routines** (`backend/src/routes/routines.js`)
-   - Create routines
-   - Manage exercises in routines
-   - Start workout from routine
+6. **Meal Logging API** (`backend/src/routes/meals.js`)
+   - POST /meals (log meal)
+   - GET /meals (list user's meals)
+   - GET /meals/:id (meal details)
+   - DELETE /meals/:id
 
-6. **Frontend Workout UI**
-   - Workout logging interface
-   - Routine builder
-   - Exercise selector
+7. **Daily Summary API** (`backend/src/routes/nutrition.js`)
+   - GET /nutrition/daily/:date
+   - GET /nutrition/weekly
+
+**Week 3: Nutrition Tracking Frontend**
+
+8. **Food Search Component** (`frontend/src/components/nutrition/FoodSearch.jsx`)
+   - Search bar with autocomplete
+   - Food item display with macros
+   - Add to meal button
+
+9. **Meal Logger** (`frontend/src/pages/MealLogger.jsx`)
+   - Date picker
+   - Meal type selector
+   - Food list with serving sizes
+   - Macro totals display
+
+10. **Daily Summary View** (`frontend/src/pages/DailySummary.jsx`)
+    - Daily macro totals
+    - Breakdown by meal
+    - Progress bars vs targets
+
+**Week 4: Exercise Tracking Backend**
+
+11. **Exercise Library API** (`backend/src/routes/exercises.js`)
+    - GET /exercises (search/filter)
+    - GET /exercises/:id
+    - POST /exercises (custom)
+
+12. **Workout Logging API** (`backend/src/routes/workouts.js`)
+    - POST /workouts (log workout)
+    - GET /workouts (list)
+    - GET /workouts/:id (details)
+
+**Week 5: Exercise Tracking Frontend**
+
+13. **Exercise Search** (`frontend/src/components/workouts/ExerciseSearch.jsx`)
+    - Search exercises
+    - Filter by category/equipment
+    - Add to workout
+
+14. **Workout Logger** (`frontend/src/pages/WorkoutLogger.jsx`)
+    - Set tracking (reps/weight/RPE)
+    - Timer for rest periods
+    - Exercise notes
+
+15. **Integration & Polish**
+    - Same-day view (meals + workout)
+    - Basic charts for both
+    - Mobile responsiveness
+
+### Phase 2 - Routines & Advanced Features
+
+16. **Workout Routines**
+17. **Progress Analytics**
+18. **Import/Export Implementation**
 
 ### Phase 3 - Advanced Features
-7. **Body Composition Tracking**
-8. **Progress Analytics & Charts**
-9. **Import/Export Implementation**
-10. **OAuth Integration**
+
+19. **Body Composition Tracking**
+20. **Recipe Builder**
+21. **OAuth Integration**
 
 ---
 
@@ -441,6 +499,6 @@ Let me know if you have questions about any part of the framework!
 
 ---
 
-**Created**: January 14, 2026 (Updated for v2)
+**Created**: January 15, 2026 (Updated for Nutrition Tracking)
 **Git Commit**: TBD (after your first commit)
 **Your Saved Location**: `~/Desktop/dev_proj/ripfit-app`

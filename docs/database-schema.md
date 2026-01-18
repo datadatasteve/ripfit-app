@@ -2,7 +2,7 @@
 
 ## Overview
 
-RipFit uses PostgreSQL with 16 core tables organized into 6 functional categories. The schema is designed for flexibility, scalability, and data integrity.
+RipFit uses PostgreSQL with 20 core tables organized into 7 functional categories. The schema is designed for flexibility, scalability, and data integrity.
 
 ## Design Principles
 
@@ -270,7 +270,7 @@ Progress photo metadata (photos stored locally).
 - `idx_photos_user_date` on `user_id, photo_date`
 
 ### nutrition_plans
-Dietary targets and macro breakdowns (Phase 3 feature).
+Dietary targets and macro breakdowns.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
@@ -294,7 +294,109 @@ Dietary targets and macro breakdowns (Phase 3 feature).
 
 ---
 
-## Category 6: Import/Export
+## Category 6: Nutrition Tracking (NEW)
+
+### foods
+Nutrition database (USDA foods, branded foods, custom user foods).
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | SERIAL | PRIMARY KEY | Unique identifier |
+| name | VARCHAR(255) | NOT NULL | Food name |
+| brand | VARCHAR(255) | NULL | Brand name (if applicable) |
+| description | TEXT | NULL | Food description |
+| calories_per_100g | DECIMAL(8,2) | NOT NULL | Calories per 100g |
+| protein_per_100g | DECIMAL(6,2) | NOT NULL | Protein per 100g |
+| carbs_per_100g | DECIMAL(6,2) | NOT NULL | Carbs per 100g |
+| fat_per_100g | DECIMAL(6,2) | NOT NULL | Fat per 100g |
+| fiber_per_100g | DECIMAL(6,2) | NULL | Fiber per 100g |
+| sugar_per_100g | DECIMAL(6,2) | NULL | Sugar per 100g |
+| sodium_per_100g | DECIMAL(6,2) | NULL | Sodium (mg) per 100g |
+| serving_size | DECIMAL(8,2) | NULL | Default serving size |
+| serving_unit | VARCHAR(20) | NULL | g, ml, oz, cup, item |
+| source | VARCHAR(50) | NOT NULL | USDA, custom, branded |
+| source_id | VARCHAR(100) | NULL | ID from source database |
+| is_custom | BOOLEAN | DEFAULT FALSE | User-created food |
+| created_by_user_id | INTEGER | FK users(id) | Creator (if custom) |
+| created_at | TIMESTAMP | DEFAULT NOW() | Creation time |
+| updated_at | TIMESTAMP | DEFAULT NOW() | Last modified |
+
+**Indexes:**
+- `idx_foods_name` on `name`
+- `idx_foods_source` on `source`
+- `idx_foods_custom` on `is_custom, created_by_user_id`
+
+### meals
+Logged meals with date and meal type.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | SERIAL | PRIMARY KEY | Unique identifier |
+| user_id | INTEGER | FK users(id) | Meal owner |
+| meal_date | DATE | NOT NULL | Date of meal |
+| meal_type | VARCHAR(20) | NOT NULL | breakfast/lunch/dinner/snack/other |
+| meal_name | VARCHAR(255) | NULL | Optional custom name |
+| notes | TEXT | NULL | Meal notes |
+| created_at | TIMESTAMP | DEFAULT NOW() | Creation time |
+| updated_at | TIMESTAMP | DEFAULT NOW() | Last modified |
+
+**Indexes:**
+- `idx_meals_user_date` on `user_id, meal_date`
+- `idx_meals_type` on `meal_type`
+
+### meal_foods
+Individual food items in each meal.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | SERIAL | PRIMARY KEY | Unique identifier |
+| meal_id | INTEGER | FK meals(id) | Parent meal |
+| food_id | INTEGER | FK foods(id) | The food |
+| serving_size | DECIMAL(8,2) | NOT NULL | Amount consumed |
+| serving_unit | VARCHAR(20) | NOT NULL | g, ml, oz, cup, item |
+| calories | DECIMAL(8,2) | NOT NULL | Calculated calories |
+| protein | DECIMAL(6,2) | NOT NULL | Calculated protein |
+| carbs | DECIMAL(6,2) | NOT NULL | Calculated carbs |
+| fat | DECIMAL(6,2) | NOT NULL | Calculated fat |
+| fiber | DECIMAL(6,2) | NULL | Calculated fiber |
+| notes | TEXT | NULL | Item notes |
+| created_at | TIMESTAMP | DEFAULT NOW() | Creation time |
+
+**Indexes:**
+- `idx_meal_foods_meal` on `meal_id`
+- `idx_meal_foods_food` on `food_id`
+
+### daily_nutrition_summary
+Aggregated daily nutrition totals (auto-calculated).
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | SERIAL | PRIMARY KEY | Unique identifier |
+| user_id | INTEGER | FK users(id) | Summary owner |
+| summary_date | DATE | NOT NULL | Date of summary |
+| total_calories | DECIMAL(8,2) | DEFAULT 0 | Total calories for day |
+| total_protein | DECIMAL(6,2) | DEFAULT 0 | Total protein for day |
+| total_carbs | DECIMAL(6,2) | DEFAULT 0 | Total carbs for day |
+| total_fat | DECIMAL(6,2) | DEFAULT 0 | Total fat for day |
+| total_fiber | DECIMAL(6,2) | DEFAULT 0 | Total fiber for day |
+| breakfast_calories | DECIMAL(8,2) | DEFAULT 0 | Breakfast total |
+| lunch_calories | DECIMAL(8,2) | DEFAULT 0 | Lunch total |
+| dinner_calories | DECIMAL(8,2) | DEFAULT 0 | Dinner total |
+| snack_calories | DECIMAL(8,2) | DEFAULT 0 | Snack total |
+| nutrition_plan_id | INTEGER | FK nutrition_plans(id) NULL | Linked plan |
+| calories_vs_target | DECIMAL(8,2) | NULL | Difference from target |
+| protein_vs_target | DECIMAL(6,2) | NULL | Difference from target |
+| created_at | TIMESTAMP | DEFAULT NOW() | Creation time |
+| updated_at | TIMESTAMP | DEFAULT NOW() | Last modified |
+
+**Indexes:**
+- `idx_daily_summary_user_date` on `user_id, summary_date`
+
+**Note:** This table is auto-updated via trigger when meal_foods are inserted/updated/deleted.
+
+---
+
+## Category 7: Import/Export
 
 ### user_export_preferences
 Auto-export settings.
@@ -317,8 +419,10 @@ Auto-export settings.
 
 ```
 users (1) ──┬─→ (∞) exercises [custom]
+            ├─→ (∞) foods [custom]
             ├─→ (∞) workout_routines
             ├─→ (∞) workouts
+            ├─→ (∞) meals
             ├─→ (∞) user_metrics
             ├─→ (∞) progress_photos
             ├─→ (∞) nutrition_plans
@@ -330,6 +434,8 @@ exercises (1) ──┬─→ (∞) exercise_alternatives [main]
                 ├─→ (∞) routine_exercises
                 └─→ (∞) workout_exercises
 
+foods (1) ──→ (∞) meal_foods
+
 workout_routines (1) ──┬─→ (∞) routine_exercises
                         ├─→ (∞) exercise_replacements
                         ├─→ (∞) routine_additions_preferences
@@ -337,21 +443,22 @@ workout_routines (1) ──┬─→ (∞) routine_exercises
 
 workouts (1) ──→ (∞) workout_exercises ──→ (∞) workout_sets
 
+meals (1) ──→ (∞) meal_foods
+
 user_metrics (1) ──┬─→ (∞) progress_photos
                    └─→ (∞) nutrition_plans
+
+nutrition_plans (1) ──→ (∞) daily_nutrition_summary
 ```
 
 ---
 
 ## Migration Strategy
 
-1. **001_initial_schema.sql** - Create all tables
-2. **002_add_indexes.sql** - Add performance indexes
-3. **003_seed_exercises.sql** - Load system exercise library
-4. **004_seed_muscles.sql** - Load muscle groups
-
-Future migrations as features are added.
+1. **001_initial_schema.sql** - Create all original 16 tables
+2. **002_nutrition_tables.sql** - Add 4 nutrition tracking tables
+3. Future migrations as features are added
 
 ---
 
-**Last Updated**: January 14, 2026
+**Last Updated**: January 15, 2026 (Added Nutrition Tracking)

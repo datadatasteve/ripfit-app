@@ -7,9 +7,10 @@ A comprehensive fitness tracking web application for logging workouts, tracking 
 RipFit is a full-stack fitness tracking application that enhances traditional gym apps with features like:
 
 - **Comprehensive Workout Logging**: Track sets, reps, weights, RPE, rest times, and more
+- **Nutrition Tracking**: Log meals and track daily macros (calories, protein, carbs, fat)
 - **Flexible Routine Management**: Create reusable workout programs with superset support
 - **Body Composition Tracking**: Import scans from InBody, DEXA, and other devices
-- **Progress Analytics**: Visualize strength gains and body composition changes
+- **Progress Analytics**: Visualize strength gains, nutrition trends, and body composition changes
 - **Data Ownership**: Export all your data in CSV/JSON formats
 - **Privacy-First**: Photos stored locally on your device
 
@@ -120,9 +121,12 @@ See [docs/database-schema.md](docs/database-schema.md) for complete database des
 **Core tables:**
 - `users` - User accounts and authentication
 - `exercises` - Exercise library (system + custom)
+- `foods` - Nutrition database (USDA + custom)
 - `workout_routines` - Saved workout programs
 - `workouts` - Logged gym sessions
 - `workout_sets` - Individual set records
+- `meals` - Logged meals
+- `meal_foods` - Individual foods in meals
 - `user_metrics` - Body composition data
 - `nutrition_plans` - Dietary targets
 
@@ -138,6 +142,9 @@ See [docs/api-documentation.md](docs/api-documentation.md) for complete API refe
 - `GET /workouts` - List user's workouts
 - `POST /workouts` - Log a new workout
 - `GET /routines` - List user's routines
+- `GET /meals` - List user's meals
+- `POST /meals` - Log a new meal
+- `GET /nutrition/daily` - Get daily nutrition summary
 - `POST /body-composition` - Record body scan
 
 ## Import/Export
@@ -181,7 +188,10 @@ Deployment instructions coming soon. Will support:
 ### Phase 1 - MVP (Current)
 - [x] Database schema design
 - [ ] User authentication (simple + OAuth)
+- [ ] Exercise library (import from wger API)
+- [ ] Nutrition database (import from USDA)
 - [ ] Workout logging
+- [ ] Meal logging and nutrition tracking
 - [ ] Routine management
 - [ ] Basic body composition tracking
 - [ ] CSV/JSON export
@@ -190,14 +200,13 @@ Deployment instructions coming soon. Will support:
 - [ ] Progress charts and analytics
 - [ ] PDF import for body scans
 - [ ] Advanced superset/circuit support
-- [ ] Mobile-responsive UI
+- [ ] Mobile-responsive UI improvements
 - [ ] Auto-export to Google Drive
 
 ### Phase 3 - Advanced Features
-- [ ] Nutrition plan integration
 - [ ] Exercise video library
+- [ ] Recipe builder and meal planning
 - [ ] Social features (optional sharing)
-- [ ] React frontend migration
 - [ ] Mobile app (React Native)
 
 ## Contributing
@@ -224,4 +233,4 @@ MIT License - See LICENSE file for details
 ---
 
 **Status**: Active Development  
-**Last Updated**: January 14, 2026
+**Last Updated**: January 15, 2026
