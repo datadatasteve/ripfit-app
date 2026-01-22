@@ -1,10 +1,10 @@
 # RipFit App
 
-A comprehensive fitness tracking web application for logging workouts, tracking body composition, and analyzing progress over time.
+A comprehensive fitness and nutrition tracking web application for logging workouts and meals, tracking body composition, and analyzing progress over time.
 
 ## Project Overview
 
-RipFit is a full-stack fitness tracking application that enhances traditional gym apps with features like:
+RipFit is a full-stack fitness and nutrition tracking application that enhances traditional gym apps with features like:
 
 - **Comprehensive Workout Logging**: Track sets, reps, weights, RPE, rest times, and more
 - **Nutrition Tracking**: Log meals and track daily macros (calories, protein, carbs, fat)
