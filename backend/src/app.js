@@ -50,6 +50,9 @@ app.use(`/api/${API_VERSION}`, limiter);
 // ROUTES
 // ============================================================================
 
+const nutritionRoutes = require('./routes/nutritionRoutes');
+app.use(`/api/${API_VERSION}/nutrition`, nutritionRoutes);
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({
