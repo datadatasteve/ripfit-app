@@ -157,7 +157,8 @@ const scanBarcode = async (req, res) => {
  * }
  */
 const logMeal = async (req, res) => {
-  const { user_id, meal_date, meal_type, meal_name, foods } = req.body;
+  const user_id = req.user.userId; // Get from JWT token
+  const { meal_date, meal_type, meal_name, foods } = req.body;
 
   // Validation
   if (!user_id || !meal_date || !meal_type || !foods || !Array.isArray(foods)) {
