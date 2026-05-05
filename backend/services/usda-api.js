@@ -73,23 +73,28 @@ async function searchFoods(query, options = {}) {
  */
 async function searchByBarcode(barcode) {
   try {
-    const result = await searchFoods('', {
-      dataType: 'Branded',
-      pageSize: 1
-    });
-
-    // Add barcode to search params
+    // USDA API requires the barcode in the query parameter
     const params = {
       api_key: API_KEY,
-      query: '',
+      query: barcode,  // Put barcode in query
       dataType: 'Branded',
-      pageSize: 1,
-      gtinUpc: barcode  // Barcode filter
+      pageSize: 50  // Get more results to filter through
     };
 
     const response = await axios.get(`${USDA_API_BASE}/foods/search`, { params });
     
     if (response.data.foods && response.data.foods.length > 0) {
+      // Filter results to find exact barcode match
+      const exactMatch = response.data.foods.find(food => 
+        food.gtinUpc === barcode || 
+        food.gtinUpc === barcode.replace(/^0+/, '')  // Try without leading zeros
+      );
+      
+      if (exactMatch) {
+        return exactMatch;
+      }
+      
+      // If no exact match, return first result (might be close match)
       return response.data.foods[0];
     }
     

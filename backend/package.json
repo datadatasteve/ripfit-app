@@ -14,7 +14,8 @@
     "lint": "eslint src/**/*.js",
     "format": "prettier --write 'src/**/*.js'",
     "seed:exercises": "node database/seeds/import-exercises-exercisedb.js",
-    "seed:foods": "node database/seeds/import-foundation-foods.js"
+    "seed:foods": "node database/seeds/import-foundation-foods.js",
+    "seed:branded": "node database/seeds/import-branded-foods.js"
   },
   "keywords": [
     "fitness",
