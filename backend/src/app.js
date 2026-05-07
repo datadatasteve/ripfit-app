@@ -34,6 +34,7 @@ if (process.env.NODE_ENV !== 'test') {
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
+app.use(cors());  // Keep this here
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Rate limiting
@@ -52,8 +53,10 @@ app.use(`/api/${API_VERSION}`, limiter);
 
 const nutritionRoutes = require('./routes/nutritionRoutes');
 const authRoutes = require('./routes/authRoutes');
+const workoutRoutes = require('./routes/workoutRoutes');
 app.use(`/api/${API_VERSION}/nutrition`, nutritionRoutes);
 app.use(`/api/${API_VERSION}/auth`, authRoutes);
+app.use(`/api/${API_VERSION}/workouts`, workoutRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
