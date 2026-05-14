@@ -19,13 +19,25 @@ const searchExercises = async (req, res) => {
   }
 
   try {
+    // Fuzzy search: handle common variations
+    const searchTerms = q
+      .toLowerCase()
+      .replace(/flies/g, 'fly')
+      .replace(/flys/g, 'fly')
+      .split(' ')
+      .filter(Boolean);
+
+    const conditions = searchTerms.map((_, idx) => `name ILIKE $${idx + 1}`).join(' OR ');
+    const params = searchTerms.map(term => `%${term}%`);
+    params.push(limit);
+
     const result = await pool.query(
       `SELECT id, name, description, category, equipment_type
-      FROM exercises
-      WHERE name ILIKE $1
-      ORDER BY name
-      LIMIT $2`,
-      [`%${q}%`, limit]
+       FROM exercises
+       WHERE ${conditions}
+       ORDER BY name
+       LIMIT $${params.length}`,
+      params
     );
 
     res.json({
@@ -239,9 +251,93 @@ const getWorkouts = async (req, res) => {
   }
 };
 
+// Add before module.exports
+const logWorkoutSet = async (req, res) => {
+  const { workoutId } = req.params;
+  const { workout_exercise_id, set_number, reps_completed, weight_used, rpe } = req.body;
+  const user_id = req.user.userId;
+
+  try {
+    const workoutCheck = await pool.query(
+      `SELECT id FROM workouts WHERE id = $1 AND user_id = $2`,
+      [workoutId, user_id]
+    );
+
+    if (workoutCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Workout not found' });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO workout_sets (workout_exercise_id, set_number, reps_completed, weight_used, rpe, set_type)
+       VALUES ($1, $2, $3, $4, $5, 'normal') RETURNING *`,
+      [workout_exercise_id, set_number, reps_completed, weight_used, rpe || null]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Log set error:', error);
+    res.status(500).json({ error: 'Failed to log set' });
+  }
+};
+
+const finishWorkout = async (req, res) => {
+  const { workoutId } = req.params;
+  const user_id = req.user.userId;
+
+  try {
+    const result = await pool.query(
+      `UPDATE workouts SET end_time = NOW() WHERE id = $1 AND user_id = $2 RETURNING *`,
+      [workoutId, user_id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Workout not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Finish workout error:', error);
+    res.status(500).json({ error: 'Failed to finish workout' });
+  }
+};
+
+// Backend endpoint to add exercises to active workout
+const addExerciseToWorkout = async (req, res) => {
+  const { workoutId } = req.params;
+  const { exercise_id, order_index } = req.body;
+  const user_id = req.user.userId;
+
+  try {
+    const workoutCheck = await pool.query(
+      `SELECT id FROM workouts WHERE id = $1 AND user_id = $2`,
+      [workoutId, user_id]
+    );
+
+    if (workoutCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Workout not found' });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO workout_exercises (workout_id, exercise_id, order_index)
+       VALUES ($1, $2, $3) RETURNING *`,
+      [workoutId, exercise_id, order_index]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Add exercise error:', error);
+    res.status(500).json({ error: 'Failed to add exercise' });
+  }
+};
+
+// Update module.exports to include new functions:
 module.exports = {
   searchExercises,
   getExerciseById,
   logWorkout,
-  getWorkouts
+  getWorkouts,
+  logWorkoutSet,
+  addExerciseToWorkout,
+  finishWorkout
 };
+

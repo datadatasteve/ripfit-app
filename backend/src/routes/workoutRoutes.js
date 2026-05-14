@@ -14,4 +14,9 @@ router.get('/exercises/:id', workoutController.getExerciseById);
 router.post('/', authenticate, workoutController.logWorkout);
 router.get('/', authenticate, workoutController.getWorkouts);
 
+router.post('/:workoutId/sets', authenticate, workoutController.logWorkoutSet);
+router.put('/:workoutId/finish', authenticate, workoutController.finishWorkout);
+
+router.post('/:workoutId/exercises', authenticate, workoutController.addExerciseToWorkout); // add exercises to active workout
+
 module.exports = router;

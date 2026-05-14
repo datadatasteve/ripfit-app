@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RipFit Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        input, button {
+            padding: 10px;
+            margin: 5px 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .error {
+            border-left-color: #dc3545;
+            background: #fff5f5;
+        }
+        .success {
+            border-left-color: #28a745;
+            background: #f0fff4;
+        }
+        .hidden {
+            display: none;
+        }
+        .user-info {
+            background: #e7f3ff;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        .food-item {
+            background: #f8f9fa;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>RipFit API Test Page</h1>
+    
+    <div id="userInfo" class="user-info hidden">
+        <strong>Logged in as:</strong> <span id="userName"></span> (<span id="userEmail"></span>)
+        <button onclick="logout()" style="width: auto; margin-left: 10px;">Logout</button>
+    </div>
+
+    <!-- AUTH SECTION -->
+    <div id="authSection" class="section">
+        <h2>Authentication</h2>
+        
+        <div>
+            <h3>Register</h3>
+            <input type="email" id="regEmail" placeholder="Email">
+            <input type="text" id="regUsername" placeholder="Username">
+            <input type="password" id="regPassword" placeholder="Password">
+            <button onclick="register()">Register</button>
+        </div>
+
+        <div style="margin-top: 20px;">
+            <h3>Login</h3>
+            <input type="email" id="loginEmail" placeholder="Email">
+            <input type="password" id="loginPassword" placeholder="Password">
+            <button onclick="login()">Login</button>
+        </div>
+
+        <div id="authResult" class="result hidden"></div>
+    </div>
+
+    <!-- FOOD SEARCH SECTION -->
+    <div id="searchSection" class="section hidden">
+        <h2>Food Search</h2>
+        <input type="text" id="searchQuery" placeholder="Search for food (e.g., chicken)">
+        <button onclick="searchFoods()">Search</button>
+        <div id="searchResult" class="result hidden"></div>
+    </div>
+
+    <!-- BARCODE SCANNER SECTION -->
+    <div id="barcodeSection" class="section hidden">
+        <h2>Barcode Scanner</h2>
+        <input type="text" id="barcodeInput" placeholder="Enter barcode (e.g., 00051000198808)">
+        <button onclick="scanBarcode()">Scan</button>
+        <div id="barcodeResult" class="result hidden"></div>
+    </div>
+
+    <!-- MEAL LOGGING SECTION -->
+    <div id="mealSection" class="section hidden">
+        <h2>Log Meal</h2>
+        <input type="date" id="mealDate" placeholder="Date">
+        <select id="mealType">
+            <option value="breakfast">Breakfast</option>
+            <option value="lunch">Lunch</option>
+            <option value="dinner">Dinner</option>
+            <option value="snack">Snack</option>
+        </select>
+        <input type="text" id="mealName" placeholder="Meal name (optional)">
+        <input type="number" id="foodId" placeholder="Food ID">
+        <input type="number" id="servingSize" placeholder="Serving size (g)">
+        <button onclick="logMeal()">Log Meal</button>
+        <div id="mealResult" class="result hidden"></div>
+    </div>
+
+    <!-- EXERCISE SEARCH SECTION -->
+    <div id="exerciseSearchSection" class="section hidden">
+        <h2>Exercise Search</h2>
+        <input type="text" id="exerciseQuery" placeholder="Search for exercise (e.g., bench)">
+        <button onclick="searchExercises()">Search</button>
+        <div id="exerciseResult" class="result hidden"></div>
+    </div>
+
+    <!-- WORKOUT LOGGING SECTION -->
+    <div id="workoutSection" class="section hidden">
+        <h2>Log Workout</h2>
+        <input type="date" id="workoutDate" placeholder="Date">
+        <input type="number" id="exerciseId" placeholder="Exercise ID">
+        <input type="number" id="reps" placeholder="Reps">
+        <input type="number" id="weight" placeholder="Weight (lbs)">
+        <input type="number" id="rpe" placeholder="RPE (1-10, optional)">
+        <button onclick="logWorkout()">Log Workout</button>
+        <div id="workoutResult" class="result hidden"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000/api/v1';
+        let authToken = localStorage.getItem('ripfit_token');
+        let currentUser = JSON.parse(localStorage.getItem('ripfit_user') || 'null');
+
+        // Initialize page
+        if (authToken && currentUser) {
+            showLoggedInState();
+        }
+
+        function showLoggedInState() {
+            document.getElementById('authSection').classList.add('hidden');
+            document.getElementById('searchSection').classList.remove('hidden');
+            document.getElementById('barcodeSection').classList.remove('hidden');
+            document.getElementById('mealSection').classList.remove('hidden');
+            document.getElementById('exerciseSearchSection').classList.remove('hidden');
+            document.getElementById('workoutSection').classList.remove('hidden');
+            document.getElementById('userInfo').classList.remove('hidden');
+            document.getElementById('userName').textContent = currentUser.username;
+            document.getElementById('userEmail').textContent = currentUser.email;
+            
+            // Set today's date
+            document.getElementById('mealDate').valueAsDate = new Date();
+            document.getElementById('workoutDate').valueAsDate = new Date();
+        }
+
+        function showLoggedOutState() {
+            document.getElementById('authSection').classList.remove('hidden');
+            document.getElementById('searchSection').classList.add('hidden');
+            document.getElementById('barcodeSection').classList.add('hidden');
+            document.getElementById('mealSection').classList.add('hidden');
+            document.getElementById('userInfo').classList.add('hidden');
+        }
+
+        function logout() {
+            localStorage.removeItem('ripfit_token');
+            localStorage.removeItem('ripfit_user');
+            authToken = null;
+            currentUser = null;
+            showLoggedOutState();
+            showResult('authResult', 'Logged out successfully', 'success');
+        }
+
+        async function register() {
+            const email = document.getElementById('regEmail').value;
+            const username = document.getElementById('regUsername').value;
+            const password = document.getElementById('regPassword').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, username, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    authToken = data.token;
+                    currentUser = data.user;
+                    localStorage.setItem('ripfit_token', authToken);
+                    localStorage.setItem('ripfit_user', JSON.stringify(currentUser));
+                    showResult('authResult', `Registration successful! Welcome ${data.user.username}`, 'success');
+                    setTimeout(showLoggedInState, 1000);
+                } else {
+                    showResult('authResult', `Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult('authResult', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function login() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    authToken = data.token;
+                    currentUser = data.user;
+                    localStorage.setItem('ripfit_token', authToken);
+                    localStorage.setItem('ripfit_user', JSON.stringify(currentUser));
+                    showResult('authResult', `Login successful! Welcome back ${data.user.username}`, 'success');
+                    setTimeout(showLoggedInState, 1000);
+                } else {
+                    showResult('authResult', `Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult('authResult', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function searchFoods() {
+            const query = document.getElementById('searchQuery').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/nutrition/foods/search?q=${query}`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    let html = `<strong>Found ${data.count} foods:</strong><br><br>`;
+                    data.foods.forEach(food => {
+                        html += `<div class="food-item">
+                            <strong>ID: ${food.id}</strong> - ${food.name} ${food.brand ? `(${food.brand})` : ''}<br>
+                            Per 100g: ${food.calories_per_100g} cal | P: ${food.protein_per_100g}g | C: ${food.carbs_per_100g}g | F: ${food.fat_per_100g}g
+                        </div>`;
+                    });
+                    showResult('searchResult', html, 'success');
+                } else {
+                    showResult('searchResult', `Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult('searchResult', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function scanBarcode() {
+            const barcode = document.getElementById('barcodeInput').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/nutrition/foods/barcode/${barcode}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+
+                if (response.ok && data.food) {
+                    const food = data.food;
+                    const html = `<div class="food-item">
+                        <strong>${food.name}</strong> ${food.brand ? `- ${food.brand}` : ''}<br>
+                        <strong>ID: ${food.id}</strong> (use this for meal logging)<br>
+                        Per 100g: ${food.calories_per_100g} cal | P: ${food.protein_per_100g}g | C: ${food.carbs_per_100g}g | F: ${food.fat_per_100g}g<br>
+                        Serving: ${food.serving_size} ${food.serving_unit}
+                    </div>`;
+                    showResult('barcodeResult', html, 'success');
+                    // Pre-fill meal form
+                    document.getElementById('foodId').value = food.id;
+                    document.getElementById('servingSize').value = food.serving_size;
+                } else {
+                    showResult('barcodeResult', `Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult('barcodeResult', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function logMeal() {
+            const meal_date = document.getElementById('mealDate').value;
+            const meal_type = document.getElementById('mealType').value;
+            const meal_name = document.getElementById('mealName').value;
+            const food_id = parseInt(document.getElementById('foodId').value);
+            const serving_size = parseFloat(document.getElementById('servingSize').value);
+
+            const payload = {
+                meal_date,
+                meal_type,
+                meal_name: meal_name || null,
+                foods: [{
+                    food_id,
+                    quantity: serving_size,
+                    serving_size,
+                    serving_unit: 'g'
+                }]
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/nutrition/meals`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showResult('mealResult', `Meal logged successfully!\n${JSON.stringify(data, null, 2)}`, 'success');
+                } else {
+                    showResult('mealResult', `Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult('mealResult', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function searchExercises() {
+            const query = document.getElementById('exerciseQuery').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/workouts/exercises/search?q=${query}`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    let html = `<strong>Found ${data.count} exercises:</strong><br><br>`;
+                    data.exercises.forEach(ex => {
+                        html += `<div class="food-item">
+                            <strong>ID: ${ex.id}</strong> - ${ex.name}<br>
+                            Category: ${ex.category || 'N/A'} | Equipment: ${ex.equipment_type || 'N/A'}<br>
+                            ${ex.description ? ex.description.substring(0, 150) + '...' : ''}
+                        </div>`;
+                    });
+                    showResult('exerciseResult', html, 'success');
+                } else {
+                    showResult('exerciseResult', `Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult('exerciseResult', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function logWorkout() {
+            const workout_date = document.getElementById('workoutDate').value;
+            const exercise_id = parseInt(document.getElementById('exerciseId').value);
+            const reps = parseInt(document.getElementById('reps').value);
+            const weight = parseFloat(document.getElementById('weight').value);
+            const rpe = document.getElementById('rpe').value ? parseInt(document.getElementById('rpe').value) : null;
+
+            const payload = {
+                workout_date,
+                exercises: [{
+                    exercise_id,
+                    sets: [{
+                        reps,
+                        weight,
+                        rpe
+                    }]
+                }]
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/workouts`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showResult('workoutResult', `Workout logged successfully!\n${JSON.stringify(data, null, 2)}`, 'success');
+                } else {
+                    showResult('workoutResult', `Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult('workoutResult', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        function showResult(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = message;
+            element.className = `result ${type}`;
+            element.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>

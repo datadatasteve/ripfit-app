@@ -1,0 +1,387 @@
+.workout-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  color: #000;
+}
+ 
+.workout-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+ 
+.finish-btn {
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+ 
+.routines-list {
+  display: grid;
+  gap: 15px;
+}
+ 
+.routine-card {
+  background: #f0f0f0;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #333;
+  color: #000;
+}
+ 
+.routine-card h3 {
+  margin: 0 0 10px 0;
+  color: #000;
+}
+ 
+.routine-card p {
+  color: #000;
+}
+ 
+.routine-card button {
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 10px;
+}
+ 
+.exercise-progress {
+  text-align: center;
+  color: #000;
+  margin-bottom: 20px;
+  font-weight: bold;
+}
+ 
+.current-exercise {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border: 1px solid #333;
+}
+ 
+.current-exercise h3 {
+  margin: 0 0 5px 0;
+  color: #000;
+}
+ 
+.category {
+  color: #000;
+  margin: 0 0 15px 0;
+}
+ 
+.template-info {
+  background: #add8e6;
+  padding: 10px;
+  border-radius: 4px;
+  margin: 15px 0;
+  color: #000;
+  border: 1px solid #000;
+}
+ 
+.last-performance {
+  background: #ffeb99;
+  padding: 10px;
+  border-radius: 4px;
+  margin: 15px 0;
+  color: #000;
+  border: 1px solid #000;
+}
+ 
+.sets-history {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 10px 0;
+}
+ 
+.set-pill {
+  background: white;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 14px;
+  border: 1px solid #000;
+  color: #000;
+}
+ 
+.notes-warning {
+  color: #000;
+  margin: 10px 0 0 0;
+  font-weight: bold;
+}
+ 
+.logged-sets {
+  margin: 20px 0;
+}
+ 
+.logged-sets h4 {
+  margin: 0 0 10px 0;
+  color: #000;
+}
+ 
+.set-entry {
+  background: #f0f0f0;
+  padding: 10px;
+  margin: 5px 0;
+  border-radius: 4px;
+  color: #000;
+  border: 1px solid #333;
+}
+ 
+.set-form {
+  margin: 20px 0;
+  padding: 20px;
+  background: #f0f0f0;
+  border-radius: 4px;
+  border: 1px solid #333;
+}
+ 
+.set-form h4 {
+  margin: 0 0 15px 0;
+  color: #000;
+}
+ 
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+ 
+.form-row input {
+  padding: 10px;
+  border: 1px solid #000;
+  border-radius: 4px;
+  color: #000;
+  background: white;
+}
+ 
+.log-set-btn {
+  width: 100%;
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+}
+ 
+.exercise-nav {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20px;
+}
+ 
+.exercise-nav button {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+ 
+.exercise-nav button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+ 
+.add-exercise-btn {
+  background: #28a745 !important;
+}
+ 
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+ 
+.modal-content {
+  background: white;
+  padding: 30px;
+  border-radius: 8px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  border: 2px solid #000;
+  position: relative;
+}
+ 
+.modal-content h3 {
+  margin: 0 0 20px 0;
+  color: #000;
+}
+ 
+.search-box {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+ 
+.search-box input {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid #000;
+  border-radius: 4px;
+  color: #000;
+  background: white;
+}
+ 
+.search-box button {
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+ 
+.search-results {
+  max-height: 400px;
+  overflow-y: auto;
+  margin-bottom: 20px;
+}
+ 
+.result-item {
+  padding: 15px;
+  border: 1px solid #000;
+  margin-bottom: 10px;
+  cursor: pointer;
+  border-radius: 4px;
+  background: #f0f0f0;
+}
+ 
+.result-item:hover {
+  background: #007bff;
+  color: white;
+}
+ 
+.result-item:hover strong,
+.result-item:hover span {
+  color: white;
+}
+ 
+.result-item strong {
+  display: block;
+  margin-bottom: 5px;
+  color: #000;
+}
+ 
+.result-item span {
+  color: #000;
+  font-size: 14px;
+}
+ 
+.close-btn {
+  width: 100%;
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+ 
+.target-form {
+  margin: 20px 0;
+}
+ 
+.target-form input {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 10px;
+  border: 1px solid #000;
+  border-radius: 4px;
+  color: #000;
+  background: white;
+}
+ 
+.add-btn {
+  width: 100%;
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-bottom: 10px;
+}
+ 
+.back-btn {
+  width: 100%;
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+ 
+.success-toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: #28a745;
+  color: white;
+  padding: 15px 20px;
+  border-radius: 4px;
+  z-index: 2000;
+}
+ 
+.rest-timer {
+  text-align: center;
+  padding: 20px;
+  background: #fff3cd;
+  border: 2px solid #ffc107;
+  border-radius: 4px;
+  margin: 20px 0;
+}
+ 
+.timer-display {
+  font-size: 48px;
+  font-weight: bold;
+  color: #000;
+  margin-bottom: 10px;
+}
+ 
+.skip-rest-btn {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+ 
+.set-form.resting {
+  animation: pulse 2s infinite;
+  border: 3px solid #ffc107;
+}
+ 
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    border-color: #ffc107;
+  }
+  50% {
+    opacity: 0.6;
+    border-color: #ffeb99;
+  }
+}

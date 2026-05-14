@@ -1,0 +1,415 @@
+id,name,brand,calories_per_100g,protein_per_100g,carbs_per_100g,fat_per_100g,source
+790, AdvancePierre Flamebroiled Rib Shaped Pork Patty Topped with BBQ Sauce ,Tyson Foods Inc.,209.00,14.80,10.20,12.10,usda_branded
+607,"Almond butter, creamy",,0.00,20.79,21.24,53.04,usda_foundation
+589,"Almond milk, unsweetened, plain, refrigerated",,0.00,0.66,0.67,1.56,usda_foundation
+547,"Almond milk, unsweetened, plain, shelf stable",,0.00,0.55,0.34,1.22,usda_foundation
+565,"Almond milk, unsweetened, plain, shelf stable",,0.00,0.55,0.34,1.22,usda_foundation
+767,"Anchovies, canned in olive oil, with salt, drained",,0.00,26.94,2.41,9.85,usda_foundation
+573,"Apple juice, with added vitamin C, from concentrate, shelf stable",,0.00,0.09,11.36,0.29,usda_foundation
+645,"Applesauce, unsweetened, with added vitamin C",,0.00,0.27,12.26,0.16,usda_foundation
+614,"Applesauce, unsweetened, with added vitamin C",,0.00,0.27,12.26,0.16,usda_foundation
+549,"Apples, fuji, with skin, raw",,0.00,0.15,15.65,0.16,usda_foundation
+545,"Apples, fuji, with skin, raw",,65.00,0.15,15.70,0.16,usda_foundation
+544,"Apples, gala, with skin, raw",,61.00,0.13,14.80,0.15,usda_foundation
+550,"Apples, gala, with skin, raw",,0.00,0.13,14.77,0.15,usda_foundation
+551,"Apples, granny smith, with skin, raw",,0.00,0.27,14.14,0.14,usda_foundation
+543,"Apples, granny smith, with skin, raw",,59.00,0.27,14.20,0.14,usda_foundation
+552,"Apples, honeycrisp, with skin, raw",,0.00,0.10,14.68,0.10,usda_foundation
+542,"Apples, honeycrisp, with skin, raw",,60.00,0.10,14.70,0.10,usda_foundation
+541,"Apples, red delicious, with skin, raw",,62.00,0.19,14.80,0.21,usda_foundation
+548,"Apples, red delicious, with skin, raw",,0.00,0.19,14.78,0.21,usda_foundation
+723,"Apricot, with skin, raw",,0.00,0.96,10.24,0.41,usda_foundation
+730,"Arugula, baby, raw",,0.00,1.65,5.37,0.33,usda_foundation
+731,"Asparagus, green, raw",,0.00,1.44,5.10,0.22,usda_foundation
+732,"Avocado, Hass, peeled, raw",,0.00,1.81,8.32,20.31,usda_foundation
+539,"Bananas, overripe, raw",,85.00,0.73,20.10,0.22,usda_foundation
+530,"Bananas, overripe, raw",,85.00,0.73,20.10,0.22,usda_foundation
+531,"Bananas, ripe and slightly ripe, raw",,97.00,0.74,23.00,0.29,usda_foundation
+540,"Bananas, ripe and slightly ripe, raw",,97.00,0.74,23.00,0.29,usda_foundation
+676,"Beans, black, canned, sodium added, drained and rinsed",,0.00,6.91,19.81,1.27,usda_foundation
+678,"Beans, cannellini, canned, sodium added, drained and rinsed",,0.00,7.41,18.82,1.17,usda_foundation
+672,"Beans, cannellini, dry",,0.00,21.56,59.80,2.20,usda_foundation
+511,"Beans, Dry, Black (0% moisture)",,0.00,24.40,0.00,1.45,usda_foundation
+464,"Beans, Dry, Black (0% moisture)",,0.00,24.40,0.00,1.45,usda_foundation
+455,"Beans, Dry, Brown (0% moisture)",,0.00,25.60,0.00,1.12,usda_foundation
+500,"Beans, Dry, Brown (0% moisture)",,0.00,25.60,0.00,1.12,usda_foundation
+503,"Beans, Dry, Carioca (0% moisture)",,0.00,25.20,0.00,1.44,usda_foundation
+457,"Beans, Dry, Carioca (0% moisture)",,0.00,25.20,0.00,1.44,usda_foundation
+462,"Beans, Dry, Cranberry (0% moisture)",,0.00,24.40,0.00,1.23,usda_foundation
+504,"Beans, Dry, Cranberry (0% moisture)",,0.00,24.40,0.00,1.23,usda_foundation
+451,"Beans, Dry, Dark Red Kidney (0% moisture)",,0.00,25.90,0.00,1.31,usda_foundation
+507,"Beans, Dry, Dark Red Kidney (0% moisture)",,0.00,25.90,0.00,1.31,usda_foundation
+499,"Beans, Dry, Flor de Mayo (0% moisture)",,0.00,23.30,0.00,0.86,usda_foundation
+456,"Beans, Dry, Flor de Mayo (0% moisture)",,0.00,23.30,0.00,0.86,usda_foundation
+513,"Beans, Dry, Great Northern (0% moisture)",,0.00,24.70,0.00,1.24,usda_foundation
+467,"Beans, Dry, Great Northern (0% moisture)",,0.00,24.70,0.00,1.24,usda_foundation
+505,"Beans, Dry, Light Red Kidney (0% moisture)",,0.00,25.00,0.00,1.03,usda_foundation
+454,"Beans, Dry, Light Red Kidney (0% moisture)",,0.00,25.00,0.00,1.03,usda_foundation
+463,"Beans, Dry, Light Tan (0% moisture)",,0.00,24.60,0.00,1.28,usda_foundation
+502,"Beans, Dry, Light Tan (0% moisture)",,0.00,24.60,0.00,1.28,usda_foundation
+461,"Beans, Dry, Medium Red (0% moisture)",,0.00,25.50,0.00,1.04,usda_foundation
+497,"Beans, Dry, Medium Red (0% moisture)",,0.00,25.50,0.00,1.04,usda_foundation
+508,"Beans, Dry, Navy (0% moisture)",,0.00,24.10,0.00,1.51,usda_foundation
+453,"Beans, Dry, Navy (0% moisture)",,0.00,24.10,0.00,1.51,usda_foundation
+506,"Beans, Dry, Pink (0% moisture)",,0.00,23.40,0.00,1.20,usda_foundation
+452,"Beans, Dry, Pink (0% moisture)",,0.00,23.40,0.00,1.20,usda_foundation
+459,"Beans, Dry, Pinto (0% moisture)",,0.00,23.70,0.00,1.24,usda_foundation
+512,"Beans, Dry, Pinto (0% moisture)",,0.00,23.70,0.00,1.24,usda_foundation
+466,"Beans, Dry, Red (0% moisture)",,0.00,21.30,0.00,1.16,usda_foundation
+498,"Beans, Dry, Red (0% moisture)",,0.00,21.30,0.00,1.16,usda_foundation
+510,"Beans, Dry, Small Red (0% moisture)",,0.00,23.50,0.00,1.28,usda_foundation
+460,"Beans, Dry, Small Red (0% moisture)",,0.00,23.50,0.00,1.28,usda_foundation
+509,"Beans, Dry, Small White (0% moisture)",,0.00,24.50,0.00,1.32,usda_foundation
+465,"Beans, Dry, Small White (0% moisture)",,0.00,24.50,0.00,1.32,usda_foundation
+458,"Beans, Dry, Tan (0% moisture)",,0.00,26.80,0.00,1.14,usda_foundation
+501,"Beans, Dry, Tan (0% moisture)",,0.00,26.80,0.00,1.14,usda_foundation
+685,"Beans, great northern, canned, sodium added, drained and rinsed",,0.00,7.03,19.33,1.27,usda_foundation
+680,"Beans, kidney, dark red, canned, sodium added, sugar added, drained and rinsed",,0.00,7.80,21.03,1.26,usda_foundation
+681,"Beans, kidney, light red, canned, sodium added, sugar added, drained and rinsed",,0.00,7.31,21.45,1.30,usda_foundation
+677,"Beans, navy, canned, sodium added, drained and rinsed",,0.00,6.57,19.98,1.40,usda_foundation
+683,"Beans, pinto, canned, sodium added, drained and rinsed",,0.00,6.69,19.60,1.27,usda_foundation
+380,"Beans, snap, green, canned, regular pack, drained solids",,21.00,1.04,4.11,0.39,usda_foundation
+631,"Beans, snap, green, raw",,0.00,1.97,7.41,0.28,usda_foundation
+692,"Beef, chuck, roast, boneless, choice, raw",,0.00,18.40,0.00,17.80,usda_foundation
+693,"Beef, flank, steak, boneless, choice, raw",,0.00,20.13,0.00,9.40,usda_foundation
+658,"Beef, ground, 80% lean meat / 20% fat, raw",,0.00,17.53,0.00,19.44,usda_foundation
+657,"Beef, ground, 90% lean meat / 10% fat, raw",,0.00,18.16,0.00,12.85,usda_foundation
+468,"Beef, loin, tenderloin roast, separable lean only, boneless, trimmed to 0"" fat, select, cooked, roasted",,176.00,27.70,0.00,6.36,usda_foundation
+445,"Beef, loin, tenderloin roast, separable lean only, boneless, trimmed to 0"" fat, select, cooked, roasted",,176.00,27.70,0.00,6.36,usda_foundation
+469,"Beef, loin, top loin steak, boneless, lip-on, separable lean only, trimmed to 1/8"" fat, choice, raw",,155.00,22.80,0.00,6.39,usda_foundation
+444,"Beef, loin, top loin steak, boneless, lip-on, separable lean only, trimmed to 1/8"" fat, choice, raw",,155.00,22.80,0.00,6.39,usda_foundation
+690,"Beef, ribeye, steak, boneless, choice, raw",,0.00,18.74,0.00,20.04,usda_foundation
+446,"Beef, round, eye of round roast, boneless, separable lean only, trimmed to 0"" fat, select, raw",,122.00,23.40,0.00,2.48,usda_foundation
+470,"Beef, round, eye of round roast, boneless, separable lean only, trimmed to 0"" fat, select, raw",,122.00,23.40,0.00,2.48,usda_foundation
+691,"Beef, round, top round, boneless, choice, raw",,0.00,21.48,0.85,5.70,usda_foundation
+447,"Beef, round, top round roast, boneless, separable lean only, trimmed to 0"" fat, select, raw",,123.00,23.70,0.00,2.41,usda_foundation
+471,"Beef, round, top round roast, boneless, separable lean only, trimmed to 0"" fat, select, raw",,123.00,23.70,0.00,2.41,usda_foundation
+752,"Beef, short loin (NY strip steak), raw",,0.00,21.33,0.22,11.54,usda_foundation
+472,"Beef, short loin, porterhouse steak, separable lean only, trimmed to 1/8"" fat, select, raw",,145.00,22.70,0.00,5.32,usda_foundation
+449,"Beef, short loin, porterhouse steak, separable lean only, trimmed to 1/8"" fat, select, raw",,145.00,22.70,0.00,5.32,usda_foundation
+473,"Beef, short loin, t-bone steak, bone-in, separable lean only, trimmed to 1/8"" fat, choice, cooked, grilled",,219.00,27.30,0.00,11.40,usda_foundation
+448,"Beef, short loin, t-bone steak, bone-in, separable lean only, trimmed to 1/8"" fat, choice, cooked, grilled",,219.00,27.30,0.00,11.40,usda_foundation
+753,"Beef, tenderloin steak, raw",,0.00,21.09,0.18,6.46,usda_foundation
+754,"Beef, top sirloin steak, raw",,0.00,21.98,0.22,5.71,usda_foundation
+768,"Beet greens, raw",,0.00,1.61,4.66,0.14,usda_foundation
+716,"Beets, raw",,0.00,1.69,8.79,0.30,usda_foundation
+759,"Blackberries, raw",,0.00,1.53,0.00,0.00,usda_foundation
+684,"Blackeye pea, canned, sodium added, drained and rinsed",,0.00,6.93,19.17,1.30,usda_foundation
+675,"Blackeye pea, dry",,0.00,21.23,61.84,2.42,usda_foundation
+611,"Blueberries, raw",,0.00,0.70,14.57,0.31,usda_foundation
+642,"Blueberries, raw",,0.00,0.70,14.57,0.31,usda_foundation
+403,"Bread, white, commercially prepared",,270.00,9.43,49.20,3.59,usda_foundation
+450,"Bread, whole-wheat, commercially prepared",,254.00,12.30,43.10,3.55,usda_foundation
+381,"Broccoli, raw",,32.00,2.57,6.29,0.34,usda_foundation
+514,"Broccoli, raw",,31.00,2.57,6.27,0.34,usda_foundation
+715,"Brussels sprouts, raw",,0.00,3.98,9.62,0.57,usda_foundation
+653,"Buckwheat, whole grain",,0.00,11.07,71.13,3.04,usda_foundation
+728,"Bulgur, dry, raw",,0.00,11.76,75.88,2.42,usda_foundation
+597,"Buttermilk, low fat",,0.00,3.46,4.81,1.08,usda_foundation
+712,"Cabbage, bok choy, raw",,0.00,1.02,3.51,0.23,usda_foundation
+638,"Cabbage, green, raw",,0.00,0.96,6.38,0.23,usda_foundation
+761,"Cabbage, napa, leaf, destemmed, raw",,0.00,1.06,0.00,0.00,usda_foundation
+639,"Cabbage, red, raw",,0.00,1.24,6.79,0.21,usda_foundation
+592,"Carrots, baby, raw",,0.00,0.81,9.08,0.14,usda_foundation
+474,"Carrots, frozen, unprepared",,37.00,0.81,7.92,0.47,usda_foundation
+407,"Carrots, frozen, unprepared (Includes foods for USDA's Food Distribution Program)",,37.00,0.81,7.92,0.47,usda_foundation
+591,"Carrots, mature, raw",,0.00,0.94,10.27,0.35,usda_foundation
+713,"Cauliflower, raw",,0.00,1.64,4.72,0.24,usda_foundation
+636,"Celery, raw",,0.00,0.49,3.32,0.16,usda_foundation
+496,"Cheese, American, restaurant",,375.00,17.50,6.35,31.10,usda_foundation
+416,"Cheese, cheddar",,408.00,23.30,2.44,34.00,usda_foundation
+700,"Cheese, cotija, solid",,0.00,23.84,2.72,27.24,usda_foundation
+417,"Cheese, cottage, lowfat, 2% milkfat",,84.00,11.00,4.31,2.30,usda_foundation
+422,"Cheese, dry white, queso seco",,326.00,24.50,2.07,24.30,usda_foundation
+475,"Cheese, dry white, queso seco",,326.00,24.50,2.07,24.30,usda_foundation
+601,"Cheese, feta, whole milk, crumbled",,0.00,19.71,5.58,19.08,usda_foundation
+695,"Cheese, monterey jack, solid",,0.00,22.62,1.90,32.63,usda_foundation
+418,"Cheese, mozzarella, low moisture, part-skim",,298.00,23.70,4.44,20.40,usda_foundation
+698,"Cheese, oaxaca, solid",,0.00,22.14,2.40,22.10,usda_foundation
+397,"Cheese, parmesan, grated",,421.00,29.60,12.40,28.00,usda_foundation
+600,"Cheese, parmesan, grated, refrigerated",,0.00,30.14,4.33,29.50,usda_foundation
+398,"Cheese, pasteurized process, American, vitamin D fortified",,366.00,18.00,5.27,30.60,usda_foundation
+696,"Cheese, pasteurized process cheese food or product, American, singles",,0.00,15.57,8.19,23.86,usda_foundation
+697,"Cheese, provolone, sliced",,0.00,23.45,2.45,28.13,usda_foundation
+699,"Cheese, queso fresco, solid",,0.00,18.88,2.96,23.36,usda_foundation
+476,"Cheese, ricotta, whole milk",,157.00,7.81,6.86,11.00,usda_foundation
+387,"Cheese, ricotta, whole milk",,157.00,7.81,6.86,11.00,usda_foundation
+477,"Cheese, swiss",,393.00,27.00,1.44,31.00,usda_foundation
+405,"Cheese, swiss",,393.00,27.00,1.44,31.00,usda_foundation
+630,"Cherries, sweet, dark red, raw",,0.00,1.04,16.16,0.19,usda_foundation
+727,"Chia seeds, dry, raw",,0.00,17.01,38.27,32.89,usda_foundation
+688,"Chicken, breast, boneless, skinless, raw",,0.00,22.53,0.00,1.93,usda_foundation
+428,"Chicken, broiler or fryers, breast, skinless, boneless, meat only, cooked, braised",,166.00,32.10,0.00,3.24,usda_foundation
+427,"Chicken, broilers or fryers, drumstick, meat only, cooked, braised",,156.00,23.90,0.00,5.95,usda_foundation
+660,"Chicken, ground, with additives, raw",,0.00,17.91,0.00,7.16,usda_foundation
+689,"Chicken, thigh, boneless, skinless, raw",,0.00,18.61,0.00,7.92,usda_foundation
+679,"Chickpeas (garbanzo beans, bengal gram), canned, sodium added, drained and rinsed",,0.00,7.02,20.32,3.10,usda_foundation
+673,"Chickpeas, (garbanzo beans, bengal gram), dry",,0.00,21.28,60.36,6.27,usda_foundation
+769,"Cod, Pacific or Alaskan, frozen, wild caught",,0.00,14.20,0.52,0.22,usda_foundation
+714,"Collards, raw",,0.00,2.97,7.02,0.77,usda_foundation
+434,"Cookies, oatmeal, soft, with raisins",,430.00,5.79,69.60,14.30,usda_foundation
+743,"Corn flour, masa harina, white or yellow, dry, raw",,0.00,7.56,76.69,4.34,usda_foundation
+734,"Corn, sweet, yellow and white kernels,  fresh, raw",,0.00,2.79,14.69,1.63,usda_foundation
+615,"Cottage cheese, full fat, large or small curd",,0.00,11.62,4.60,4.23,usda_foundation
+577,"Cranberry juice, not fortified, from concentrate, shelf stable",,0.00,0.00,7.26,0.34,usda_foundation
+616,"Cream cheese, full fat, block",,0.00,5.79,4.56,33.49,usda_foundation
+617,"Cream, heavy",,0.00,2.02,3.80,35.56,usda_foundation
+618,"Cream, sour, full fat",,0.00,3.07,5.56,17.99,usda_foundation
+707,"Crustaceans, crab, blue swimming, lump, pasteurized, refrigerated",,0.00,18.65,0.00,0.81,usda_foundation
+704,"Crustaceans, shrimp, farm raised, raw",,0.00,15.57,0.48,0.80,usda_foundation
+637,"Cucumber, with peel, raw",,0.00,0.63,2.95,0.18,usda_foundation
+717,"Eggplant, raw",,0.00,0.85,5.40,0.12,usda_foundation
+517,"Eggs, Grade A, Large, egg white",,55.00,10.70,2.36,0.00,usda_foundation
+519,"Eggs, Grade A, Large, egg whole",,148.00,12.40,0.96,9.96,usda_foundation
+518,"Eggs, Grade A, Large, egg yolk",,334.00,16.20,1.02,28.80,usda_foundation
+391,"Egg, white, dried",,376.00,79.90,6.02,0.65,usda_foundation
+390,"Egg, white, raw, frozen, pasteurized",,48.00,10.10,0.74,0.16,usda_foundation
+419,"Egg, whole, dried",,575.00,48.10,1.87,39.80,usda_foundation
+389,"Egg, whole, raw, frozen, pasteurized",,150.00,12.30,0.91,10.30,usda_foundation
+421,"Egg, yolk, dried",,654.00,34.20,1.07,55.50,usda_foundation
+420,"Egg, yolk, raw, frozen, pasteurized",,296.00,15.60,0.59,25.10,usda_foundation
+735,"Einkorn, grain, dry, raw",,0.00,15.12,68.65,3.81,usda_foundation
+736,"Farro, pearled, dry, raw",,0.00,12.64,72.13,3.10,usda_foundation
+770,"Fennel, bulb, raw",,0.00,0.92,5.49,0.14,usda_foundation
+478,"Figs, dried, uncooked",,249.00,3.30,63.90,0.92,usda_foundation
+409,"Figs, dried, uncooked",,249.00,3.30,63.90,0.92,usda_foundation
+706,"Fish, catfish, farm raised, raw",,0.00,16.47,0.00,7.31,usda_foundation
+705,"Fish, cod, Atlantic, wild caught, raw",,0.00,16.07,0.00,0.67,usda_foundation
+436,"Fish, haddock, raw",,74.00,16.30,0.00,0.45,usda_foundation
+437,"Fish, pollock, raw",,56.00,12.30,0.00,0.41,usda_foundation
+702,"Fish, salmon, Atlantic, farm raised, raw",,0.00,20.32,0.00,13.11,usda_foundation
+701,"Fish, salmon, sockeye, wild caught, raw",,0.00,22.30,0.00,4.94,usda_foundation
+703,"Fish, tilapia, farm raised, raw",,0.00,19.00,0.00,2.48,usda_foundation
+438,"Fish, tuna, light, canned in water, drained solids",,90.00,19.00,0.08,0.94,usda_foundation
+608,"Flaxseed, ground",,0.00,18.04,34.36,37.28,usda_foundation
+569,"Flour, 00",,0.00,11.40,74.45,1.52,usda_foundation
+602,"Flour, almond",,0.00,26.24,16.25,50.23,usda_foundation
+646,"Flour, amaranth",,0.00,13.21,68.78,6.24,usda_foundation
+651,"Flour, barley",,0.00,8.72,77.40,2.45,usda_foundation
+525,"Flour, bread, white, enriched, unbleached",,363.00,14.30,72.80,1.65,usda_foundation
+649,"Flour, buckwheat",,0.00,8.88,75.02,2.48,usda_foundation
+652,"Flour, cassava",,0.00,0.92,87.31,0.49,usda_foundation
+666,"Flour, chestnut",,0.00,5.29,80.45,4.64,usda_foundation
+671,"Flour, coconut",,0.00,16.14,58.90,15.28,usda_foundation
+527,"Flour, corn, yellow, fine meal, enriched",,364.00,6.20,80.80,1.74,usda_foundation
+603,"Flour, oat, whole grain",,0.00,13.17,69.92,6.31,usda_foundation
+537,"Flour, pastry, unenriched, unbleached",,358.00,8.75,77.20,1.64,usda_foundation
+604,"Flour, potato",,0.00,8.11,79.94,0.95,usda_foundation
+647,"Flour, quinoa",,0.00,11.92,69.52,6.60,usda_foundation
+535,"Flour, rice, brown",,365.25,7.19,75.50,3.85,usda_foundation
+536,"Flour, rice, glutinous",,358.00,6.69,80.10,1.16,usda_foundation
+526,"Flour, rice, white, unenriched",,359.00,6.94,79.80,1.30,usda_foundation
+650,"Flour, rye",,0.00,8.40,77.16,1.91,usda_foundation
+571,"Flour, semolina, coarse and semi-coarse",,0.00,11.73,73.82,1.60,usda_foundation
+572,"Flour, semolina, fine",,0.00,13.33,71.99,1.84,usda_foundation
+648,"Flour, sorghum",,0.00,8.27,77.39,3.59,usda_foundation
+533,"Flour, soy, defatted",,366.00,51.10,32.90,3.33,usda_foundation
+534,"Flour, soy, full-fat",,452.00,38.60,27.90,20.70,usda_foundation
+570,"Flour, spelt, whole grain",,0.00,14.48,70.72,2.54,usda_foundation
+521,"Flour, wheat, all-purpose, enriched, bleached",,366.00,10.90,77.30,1.48,usda_foundation
+522,"Flour, wheat, all-purpose, enriched, unbleached",,358.00,13.10,73.20,1.48,usda_foundation
+523,"Flour, wheat, all-purpose, unenriched, unbleached",,362.00,12.00,74.60,1.70,usda_foundation
+524,"Flour, whole wheat, unenriched",,370.00,15.10,71.20,2.73,usda_foundation
+737,"Fonio, grain, dry, raw",,0.00,7.17,81.31,1.69,usda_foundation
+385,"Frankfurter, beef, unheated",,314.00,11.70,2.89,28.00,usda_foundation
+532,"Garlic, raw",,143.00,6.62,28.20,0.38,usda_foundation
+578,"Grapefruit juice, red, not fortified, not from concentrate, refrigerated",,0.00,0.57,9.10,0.27,usda_foundation
+399,"Grapefruit juice, white, canned or bottled, unsweetened",,37.00,0.55,7.59,0.70,usda_foundation
+575,"Grape juice, purple, with added vitamin C, from concentrate, shelf stable",,0.00,0.26,15.62,0.29,usda_foundation
+576,"Grape juice, white, with added vitamin C, from concentrate, shelf stable",,0.00,0.09,15.84,0.27,usda_foundation
+644,"Grapes, green, seedless, raw",,0.00,0.90,18.60,0.23,usda_foundation
+613,"Grapes, green, seedless, raw",,0.00,0.90,18.60,0.23,usda_foundation
+612,"Grapes, red, seedless, raw",,0.00,0.91,20.20,0.16,usda_foundation
+643,"Grapes, red, seedless, raw",,0.00,0.91,20.20,0.16,usda_foundation
+763,"Green onion, (scallion), bulb and greens, root removed, raw",,0.00,0.67,0.00,0.00,usda_foundation
+430,"Ham, sliced, pre-packaged, deli meat (96%fat free, water added)",,106.00,16.70,0.27,3.73,usda_foundation
+495,"Ham, sliced, restaurant",,121.00,19.60,2.36,3.68,usda_foundation
+377,"Hummus, commercial",,229.00,7.35,14.90,17.10,usda_foundation
+765,"Juice, prune, shelf-stable",,0.00,0.42,0.00,0.00,usda_foundation
+766,"Juice, tart cherry, from concentrate, shelf-stable",,0.00,0.15,0.00,0.00,usda_foundation
+406,"Kale, frozen, cooked, boiled, drained, without salt",,36.00,2.94,5.30,1.21,usda_foundation
+388,"Kale, raw",,35.00,2.92,4.42,1.49,usda_foundation
+516,"Ketchup, restaurant",,117.00,1.11,26.80,0.55,usda_foundation
+738,"Khorasan, grain, dry, raw",,0.00,14.76,71.79,2.80,usda_foundation
+410,"Kiwifruit, green, raw",,58.00,1.06,14.00,0.44,usda_foundation
+739,"Kiwifruit (kiwi), green, peeled, raw",,0.00,1.01,13.82,0.64,usda_foundation
+762,"Leeks, bulb and greens, root removed, raw",,0.00,1.47,0.00,0.00,usda_foundation
+674,"Lentils, dry",,0.00,23.57,62.17,1.93,usda_foundation
+415,"Lettuce, cos or romaine, raw",,17.00,1.24,3.24,0.26,usda_foundation
+479,"Lettuce, cos or romaine, raw",,17.00,1.24,3.24,0.26,usda_foundation
+619,"Lettuce, iceberg, raw",,0.00,0.74,3.37,0.07,usda_foundation
+622,"Lettuce, leaf, green, raw",,0.00,1.09,4.07,0.16,usda_foundation
+621,"Lettuce, leaf, red, raw",,0.00,0.88,3.26,0.11,usda_foundation
+620,"Lettuce, romaine, green, raw",,0.00,0.98,4.06,0.07,usda_foundation
+771,"Lobster, tail only, frozen, wild caught",,0.00,12.99,0.89,0.37,usda_foundation
+772,"Mahi mahi, frozen, wild caught",,0.00,19.79,0.29,0.38,usda_foundation
+740,"Mandarin, seedless, peeled, raw",,0.00,1.04,13.42,0.46,usda_foundation
+742,"Mango, Ataulfo, peeled, raw",,0.00,0.69,17.40,0.68,usda_foundation
+741,"Mango, Tommy Atkins, peeled, raw",,0.00,0.56,15.27,0.57,usda_foundation
+411,"Melons, cantaloupe, raw",,34.00,0.82,8.16,0.18,usda_foundation
+480,"Melons, cantaloupe, raw",,34.00,0.82,8.16,0.18,usda_foundation
+724,"Melons, honeydew, raw",,0.00,0.53,8.15,0.22,usda_foundation
+482,"Milk, lowfat, fluid, 1% milkfat, with added vitamin A and vitamin D",,43.00,3.38,5.18,0.95,usda_foundation
+382,"Milk, lowfat, fluid, 1% milkfat, with added vitamin A and vitamin D",,43.00,3.38,5.19,0.95,usda_foundation
+383,"Milk, nonfat, fluid, with added vitamin A and vitamin D (fat free or skim)",,34.00,3.43,4.89,0.08,usda_foundation
+485,"Milk, nonfat, fluid, with added vitamin A and vitamin D (fat free or skim)",,34.00,3.43,4.92,0.08,usda_foundation
+487,"Milk, reduced fat, fluid, 2% milkfat, with added vitamin A and vitamin D",,50.00,3.36,4.90,1.90,usda_foundation
+378,"Milk, reduced fat, fluid, 2% milkfat, with added vitamin A and vitamin D",,50.00,3.35,4.91,1.90,usda_foundation
+491,"Milk, whole, 3.25% milkfat, with added vitamin D",,60.00,3.27,4.63,3.20,usda_foundation
+384,"Milk, whole, 3.25% milkfat, with added vitamin D",,60.00,3.28,4.67,3.20,usda_foundation
+654,"Millet, whole grain",,0.00,10.02,74.45,4.19,usda_foundation
+586,"Mushroom, beech",,0.00,2.18,6.76,0.45,usda_foundation
+584,"Mushroom, crimini",,0.00,3.09,4.01,0.20,usda_foundation
+583,"Mushroom, enoki",,0.00,2.42,8.14,0.25,usda_foundation
+582,"Mushroom, king oyster",,0.00,2.41,8.50,0.31,usda_foundation
+553,"Mushroom, lion's mane",,0.00,2.50,7.59,0.26,usda_foundation
+560,"Mushroom, lion's mane",,0.00,2.50,7.59,0.26,usda_foundation
+585,"Mushroom, maitake",,0.00,2.20,6.60,0.27,usda_foundation
+561,"Mushroom, oyster",,0.00,2.90,6.94,0.19,usda_foundation
+554,"Mushroom, oyster",,0.00,2.90,6.94,0.19,usda_foundation
+587,"Mushroom, pioppini",,0.00,3.50,5.76,0.24,usda_foundation
+581,"Mushroom, portabella",,0.00,2.75,4.66,0.31,usda_foundation
+555,"Mushrooms, shiitake",,0.00,2.41,8.17,0.20,usda_foundation
+562,"Mushrooms, shiitake",,0.00,2.41,8.17,0.20,usda_foundation
+563,"Mushrooms, white button",,0.00,2.89,4.08,0.37,usda_foundation
+556,"Mushrooms, white button",,0.00,2.89,4.08,0.37,usda_foundation
+408,"Mustard, prepared, yellow",,61.00,4.25,5.30,3.38,usda_foundation
+412,"Nectarines, raw",,39.00,1.06,9.18,0.28,usda_foundation
+386,"Nuts, almonds, dry roasted, with salt added",,620.00,20.40,16.20,57.80,usda_foundation
+624,"Nuts, almonds, whole, raw",,0.00,21.45,20.03,51.09,usda_foundation
+662,"Nuts, brazilnuts, raw",,0.00,15.04,21.64,57.43,usda_foundation
+663,"Nuts, cashew nuts, raw",,0.00,17.44,36.29,38.86,usda_foundation
+664,"Nuts, hazelnuts or filberts, raw",,0.00,13.49,26.50,53.49,usda_foundation
+667,"Nuts, macadamia nuts, raw",,0.00,7.79,24.09,64.93,usda_foundation
+626,"Nuts, pecans, halves, raw",,0.00,9.96,12.70,73.28,usda_foundation
+623,"Nuts, pine nuts, raw",,0.00,15.70,18.59,61.27,usda_foundation
+668,"Nuts, pistachio nuts, raw",,0.00,20.51,27.69,45.02,usda_foundation
+625,"Nuts, walnuts, English, halves, raw",,0.00,14.56,10.91,69.74,usda_foundation
+590,"Oat milk, unsweetened, plain, refrigerated",,0.00,0.80,5.10,2.75,usda_foundation
+627,"Oats, whole grain, rolled, old fashioned",,0.00,13.50,68.66,5.89,usda_foundation
+628,"Oats, whole grain, steel cut",,0.00,12.51,69.75,5.80,usda_foundation
+425,"Oil, coconut",,833.00,0.00,0.84,99.10,usda_foundation
+432,"Olives, green, Manzanilla, stuffed with pimiento",,130.00,1.15,4.96,12.90,usda_foundation
+394,"Onion rings, breaded, par fried, frozen, prepared, heated in oven",,288.00,4.52,36.30,14.40,usda_foundation
+528,"Onions, red, raw",,44.00,0.94,9.93,0.10,usda_foundation
+538,"Onions, white, raw",,35.00,0.89,7.68,0.13,usda_foundation
+529,"Onions, yellow, raw",,38.00,0.83,8.61,0.05,usda_foundation
+574,"Orange juice, no pulp, not fortified, from concentrate, refrigerated",,0.00,0.73,10.34,0.33,usda_foundation
+580,"Orange juice, no pulp, not fortified, not from concentrate, refrigerated",,0.00,0.81,10.01,0.36,usda_foundation
+481,"Oranges, raw, navels",,47.00,0.91,11.80,0.15,usda_foundation
+413,"Oranges, raw, navels (Includes foods for USDA's Food Distribution Program)",,47.00,0.91,11.80,0.15,usda_foundation
+773,"Parsnips, raw",,0.00,1.27,19.29,0.54,usda_foundation
+755,"Pawpaw, peeled, seeded, raw",,0.00,1.15,0.00,0.00,usda_foundation
+400,"Peaches, yellow, raw",,42.00,0.91,10.10,0.27,usda_foundation
+605,"Peanut butter, creamy",,0.00,23.99,22.70,49.43,usda_foundation
+396,"Peanut butter, smooth style, with salt",,597.00,22.50,22.30,51.10,usda_foundation
+665,"Peanuts, raw",,0.00,23.21,26.50,43.28,usda_foundation
+744,"Pear, Anjou, green, with skin, raw",,0.00,0.31,14.77,0.37,usda_foundation
+483,"Pears, raw, bartlett",,57.00,0.38,15.10,0.16,usda_foundation
+431,"Pears, raw, bartlett (Includes foods for USDA's Food Distribution Program)",,57.00,0.38,15.10,0.16,usda_foundation
+682,"Peas, green, sweet, canned, sodium added, sugar added, drained and rinsed",,0.00,4.73,12.71,1.15,usda_foundation
+774,"Peppers, banana or Hungarian wax, seeded, raw",,0.00,0.72,4.97,0.13,usda_foundation
+593,"Peppers, bell, green, raw",,0.00,0.72,4.78,0.11,usda_foundation
+596,"Peppers, bell, orange, raw",,0.00,0.88,6.70,0.16,usda_foundation
+595,"Peppers, bell, red, raw",,0.00,0.90,6.65,0.13,usda_foundation
+594,"Peppers, bell, yellow, raw",,0.00,0.82,6.60,0.12,usda_foundation
+775,"Peppers, jalapeno, seeded, raw",,0.00,0.62,5.08,0.15,usda_foundation
+776,"Peppers, poblano, seeded, raw",,0.00,1.43,5.14,0.19,usda_foundation
+777,"Peppers, serrano, seeded, raw",,0.00,0.86,6.14,0.14,usda_foundation
+395,"Pickles, cucumber, dill or kosher dill",,12.00,0.48,1.99,0.43,usda_foundation
+629,"Pineapple, raw",,0.00,0.46,14.09,0.21,usda_foundation
+751,"Plantains, overripe, raw",,0.00,1.17,29.19,0.99,usda_foundation
+725,"Plantains, ripe, raw",,0.00,1.16,30.95,0.89,usda_foundation
+726,"Plantains, underripe, raw",,0.00,1.23,33.59,0.69,usda_foundation
+745,"Plum, black, with skin, raw",,0.00,0.58,13.46,0.28,usda_foundation
+520,"Pork, cured, bacon, cooked, restaurant",,500.00,40.90,2.10,36.50,usda_foundation
+659,"Pork, ground, raw",,0.00,17.81,0.00,17.49,usda_foundation
+686,"Pork, loin, boneless, raw",,0.00,21.12,0.00,9.47,usda_foundation
+687,"Pork, loin, tenderloin, boneless, raw",,0.00,21.58,0.00,3.90,usda_foundation
+634,"Potatoes, gold, without skin, raw",,0.00,1.81,15.96,0.26,usda_foundation
+633,"Potatoes, red, without skin, raw",,0.00,2.06,16.27,0.25,usda_foundation
+632,"Potatoes, russet, without skin, raw",,0.00,2.27,17.77,0.36,usda_foundation
+778,"Radicchio, raw",,0.00,1.31,4.96,0.14,usda_foundation
+779,"Radishes, red, raw",,0.00,0.66,4.06,0.08,usda_foundation
+610,"Raspberries, raw",,0.00,1.01,12.90,0.19,usda_foundation
+641,"Raspberries, raw",,0.00,1.01,12.90,0.19,usda_foundation
+441,"Restaurant, Chinese, fried rice, without meat",,174.00,3.84,32.50,3.19,usda_foundation
+440,"Restaurant, Chinese, sweet and sour pork",,260.00,8.88,25.50,13.60,usda_foundation
+484,"Restaurant, Chinese, sweet and sour pork",,260.00,8.88,25.50,13.60,usda_foundation
+443,"Restaurant, Latino, pupusas con frijoles (pupusas, bean)",,229.00,5.59,31.50,9.01,usda_foundation
+442,"Restaurant, Latino, tamale, pork",,174.00,7.38,15.80,9.04,usda_foundation
+733,"Rice, black, unenriched, raw",,0.00,7.57,77.19,3.44,usda_foundation
+655,"Rice, brown, long grain, unenriched, raw",,0.00,7.25,76.69,3.31,usda_foundation
+746,"Rice, red, unenriched, dry, raw",,0.00,8.56,76.15,3.44,usda_foundation
+656,"Rice, white, long grain, unenriched, raw",,0.00,7.04,80.31,1.03,usda_foundation
+758,"Rutabaga, peeled, raw",,0.00,0.89,0.00,0.00,usda_foundation
+429,"Sauce, pasta, spaghetti/marinara, ready-to-serve",,45.00,1.41,8.05,1.48,usda_foundation
+392,"Sauce, salsa, ready-to-serve",,29.00,1.44,6.74,0.19,usda_foundation
+486,"Sauce, salsa, ready-to-serve",,29.00,1.44,6.74,0.19,usda_foundation
+488,"Sausage, breakfast sausage, beef, pre-cooked, unprepared",,328.00,13.30,3.37,28.70,usda_foundation
+393,"Sausage, breakfast sausage, beef, pre-cooked, unprepared",,328.00,13.30,3.37,28.70,usda_foundation
+402,"Sausage, Italian, pork, mild, cooked, pan-fried",,322.00,18.20,2.15,26.20,usda_foundation
+489,"Sausage, Italian, pork, mild, cooked, pan-fried",,322.00,18.20,2.15,26.20,usda_foundation
+490,"Sausage, pork, chorizo, link or ground, cooked, pan-fried",,346.00,19.30,2.63,28.10,usda_foundation
+433,"Sausage, pork, chorizo, link or ground, cooked, pan-fried",,346.00,19.30,2.63,28.10,usda_foundation
+404,"Sausage, turkey, breakfast links, mild, raw",,169.00,16.70,0.93,10.40,usda_foundation
+492,"Sausage, turkey, breakfast links, mild, raw",,169.00,16.70,0.93,10.40,usda_foundation
+780,"Scallops, bay, Patagonian, frozen, wild caught",,0.00,16.39,2.28,0.42,usda_foundation
+781,"Scallops, sea, frozen, wild caught",,0.00,13.51,1.97,0.49,usda_foundation
+782,"Sea bass, Chilean, frozen, wild caught",,0.00,14.93,0.14,16.57,usda_foundation
+669,"Seeds, pumpkin seeds (pepitas), raw",,0.00,29.91,18.68,40.03,usda_foundation
+670,"Seeds, sunflower seed, kernel, raw",,0.00,18.87,24.50,48.44,usda_foundation
+401,"Seeds, sunflower seed kernels, dry roasted, with salt added",,612.00,21.00,17.10,56.10,usda_foundation
+606,"Sesame butter, creamy",,0.00,19.71,14.18,62.40,usda_foundation
+764,"Shallots, bulb, peeled, root removed, raw",,0.00,1.38,0.00,0.00,usda_foundation
+783,"Snapper, frozen, wild caught",,0.00,20.66,0.44,0.57,usda_foundation
+784,"Snow crab, legs only, frozen  ",,0.00,15.54,1.11,0.29,usda_foundation
+747,"Sorghum bran, white, unenriched, dry, raw",,0.00,11.17,68.70,9.26,usda_foundation
+748,"Sorghum flour, white, pearled, unenriched, dry, raw",,0.00,10.21,73.51,3.24,usda_foundation
+749,"Sorghum grain, white, pearled, unenriched, dry, raw",,0.00,10.25,74.87,3.27,usda_foundation
+750,"Sorghum, whole grain, white, dry, raw",,0.00,10.08,73.57,4.22,usda_foundation
+588,"Soy milk, sweetened, plain, refrigerated",,0.00,2.78,3.00,1.96,usda_foundation
+546,"Soy milk, unsweetened, plain, shelf stable",,0.00,3.55,1.29,2.13,usda_foundation
+564,"Soy milk, unsweetened, plain, shelf stable",,0.00,3.55,1.29,2.13,usda_foundation
+566,"Spinach, baby",,0.00,2.85,2.41,0.62,usda_foundation
+557,"Spinach, baby",,0.00,2.85,2.41,0.62,usda_foundation
+567,"Spinach, mature",,0.00,2.91,2.64,0.60,usda_foundation
+558,"Spinach, mature",,0.00,2.91,2.64,0.60,usda_foundation
+756,"Squash, pie pumpkin, peeled, seeded, raw",,0.00,0.85,0.00,0.00,usda_foundation
+757,"Squash, spaghetti, peeled, seeded, raw",,0.00,0.79,0.00,0.00,usda_foundation
+708,"Squash, summer, green, zucchini, includes skin, raw",,0.00,0.98,3.27,0.21,usda_foundation
+709,"Squash, summer, yellow, includes skin, raw",,0.00,0.89,4.39,0.14,usda_foundation
+711,"Squash, winter, acorn, raw",,0.00,1.25,10.48,0.18,usda_foundation
+710,"Squash, winter, butternut, raw",,0.00,1.15,10.51,0.17,usda_foundation
+785,"Squid (calamari), frozen, tubes only",,0.00,8.81,0.93,0.55,usda_foundation
+640,"Strawberries, raw",,0.00,0.64,7.96,0.22,usda_foundation
+414,"Strawberries, raw",,31.00,0.64,7.63,0.22,usda_foundation
+515,"Strawberries, raw",,31.00,0.64,7.63,0.22,usda_foundation
+609,"Strawberries, raw",,0.00,0.64,7.96,0.22,usda_foundation
+493,"Sugars, granulated",,385.00,0.00,99.60,0.32,usda_foundation
+439,"Sugars, granulated",,385.00,0.00,99.60,0.32,usda_foundation
+635,"Sweet potatoes, orange flesh, without skin, raw",,0.00,1.58,17.33,0.38,usda_foundation
+786,"Swordfish, frozen, wild caught",,0.00,19.24,0.45,8.12,usda_foundation
+760,"Tomatillos, dehusked, raw",,0.00,1.06,0.00,0.00,usda_foundation
+435,"Tomatoes, canned, red, ripe, diced",,18.00,0.84,3.32,0.50,usda_foundation
+721,"Tomatoes, crushed, canned",,0.00,1.44,7.14,0.40,usda_foundation
+379,"Tomatoes, grape, raw",,27.00,0.83,5.51,0.63,usda_foundation
+718,"Tomatoes, whole, canned, solids and liquids, with salt added",,0.00,0.87,4.29,0.21,usda_foundation
+579,"Tomato juice, with added ingredients, from concentrate, shelf stable",,0.00,0.86,4.32,0.29,usda_foundation
+720,"Tomato, paste, canned, without salt added",,0.00,4.23,20.19,0.73,usda_foundation
+722,"Tomato, puree, canned",,0.00,1.58,8.04,0.27,usda_foundation
+568,"Tomato, roma",,0.00,0.70,3.84,0.43,usda_foundation
+559,"Tomato, roma",,0.00,0.70,3.84,0.43,usda_foundation
+719,"Tomato, sauce, canned, with salt added",,0.00,1.35,6.33,0.38,usda_foundation
+426,"Turkey, ground, 93% lean, 7% fat, pan-broiled crumbles",,220.00,27.10,0.00,11.60,usda_foundation
+494,"Turkey, ground, 93% lean, 7% fat, pan-broiled crumbles",,220.00,27.10,0.00,11.60,usda_foundation
+661,"Turkey, ground, 93% lean/ 7% fat, raw",,0.00,17.34,0.00,9.59,usda_foundation
+787,"Turnips, raw",,0.00,0.95,7.27,0.12,usda_foundation
+788,"Watermelon, seedless, flesh only, raw",,0.00,0.87,0.00,0.00,usda_foundation
+789,"Watermelon, seedless, rind only, raw",,0.00,0.53,3.27,0.97,usda_foundation
+729,"Wild rice, dry, raw",,0.00,12.79,75.67,1.70,usda_foundation
+423,"Yogurt, Greek, plain, nonfat",,61.00,10.30,3.64,0.37,usda_foundation
+599,"Yogurt, Greek, plain, whole milk",,0.00,8.78,4.75,4.39,usda_foundation
+424,"Yogurt, Greek, strawberry, nonfat",,83.00,8.06,12.20,0.15,usda_foundation
+694,"Yogurt, plain, nonfat",,0.00,4.23,8.08,0.09,usda_foundation
+598,"Yogurt, plain, whole milk",,0.00,3.82,5.57,4.48,usda_foundation

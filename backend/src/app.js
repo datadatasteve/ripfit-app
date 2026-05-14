@@ -54,9 +54,11 @@ app.use(`/api/${API_VERSION}`, limiter);
 const nutritionRoutes = require('./routes/nutritionRoutes');
 const authRoutes = require('./routes/authRoutes');
 const workoutRoutes = require('./routes/workoutRoutes');
+const routineRoutes = require('./routes/routineRoutes');
 app.use(`/api/${API_VERSION}/nutrition`, nutritionRoutes);
 app.use(`/api/${API_VERSION}/auth`, authRoutes);
 app.use(`/api/${API_VERSION}/workouts`, workoutRoutes);
+app.use(`/api/${API_VERSION}/routines`, routineRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
