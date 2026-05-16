@@ -18,5 +18,7 @@ router.post('/:workoutId/sets', authenticate, workoutController.logWorkoutSet);
 router.put('/:workoutId/finish', authenticate, workoutController.finishWorkout);
 
 router.post('/:workoutId/exercises', authenticate, workoutController.addExerciseToWorkout); // add exercises to active workout
+router.delete('/:workoutId/exercises/:exerciseId', authenticate, workoutController.deleteExerciseFromWorkout); // delete exercise from active workout
+router.put('/:workoutId/exercises/:exerciseId/notes', authenticate, workoutController.updateExerciseNotes);
 
 module.exports = router;

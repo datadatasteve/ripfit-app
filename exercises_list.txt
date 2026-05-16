@@ -1,0 +1,331 @@
+[?1049h[22;0;0t[24;1H[?1h= category  |                            name                            
+-----------+------------------------------------------------------------
+ Abs       | 3/4 Sit-Up
+ Abs       | Ab Crunch Machine
+ Abs       | Ab Roller
+ Abs       | Advanced Kettlebell Windmill
+ Abs       | Air Bike
+ Abs       | Alternate Heel Touchers
+ Abs       | Barbell Ab Rollout
+ Abs       | Barbell Ab Rollout - On Knees
+ Abs       | Barbell Rollout from Bench
+ Abs       | Barbell Side Bend
+ Abs       | Bent-Knee Hip Raise
+ Abs       | Bent Press
+ Abs       | Bosu Ball Cable Crunch With Side Bends
+ Abs       | Bottoms Up
+ Abs       | Butt-Ups
+ Abs       | Cable Crunch
+ Abs       | Cable Judo Flip
+ Abs       | Cable Reverse Crunch
+ Abs       | Cable Russian Twists
+ Abs       | Cable Seated Crunch
+ Abs       | Cocoons
+:[K[K [KESCESC[K[[[KAA[K:[K[K [KESCESC[K[[[KDD[K:[K[K [KESCESC[K[[[KCC[K:[K[K [KESCESC[K[[[KBB[K:[K[K [KESCESC[K[[[KAA[K:[K[K Abs       | Cross-Body Crunch
+:[K[K Abs       | Crunches
+ Abs       | Crunch - Hands Overhead
+ Abs       | Crunch - Legs On Exercise Ball
+ Abs       | Dead Bug
+ Abs       | Decline Crunch
+ Abs       | Decline Oblique Crunch
+ Abs       | Decline Reverse Crunch
+ Abs       | Double Kettlebell Windmill
+ Abs       | Dumbbell Side Bend
+ Abs       | Elbow to Knee
+ Abs       | Exercise Ball Crunch
+ Abs       | Exercise Ball Pull-In
+:[K[K:[K[K:[K[K[HM Abs       | Bent-Knee Hip Raise
+[24;1H[K:[K[K Abs       | Exercise Ball Pull-In
+:[K[K...skipping...
+ Abs       | Bent Press
+ Abs       | Bosu Ball Cable Crunch With Side Bends
+ Abs       | Bottoms Up
+ Abs       | Butt-Ups
+ Abs       | Cable Crunch
+ Abs       | Cable Judo Flip
+ Abs       | Cable Reverse Crunch
+ Abs       | Cable Russian Twists
+ Abs       | Cable Seated Crunch
+ Abs       | Cocoons
+ Abs       | Cross-Body Crunch
+ Abs       | Crunches
+ Abs       | Crunch - Hands Overhead
+ Abs       | Crunch - Legs On Exercise Ball
+ Abs       | Dead Bug
+ Abs       | Decline Crunch
+ Abs       | Decline Oblique Crunch
+ Abs       | Decline Reverse Crunch
+ Abs       | Double Kettlebell Windmill
+ Abs       | Dumbbell Side Bend
+ Abs       | Elbow to Knee
+ Abs       | Exercise Ball Crunch
+ Abs       | Exercise Ball Pull-In
+:[K[K Abs       | Flat Bench Leg Pull-In
+ Abs       | Flat Bench Lying Leg Raise
+ Abs       | Frog Sit-Ups
+ Abs       | Gorilla Chin/Crunch
+ Abs       | Hanging Leg Raise
+ Abs       | Hanging Pike
+ Abs       | Jackknife Sit-Up
+ Abs       | Janda Sit-Up
+ Abs       | Kettlebell Figure 8
+ Abs       | Kettlebell Pass Between The Legs
+ Abs       | Kettlebell Windmill
+ Abs       | Knee/Hip Raise On Parallel Bars
+ Abs       | Kneeling Cable Crunch With Alternating Oblique Twists
+ Abs       | Landmine 180's
+ Abs       | Leg Pull-In
+ Abs       | Lower Back Curl
+ Abs       | Medicine Ball Full Twist
+ Abs       | Oblique Crunches
+ Abs       | Oblique Crunches - On The Floor
+ Abs       | One-Arm High-Pulley Cable Side Bends
+ Abs       | One-Arm Medicine Ball Slam
+ Abs       | Otis-Up
+ Abs       | Overhead Stretch
+:[K[K Abs       | Pallof Press
+:[K[K:[K[K Abs       | Pallof Press With Rotation
+:[K[K:[K[K Abs       | Plank
+ Abs       | Plate Twist
+ Abs       | Press Sit-Up
+ Abs       | Reverse Crunch
+ Abs       | Rope Crunch
+ Abs       | Russian Twist
+ Abs       | Scissor Kick
+ Abs       | Seated Barbell Twist
+ Abs       | Seated Flat Bench Leg Pull-In
+ Abs       | Seated Leg Tucks
+ Abs       | Seated Overhead Stretch
+ Abs       | Side Bridge
+ Abs       | Side Jackknife
+ Abs       | Sit-Up
+ Abs       | Sledgehammer Swings
+ Abs       | Smith Machine Hip Raise
+ Abs       | Spell Caster
+ Abs       | Spider Crawl
+ Abs       | Standing Cable Lift
+ Abs       | Standing Cable Wood Chop
+ Abs       | Standing Lateral Stretch
+ Abs       | Standing Rope Crunch
+ Abs       | Stomach Vacuum
+:[K[K-[1;1H[K Abs       | Plank
+[2;1H[K Abs       | Plate Twist
+[3;1H[K Abs       | Press Sit-Up
+[4;1H[K Abs       | Reverse Crunch
+[5;1H[K Abs       | Rope Crunch
+[6;1H[K Abs       | Russian Twist
+[7;1H[K Abs       | Scissor Kick
+[8;1H[K Abs       | Seated Barbell Twist
+[9;1H[K Abs       | Seated Flat Bench Leg Pull-In
+[10;1H[K Abs       | Seated Leg Tucks
+[11;1H[K Abs       | Seated Overhead Stretch
+[12;1H[K Abs       | Side Bridge
+[13;1H[K Abs       | Side Jackknife
+[14;1H[K Abs       | Sit-Up
+[15;1H[K Abs       | Sledgehammer Swings
+[16;1H[K Abs       | Smith Machine Hip Raise
+[17;1H[K Abs       | Spell Caster
+[18;1H[K Abs       | Spider Crawl
+[19;1H[K Abs       | Standing Cable Lift
+[20;1H[K Abs       | Standing Cable Wood Chop
+[21;1H[K Abs       | Standing Lateral Stretch
+[22;1H[K Abs       | Standing Rope Crunch
+[23;1H[K Abs       | Stomach Vacuum
+[24;1H[1;1H[K Abs       | Plank
+[2;1H[K Abs       | Plate Twist
+[3;1H[K Abs       | Press Sit-Up
+[4;1H[K Abs       | Reverse Crunch
+[5;1H[K Abs       | Rope Crunch
+[6;1H[K Abs       | Russian Twist
+[7;1H[K Abs       | Scissor Kick
+[8;1H[K Abs       | Seated Barbell Twist
+[9;1H[K Abs       | Seated Flat Bench Leg Pull-In
+[10;1H[K Abs       | Seated Leg Tucks
+[11;1H[K Abs       | Seated Overhead Stretch
+[12;1H[K Abs       | Side Bridge
+[13;1H[K Abs       | Side Jackknife
+[14;1H[K Abs       | Sit-Up
+[15;1H[K Abs       | Sledgehammer Swings
+[16;1H[K Abs       | Smith Machine Hip Raise
+[17;1H[K Abs       | Spell Caster
+[18;1H[K Abs       | Spider Crawl
+[19;1H[K Abs       | Standing Cable Lift
+[20;1H[K Abs       | Standing Cable Wood Chop
+[21;1H[K Abs       | Standing Lateral Stretch
+[22;1H[K Abs       | Standing Rope Crunch
+[23;1H[K Abs       | Stomach Vacuum
+[24;1H[K[7mIgnore case in searches  (press RETURN)[27m[24;1H[K[K[7mNo next tag  (press RETURN)[27m[24;1H[K[K:[K[K...skipping...
+ Abs       | Plank
+ Abs       | Plate Twist
+ Abs       | Press Sit-Up
+ Abs       | Reverse Crunch
+ Abs       | Rope Crunch
+ Abs       | Russian Twist
+ Abs       | Scissor Kick
+ Abs       | Seated Barbell Twist
+ Abs       | Seated Flat Bench Leg Pull-In
+ Abs       | Seated Leg Tucks
+ Abs       | Seated Overhead Stretch
+ Abs       | Side Bridge
+ Abs       | Side Jackknife
+ Abs       | Sit-Up
+ Abs       | Sledgehammer Swings
+ Abs       | Smith Machine Hip Raise
+ Abs       | Spell Caster
+ Abs       | Spider Crawl
+ Abs       | Standing Cable Lift
+ Abs       | Standing Cable Wood Chop
+ Abs       | Standing Lateral Stretch
+ Abs       | Standing Rope Crunch
+ Abs       | Stomach Vacuum
+:[K[K:[K[K[K[7mDetermining length of file... (interrupt to abort)[27m[K[H[2J[HM Abs       | Cocoons
+[HM Abs       | Cable Seated Crunch
+[HM Abs       | Cable Russian Twists
+[HM Abs       | Cable Reverse Crunch
+[HM Abs       | Cable Judo Flip
+[HM Abs       | Cable Crunch
+[HM Abs       | Butt-Ups
+[HM Abs       | Bottoms Up
+[HM Abs       | Bosu Ball Cable Crunch With Side Bends
+[HM Abs       | Bent Press
+[HM Abs       | Bent-Knee Hip Raise
+[HM Abs       | Barbell Side Bend
+[HM Abs       | Barbell Rollout from Bench
+[HM Abs       | Barbell Ab Rollout - On Knees
+[HM Abs       | Barbell Ab Rollout
+[HM Abs       | Alternate Heel Touchers
+[HM Abs       | Air Bike
+[HM Abs       | Advanced Kettlebell Windmill
+[HM Abs       | Ab Roller
+[HM Abs       | Ab Crunch Machine
+[HM Abs       | 3/4 Sit-Up
+[HM-----------+------------------------------------------------------------
+[HM category  |                            name                            
+[24;1H[K Abs       | Cross-Body Crunch
+ Abs       | Crunches
+ Abs       | Crunch - Hands Overhead
+ Abs       | Crunch - Legs On Exercise Ball
+ Abs       | Dead Bug
+ Abs       | Decline Crunch
+ Abs       | Decline Oblique Crunch
+ Abs       | Decline Reverse Crunch
+ Abs       | Double Kettlebell Windmill
+ Abs       | Dumbbell Side Bend
+ Abs       | Elbow to Knee
+ Abs       | Exercise Ball Crunch
+ Abs       | Exercise Ball Pull-In
+ Abs       | Flat Bench Leg Pull-In
+ Abs       | Flat Bench Lying Leg Raise
+ Abs       | Frog Sit-Ups
+ Abs       | Gorilla Chin/Crunch
+ Abs       | Hanging Leg Raise
+ Abs       | Hanging Pike
+ Abs       | Jackknife Sit-Up
+ Abs       | Janda Sit-Up
+ Abs       | Kettlebell Figure 8
+ Abs       | Kettlebell Pass Between The Legs
+[K[7mNo next tag  (press RETURN)[27m[24;1H[K[K Abs       | Kettlebell Windmill
+ Abs       | Knee/Hip Raise On Parallel Bars
+ Abs       | Kneeling Cable Crunch With Alternating Oblique Twists
+ Abs       | Landmine 180's
+ Abs       | Leg Pull-In
+ Abs       | Lower Back Curl
+ Abs       | Medicine Ball Full Twist
+ Abs       | Oblique Crunches
+ Abs       | Oblique Crunches - On The Floor
+ Abs       | One-Arm High-Pulley Cable Side Bends
+ Abs       | One-Arm Medicine Ball Slam
+ Abs       | Otis-Up
+[K-[KMax buffer space per file (K): [K  [Kpp[Kss[Kqq[Kll[K  [K--[KUU[K  [Krr[Kii[Kpp[Kff[Kii[Ktt[K__[Kuu[Kss[Kee[Krr[K  [K--[Kdd[K  [Krr[Kii[Kpp[Kff[Kii[Ktt[K__[Kdd[Kee[Kvv[K  [K--[Kcc[K  [K""[KSS[KEE[KLL[KEE[KCC[KTT[K  [Knn[Kaa[K[Kripfit_dev -c "SELECT namm[Kee[K  [KFF[KRR[KOO[KMM[K  [Kee[Kxx[Kee[Krr[Kcc[Kii[Kss[Kee[Kss[K  [KWW[KHH[KEE[KRR[KEE[K  [K[Kme FROM exercises WHERE nn[Kaa[Kmm[Kee[K  [KII[KLL[KII[KKK[KEE[K  [K''[K%%[Kdd[Kuu[Kmm[Kbb[Kbb[Kee[Kll[Kll[K%%[Kii[Knn[K[Kname ILIKE '%dumbbell%incc[Kll[Kii[Knn[Kee[K%%[K''[K;;[K""[Kdd[Koo[Kcc[Kkk[Kee[Krr[K  [Kee[Kxx[Kee[Kcc[K  [K--[Kii[Ktt[K[Kcline%';"docker exec -it  [Krr[Kii[Kpp[Kff[Kii[Ktt[K--[Kdd[Kbb[K  [Kpp[Kss[Kqq[Kll[K  [K--[KUU[K  [Krr[Kii[Kpp[Kff[Kii[K[K ripfit-db psql -U ripfitt[K__[Kuu[Kss[Kee[Krr[K  [K--[Kdd[K  [Krr[Kii[Kpp[Kff[Kii[Ktt[K__[Kdd[Kee[Kvv[K  [K--[Kcc[K  [K[Kt_user -d ripfit_dev -c ""[KSS[KEE[KLL[KEE[KCC[KTT[K  [Knn[Kaa[Kmm[Kee[K  [KFF[KRR[KOO[KMM[K  [Kee[Kxx[Kee[Krr[Kcc[Kii[K[K"SELECT name FROM exerciss[Kee[Kss[K  [KWW[KHH[KEE[KRR[KEE[K  [Knn[Kaa[Kmm[Kee[K  [KII[KLL[KII[KKK[KEE[K  [K''[K%%[Kdd[K[Kses WHERE name ILIKE '%duu[Kmm[Kbb[Kbb[Kee[Kll[Kll[K%%[Kii[Knn[Kcc[Kll[Kii[Knn[Kee[K%%[K''[K;;[K""[Kqq[H[2J[H Abs       | Exercise Ball Pull-In
+ Abs       | Flat Bench Leg Pull-In
+ Abs       | Flat Bench Lying Leg Raise
+ Abs       | Frog Sit-Ups
+ Abs       | Gorilla Chin/Crunch
+ Abs       | Hanging Leg Raise
+ Abs       | Hanging Pike
+ Abs       | Jackknife Sit-Up
+ Abs       | Janda Sit-Up
+ Abs       | Kettlebell Figure 8
+ Abs       | Kettlebell Pass Between The Legs
+ Abs       | Kettlebell Windmill
+ Abs       | Knee/Hip Raise On Parallel Bars
+ Abs       | Kneeling Cable Crunch With Alternating Oblique Twists
+ Abs       | Landmine 180's
+ Abs       | Leg Pull-In
+ Abs       | Lower Back Curl
+ Abs       | Medicine Ball Full Twist
+ Abs       | Oblique Crunches
+ Abs       | Oblique Crunches - On The Floor
+ Abs       | One-Arm High-Pulley Cable Side Bends
+ Abs       | One-Arm Medicine Ball Slam
+ Abs       | Otis-Up
+:[K[H[2J[H Abs       | Exercise Ball Pull-In
+ Abs       | Flat Bench Leg Pull-In
+ Abs       | Flat Bench Lying Leg Raise
+ Abs       | Frog Sit-Ups
+ Abs       | Gorilla Chin/Crunch
+ Abs       | Hanging Leg Raise
+ Abs       | Hanging Pike
+ Abs       | Jackknife Sit-Up
+ Abs       | Janda Sit-Up
+ Abs       | Kettlebell Figure 8
+ Abs       | Kettlebell Pass Between The Legs
+ Abs       | Kettlebell Windmill
+ Abs       | Knee/Hip Raise On Parallel Bars
+ Abs       | Kneeling Cable Crunch With Alternating Oblique Twists
+ Abs       | Landmine 180's
+ Abs       | Leg Pull-In
+ Abs       | Lower Back Curl
+ Abs       | Medicine Ball Full Twist
+ Abs       | Oblique Crunches
+ Abs       | Oblique Crunches - On The Floor
+ Abs       | One-Arm High-Pulley Cable Side Bends
+ Abs       | One-Arm Medicine Ball Slam
+ Abs       | Otis-Up
+:[K[H[2J[H Abs       | Exercise Ball Pull-In
+ Abs       | Flat Bench Leg Pull-In
+ Abs       | Flat Bench Lying Leg Raise
+ Abs       | Frog Sit-Ups
+ Abs       | Gorilla Chin/Crunch
+ Abs       | Hanging Leg Raise
+ Abs       | Hanging Pike
+ Abs       | Jackknife Sit-Up
+ Abs       | Janda Sit-Up
+ Abs       | Kettlebell Figure 8
+ Abs       | Kettlebell Pass Between The Legs
+ Abs       | Kettlebell Windmill
+ Abs       | Knee/Hip Raise On Parallel Bars
+ Abs       | Kneeling Cable Crunch With Alternating Oblique Twists
+ Abs       | Landmine 180's
+ Abs       | Leg Pull-In
+ Abs       | Lower Back Curl
+ Abs       | Medicine Ball Full Twist
+ Abs       | Oblique Crunches
+ Abs       | Oblique Crunches - On The Floor
+ Abs       | One-Arm High-Pulley Cable Side Bends
+ Abs       | One-Arm Medicine Ball Slam
+ Abs       | Otis-Up
+:[K[H[2J[H Abs       | Exercise Ball Pull-In
+ Abs       | Flat Bench Leg Pull-In
+ Abs       | Flat Bench Lying Leg Raise
+ Abs       | Frog Sit-Ups
+ Abs       | Gorilla Chin/Crunch
+ Abs       | Hanging Leg Raise
+ Abs       | Hanging Pike
+ Abs       | Jackknife Sit-Up
+ Abs       | Janda Sit-Up
+ Abs       | Kettlebell Figure 8
+ Abs       | Kettlebell Pass Between The Legs
+ Abs       | Kettlebell Windmill
+ Abs       | Knee/Hip Raise On Parallel Bars
+ Abs       | Kneeling Cable Crunch With Alternating Oblique Twists
+ Abs       | Landmine 180's
+ Abs       | Leg Pull-In
+ Abs       | Lower Back Curl
+ Abs       | Medicine Ball Full Twist
+ Abs       | Oblique Crunches
+ Abs       | Oblique Crunches - On The Floor
+ Abs       | One-Arm High-Pulley Cable Side Bends
+ Abs       | One-Arm Medicine Ball Slam
+ Abs       | Otis-Up
+:[K

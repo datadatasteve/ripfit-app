@@ -12,38 +12,77 @@ const { pool } = require('../config/database');
  * GET /api/v1/workouts/exercises/search?q=bench&limit=20
  */
 const searchExercises = async (req, res) => {
-  const { q, limit = 20 } = req.query;
+  const { q, limit = 50 } = req.query;
 
   if (!q) {
     return res.status(400).json({ error: 'Search query required' });
   }
 
   try {
-    // Fuzzy search: handle common variations
-    const searchTerms = q
-      .toLowerCase()
-      .replace(/flies/g, 'fly')
-      .replace(/flys/g, 'fly')
-      .split(' ')
-      .filter(Boolean);
+    // Normalize search term
+    let searchTerm = q.toLowerCase()
+      .replace(/\bbb\b/g, 'barbell')
+      .replace(/\bdb\b/g, 'dumbbell')
+      .replace(/\bdbs\b/g, 'dumbbell')
+      .replace(/\bcable\b/g, 'cable')
+      .trim();
 
-    const conditions = searchTerms.map((_, idx) => `name ILIKE $${idx + 1}`).join(' OR ');
-    const params = searchTerms.map(term => `%${term}%`);
-    params.push(limit);
+    // Handle common plural variations
+    const singularizeTerm = (term) => {
+      return term
+        .replace(/\bflies\b/g, 'fly')
+        .replace(/\bflys\b/g, 'fly')
+        .replace(/\bcrossovers\b/g, 'crossover')
+        .replace(/\bpresses\b/g, 'press')
+        .replace(/\bcurls\b/g, 'curl')
+        .replace(/\brows\b/g, 'row')
+        .replace(/\braises\b/g, 'raise')
+        .replace(/\bpulls\b/g, 'pull')
+        .replace(/\bextensions\b/g, 'extension')
+        .replace(/\bdips\b/g, 'dip');
+    };
+
+    const singularized = singularizeTerm(searchTerm);
+    const words = singularized.split(/\s+/).filter(Boolean);
+
+    // Build OR conditions for flexibility
+    const orConditions = words.map((_, idx) => `name ILIKE $${idx + 1}`).join(' OR ');
+    const params = words.map(w => `%${w}%`);
 
     const result = await pool.query(
-      `SELECT id, name, description, category, equipment_type
+      `SELECT id, name, description, category, equipment_type,
+        -- Relevance scoring
+        CASE
+          -- Exact match (highest priority)
+          WHEN LOWER(name) = $${params.length + 1} THEN 1000
+          -- Starts with search term
+          WHEN LOWER(name) LIKE $${params.length + 2} THEN 500
+          -- Contains all words (in order)
+          WHEN LOWER(name) LIKE $${params.length + 3} THEN 400
+          -- Equipment type match boost
+          WHEN ${words.map((_, idx) => `equipment_type ILIKE $${idx + 1}`).join(' OR ')} THEN 300
+          -- Contains all words (any order) - count matches
+          ELSE (
+            ${words.map((_, idx) => `CASE WHEN name ILIKE $${idx + 1} THEN 50 ELSE 0 END`).join(' + ')}
+          )
+        END as relevance_score
        FROM exercises
-       WHERE ${conditions}
-       ORDER BY name
-       LIMIT $${params.length}`,
-      params
+       WHERE ${orConditions}
+       ORDER BY relevance_score DESC, category, name
+       LIMIT $${params.length + 4}`,
+      [...params, singularized, `${singularized}%`, `%${singularized}%`, limit]
     );
 
     res.json({
       query: q,
       count: result.rows.length,
-      exercises: result.rows
+      exercises: result.rows.map(ex => ({
+        id: ex.id,
+        name: ex.name,
+        description: ex.description,
+        category: ex.category,
+        equipment_type: ex.equipment_type
+      }))
     });
   } catch (error) {
     console.error('Exercise search error:', error);
@@ -302,9 +341,36 @@ const finishWorkout = async (req, res) => {
 };
 
 // Backend endpoint to add exercises to active workout
+const deleteExerciseFromWorkout = async (req, res) => {
+  const { workoutId, exerciseId } = req.params;
+  const user_id = req.user.userId;
+
+  try {
+    const workoutCheck = await pool.query(
+      `SELECT id FROM workouts WHERE id = $1 AND user_id = $2`,
+      [workoutId, user_id]
+    );
+
+    if (workoutCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Workout not found' });
+    }
+
+    await pool.query(
+      `DELETE FROM workout_exercises WHERE id = $1 AND workout_id = $2`,
+      [exerciseId, workoutId]
+    );
+
+    res.json({ message: 'Exercise removed' });
+  } catch (error) {
+    console.error('Delete exercise error:', error);
+    res.status(500).json({ error: 'Failed to remove exercise' });
+  }
+};
+
+// Add exercises to workout
 const addExerciseToWorkout = async (req, res) => {
   const { workoutId } = req.params;
-  const { exercise_id, order_index } = req.body;
+  const { exercise_id, order_index, exercise_notes } = req.body;
   const user_id = req.user.userId;
 
   try {
@@ -318,9 +384,9 @@ const addExerciseToWorkout = async (req, res) => {
     }
 
     const result = await pool.query(
-      `INSERT INTO workout_exercises (workout_id, exercise_id, order_index)
-       VALUES ($1, $2, $3) RETURNING *`,
-      [workoutId, exercise_id, order_index]
+      `INSERT INTO workout_exercises (workout_id, exercise_id, order_index, exercise_notes)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [workoutId, exercise_id, order_index, exercise_notes || null]
     );
 
     res.status(201).json(result.rows[0]);
@@ -330,14 +396,47 @@ const addExerciseToWorkout = async (req, res) => {
   }
 };
 
-// Update module.exports to include new functions:
+const updateExerciseNotes = async (req, res) => {
+  const { workoutId, exerciseId } = req.params;
+  const { notes } = req.body;
+  const user_id = req.user.userId;
+
+  try {
+    const workoutCheck = await pool.query(
+      `SELECT id FROM workouts WHERE id = $1 AND user_id = $2`,
+      [workoutId, user_id]
+    );
+
+    if (workoutCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Workout not found' });
+    }
+
+    // Frontend sends complete notes string (including set numbers)
+    // Just store it as-is
+    const result = await pool.query(
+      `UPDATE workout_exercises 
+       SET exercise_notes = $1 
+       WHERE id = $2 AND workout_id = $3
+       RETURNING *`,
+      [notes, exerciseId, workoutId]
+    );
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Update notes error:', error);
+    res.status(500).json({ error: 'Failed to update notes' });
+  }
+};
+
+// Add to module.exports
 module.exports = {
   searchExercises,
   getExerciseById,
   logWorkout,
   getWorkouts,
   logWorkoutSet,
+  updateExerciseNotes,
+  finishWorkout,
   addExerciseToWorkout,
-  finishWorkout
+  deleteExerciseFromWorkout
 };
-
