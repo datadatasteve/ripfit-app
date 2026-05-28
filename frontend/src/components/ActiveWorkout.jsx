@@ -170,31 +170,37 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish }) {
   const [noteInput, setNoteInput] = useState('');
   const [editingNotes, setEditingNotes] = useState(false);
   const [editNotesText, setEditNotesText] = useState('');
+  const [workoutNotes, setWorkoutNotes] = useState('');
+  const [showWorkoutNotes, setShowWorkoutNotes] = useState(false);
+  const [workoutNotesSaved, setWorkoutNotesSaved] = useState(true);
 
   const exercises = workout.exercises;
   const currentExercise = exercises[currentExerciseIdx];
 
   // Helper function to format notes based on user preference
-  const formatNotesForDisplay = (notes) => {
+  const formatNotesForDisplay = (notes, isPrevious = false) => {
     if (!notes) return '';
-    const showSetTags = localStorage.getItem('showSetTags') !== 'false'; // default true
+    // Previous notes always show set tags
+    const showSetTags = isPrevious || localStorage.getItem('showSetTags') !== 'false';
     
-    if (showSetTags) {
-      // Convert "Set 1: note" to "note [Set 1]"
-      return notes.split('\n').map(line => {
-        const match = line.match(/^Set (\d+): (.+)$/);
-        if (match) {
-          return `${match[2]} [Set ${match[1]}]`;
+    return notes.split('\n').map(line => {
+      // Handle general notes (no set tag)
+      const generalMatch = line.match(/^General: (.+)$/);
+      if (generalMatch) {
+        return generalMatch[1];
+      }
+      
+      // Handle set-tagged notes
+      const setMatch = line.match(/^Set (\d+): (.+)$/);
+      if (setMatch) {
+        if (showSetTags) {
+          return `${setMatch[2]} [Set ${setMatch[1]}]`;
+        } else {
+          return setMatch[2];
         }
-        return line;
-      }).join('\n');
-    } else {
-      // Remove set tags entirely
-      return notes.split('\n').map(line => {
-        const match = line.match(/^Set \d+: (.+)$/);
-        return match ? match[1] : line;
-      }).join('\n');
-    }
+      }
+      return line;
+    }).join('\n');
   };
 
   // Set edit text when opening editor
@@ -236,7 +242,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish }) {
       : currentExercise.template?.target_reps || '';
     
     setSetForm({ reps: defaultReps, weight: defaultWeight, rpe: '' });
-  }, [currentExerciseIdx, loggedSets.length]);
+  }, [currentExerciseIdx, loggedSets.length, currentExercise.id]);
 
   const handleChangeExercise = async (newExercise, reason, targets) => {
     const token = localStorage.getItem('ripfit_token');
@@ -265,12 +271,18 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish }) {
       const data = await res.json();
       
       // Update state with new targets if provided
+      const oldNotes = oldExercise.exercise_notes ? `\nPrevious notes (${oldExercise.exercise_name}): ${oldExercise.exercise_notes}` : '';
+      const substitutionNote = reason 
+        ? `Substituted for ${oldExercise.exercise_name}. Reason: ${reason}${oldNotes}` 
+        : `Substituted for ${oldExercise.exercise_name}${oldNotes}`;
+      
       const updatedExercises = [...exercises];
       updatedExercises[currentExerciseIdx] = {
         ...data,
         exercise_name: newExercise.name,
         category: newExercise.category,
         equipment_type: newExercise.equipment_type,
+        exercise_notes: substitutionNote,
         logged_sets: [],
         template: {
           target_sets: targets.sets ? parseInt(targets.sets) : null,
@@ -348,13 +360,14 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish }) {
     const setNumber = loggedSets.length + 1;
     const token = localStorage.getItem('ripfit_token');
 
-    // Auto-save note if there's text in input
+    // Auto-save note if there's text in input (before logging set)
+    let notesUpdated = false;
+    let updatedNotesText = currentExercise.exercise_notes || '';
     if (noteInput.trim()) {
       try {
         const noteWithSet = `Set ${setNumber}: ${noteInput.trim()}`;
-        const currentNotes = currentExercise.exercise_notes || '';
-        const updatedNotes = currentNotes 
-          ? `${currentNotes}\n${noteWithSet}`
+        updatedNotesText = updatedNotesText
+          ? `${updatedNotesText}\n${noteWithSet}`
           : noteWithSet;
 
         await fetch(`${API_BASE}/workouts/${workout.workout.id}/exercises/${currentExercise.id}/notes`, {
@@ -363,25 +376,58 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish }) {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify({ notes: updatedNotes })
+          body: JSON.stringify({ notes: updatedNotesText })
         });
-
-        // Update local state
-        const updated = [...exercises];
-        updated[currentExerciseIdx].exercise_notes = updatedNotes;
-        setActiveWorkout({ ...workout, exercises: updated });
-        setNoteInput(''); // Clear input after auto-save
+        notesUpdated = true;
+        setNoteInput('');
       } catch (err) {
         console.error('Failed to save note:', err);
       }
     }
 
-    onLogSet(currentExerciseIdx, {
-      set_number: setNumber,
-      reps_completed: parseInt(setForm.reps),
-      weight_used: parseFloat(weightValue),
-      rpe: setForm.rpe ? parseInt(setForm.rpe) : null
-    });
+    // Log set to backend
+    try {
+      const res = await fetch(`${API_BASE}/workouts/${workout.workout.id}/sets`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          workout_exercise_id: currentExercise.id,
+          set_number: setNumber,
+          reps_completed: parseInt(setForm.reps),
+          weight_used: parseFloat(weightValue),
+          rpe: setForm.rpe ? parseInt(setForm.rpe) : null
+        })
+      });
+
+      if (res.ok) {
+        // Single state update with both set and notes
+        const updated = [...exercises];
+        if (!updated[currentExerciseIdx].logged_sets) {
+          updated[currentExerciseIdx].logged_sets = [];
+        }
+        updated[currentExerciseIdx].logged_sets.push({
+          set_number: setNumber,
+          reps_completed: parseInt(setForm.reps),
+          weight_used: parseFloat(weightValue),
+          rpe: setForm.rpe ? parseInt(setForm.rpe) : null
+        });
+        if (notesUpdated) {
+          updated[currentExerciseIdx].exercise_notes = updatedNotesText;
+        }
+        setActiveWorkout({ ...workout, exercises: updated });
+      } else {
+        console.error('Failed to log set:', await res.text());
+        alert('Failed to log set');
+        return;
+      }
+    } catch (err) {
+      console.error('Failed to log set:', err);
+      alert('Failed to log set');
+      return;
+    }
 
     // Clear any existing timer before starting new one
     if (restTimer) {
@@ -406,9 +452,11 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish }) {
     
     setRestTimer(timer);
 
-    // Auto-progress if target sets reached (with 1.5s delay)
-    if (currentExercise.template?.target_sets && loggedSets.length + 1 >= targetSets && currentExerciseIdx < exercises.length - 1) {
-      setTimeout(() => nextExercise(), 1500);
+    // Auto-progress if target sets reached (with brief delay)
+    // setNumber = loggedSets.length + 1 = the set we just logged
+    const target = currentExercise.template?.target_sets;
+    if (target && setNumber >= target && currentExerciseIdx < exercises.length - 1) {
+      setTimeout(() => autoNextExercise(), 750);
     } else {
       setSetForm({ ...setForm, reps: '', rpe: '' });
     }
@@ -422,7 +470,28 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish }) {
     }
   };
 
+  // Auto-progress version - no unsaved warning prompts
+  const autoNextExercise = () => {
+    setNoteInput('');
+    setEditingNotes(false);
+    setCurrentExerciseIdx(prev => {
+      if (prev < exercises.length - 1) {
+        return prev + 1;
+      }
+      return prev;
+    });
+    setSetForm({ reps: '', weight: '', rpe: '' });
+  };
+
   const nextExercise = () => {
+    if (editingNotes) {
+      if (!confirm('You have unsaved note edits. Discard changes?')) return;
+      setEditingNotes(false);
+    }
+    if (noteInput.trim()) {
+      if (!confirm('You have an unsaved note. Discard it?')) return;
+      setNoteInput('');
+    }
     if (currentExerciseIdx < exercises.length - 1) {
       setCurrentExerciseIdx(currentExerciseIdx + 1);
       setSetForm({ reps: '', weight: '', rpe: '' });
@@ -430,6 +499,14 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish }) {
   };
 
   const prevExercise = () => {
+    if (editingNotes) {
+      if (!confirm('You have unsaved note edits. Discard changes?')) return;
+      setEditingNotes(false);
+    }
+    if (noteInput.trim()) {
+      if (!confirm('You have an unsaved note. Discard it?')) return;
+      setNoteInput('');
+    }
     if (currentExerciseIdx > 0) {
       setCurrentExerciseIdx(currentExerciseIdx - 1);
     }
@@ -440,6 +517,9 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish }) {
       <div className="workout-header">
         <h2>{workout.routine_name}</h2>
         <div className="header-buttons">
+          <button onClick={() => setShowWorkoutNotes(true)} className="workout-notes-btn">
+            Workout Notes {workoutNotes ? '📝' : ''}
+          </button>
           <button onClick={() => setShowAllExercises(true)} className="view-all-btn">View All</button>
           <button onClick={onFinish} className="finish-btn">Finish Workout</button>
         </div>
@@ -468,14 +548,25 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish }) {
           <div className="last-performance">
             <strong>Last time ({new Date(workout.last_workout_date).toLocaleDateString()}):</strong>
             <div className="sets-history">
-              {currentExercise.last_performance.sets_completed.map((set, idx) => (
-                <span key={idx} className="set-pill">
-                  {set.reps} × {set.weight} lbs {set.rpe ? `@ ${set.rpe}` : ''}
-                </span>
-              ))}
+              {currentExercise.last_performance.sets_completed.map((set, idx) => {
+                const template = currentExercise.template;
+                const underperformed = template && (
+                  parseInt(set.reps) < parseInt(template.target_reps || 0) || 
+                  parseFloat(set.weight) < parseFloat(template.target_weight || 0)
+                );
+                const highRPE = set.rpe && parseInt(set.rpe) >= 10;
+                const showCaution = underperformed || highRPE;
+                
+                return (
+                  <span key={idx} className={`set-pill ${showCaution ? 'caution' : ''}`}>
+                    {showCaution && '⚠️ '}
+                    {set.reps} × {set.weight} lbs {set.rpe ? `@ RPE ${set.rpe}` : ''}
+                  </span>
+                );
+              })}
             </div>
-            {currentExercise.last_performance.exercise_notes && (
-              <p className="notes-warning">⚠️ {currentExercise.last_performance.exercise_notes}</p>
+            {currentExercise.last_performance.sets_completed.length < (currentExercise.template?.target_sets || 0) && (
+              <p className="sets-caution">⚠️ Completed {currentExercise.last_performance.sets_completed.length} of {currentExercise.template.target_sets} target sets</p>
             )}
           </div>
         )}
@@ -499,7 +590,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish }) {
           {currentExercise.last_performance?.exercise_notes && (
             <div className="previous-notes">
               <strong>Previous workout notes:</strong>
-              <pre>{formatNotesForDisplay(currentExercise.last_performance.exercise_notes)}</pre>
+              <pre>{formatNotesForDisplay(currentExercise.last_performance.exercise_notes, true)}</pre>
             </div>
           )}
           
@@ -573,44 +664,79 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish }) {
             onChange={(e) => setNoteInput(e.target.value)}
             rows="2"
           />
-          <button 
-            onClick={async () => {
-              if (!noteInput.trim()) return;
-              const token = localStorage.getItem('ripfit_token');
-              const setNumber = loggedSets.length + 1; // Current set context
-              
-              try {
-                const noteWithSet = `Set ${setNumber}: ${noteInput.trim()}`;
-                const currentNotes = currentExercise.exercise_notes || '';
-                const updatedNotes = currentNotes 
-                  ? `${currentNotes}\n${noteWithSet}`
-                  : noteWithSet;
-
-                const res = await fetch(`${API_BASE}/workouts/${workout.workout.id}/exercises/${currentExercise.id}/notes`, {
-                  method: 'PUT',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                  },
-                  body: JSON.stringify({ notes: updatedNotes })
-                });
-                const data = await res.json();
+          <div className="note-buttons">
+            <button 
+              onClick={async () => {
+                if (!noteInput.trim()) return;
+                const token = localStorage.getItem('ripfit_token');
+                const setNumber = loggedSets.length > 0 ? loggedSets.length : 1;
                 
-                // Update local state with returned notes
-                const updated = [...exercises];
-                updated[currentExerciseIdx].exercise_notes = data.exercise_notes;
-                setActiveWorkout({ ...workout, exercises: updated });
-                setNoteInput(''); // Clear input
-              } catch (err) {
-                console.error('Failed to save note:', err);
-                alert('Failed to save note');
-              }
-            }}
-            className="save-note-btn"
-            disabled={!noteInput.trim()}
-          >
-            Add Note
-          </button>
+                try {
+                  const noteWithSet = `Set ${setNumber}: ${noteInput.trim()}`;
+                  const currentNotes = currentExercise.exercise_notes || '';
+                  const updatedNotes = currentNotes 
+                    ? `${currentNotes}\n${noteWithSet}`
+                    : noteWithSet;
+
+                  const res = await fetch(`${API_BASE}/workouts/${workout.workout.id}/exercises/${currentExercise.id}/notes`, {
+                    method: 'PUT',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ notes: updatedNotes })
+                  });
+                  const data = await res.json();
+                  
+                  const updated = [...exercises];
+                  updated[currentExerciseIdx].exercise_notes = data.exercise_notes;
+                  setActiveWorkout({ ...workout, exercises: updated });
+                  setNoteInput('');
+                } catch (err) {
+                  console.error('Failed to save note:', err);
+                }
+              }}
+              className="save-note-btn"
+              disabled={!noteInput.trim()}
+            >
+              Add Note (Set {loggedSets.length > 0 ? loggedSets.length : 1})
+            </button>
+            <button 
+              onClick={async () => {
+                if (!noteInput.trim()) return;
+                const token = localStorage.getItem('ripfit_token');
+                
+                try {
+                  const generalNote = `General: ${noteInput.trim()}`;
+                  const currentNotes = currentExercise.exercise_notes || '';
+                  const updatedNotes = currentNotes 
+                    ? `${currentNotes}\n${generalNote}`
+                    : generalNote;
+
+                  const res = await fetch(`${API_BASE}/workouts/${workout.workout.id}/exercises/${currentExercise.id}/notes`, {
+                    method: 'PUT',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ notes: updatedNotes })
+                  });
+                  const data = await res.json();
+                  
+                  const updated = [...exercises];
+                  updated[currentExerciseIdx].exercise_notes = data.exercise_notes;
+                  setActiveWorkout({ ...workout, exercises: updated });
+                  setNoteInput('');
+                } catch (err) {
+                  console.error('Failed to save note:', err);
+                }
+              }}
+              className="save-note-btn general-note-btn"
+              disabled={!noteInput.trim()}
+            >
+              Add General Note
+            </button>
+          </div>
         </div>
 
         {restTimer && restSeconds > 0 && (
@@ -685,6 +811,60 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish }) {
       {showToast && (
         <div className="success-toast">
           Exercise added!
+        </div>
+      )}
+
+      {showWorkoutNotes && (
+        <div className="modal-overlay" onClick={() => setShowWorkoutNotes(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>Workout Notes</h3>
+            <p style={{fontSize: '0.9em', color: '#888', marginBottom: '10px'}}>
+              Overall notes for this entire workout session
+            </p>
+            <textarea
+              value={workoutNotes}
+              onChange={(e) => { setWorkoutNotes(e.target.value); setWorkoutNotesSaved(false); }}
+              placeholder="How's the workout going? Energy level, overall feel, things to remember..."
+              rows="6"
+              style={{width: '100%', padding: '10px', marginBottom: '10px'}}
+            />
+            <div style={{display: 'flex', gap: '8px', alignItems: 'stretch'}}>
+              <button 
+                onClick={async () => {
+                  const token = localStorage.getItem('ripfit_token');
+                  try {
+                    await fetch(`${API_BASE}/workouts/${workout.workout.id}/notes`, {
+                      method: 'PUT',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                      },
+                      body: JSON.stringify({ overall_notes: workoutNotes })
+                    });
+                    setWorkoutNotesSaved(true);
+                    setShowWorkoutNotes(false);
+                  } catch (err) {
+                    console.error('Failed to save workout notes:', err);
+                  }
+                }}
+                className="save-note-btn"
+                style={{flex: 1, padding: '12px', fontSize: '1em'}}
+              >
+                Save Workout Notes
+              </button>
+              <button 
+                onClick={() => {
+                  if (workoutNotes && !workoutNotesSaved) {
+                    if (!confirm('You have unsaved workout notes. Exit without saving?')) return;
+                  }
+                  setShowWorkoutNotes(false);
+                }}
+                style={{padding: '12px 16px', fontSize: '0.85em', background: '#999', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer'}}
+              >
+                Exit
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -774,6 +954,7 @@ function AddExerciseModal({ onAdd, onClose }) {
               <input
                 type="text"
                 placeholder="Search exercises..."
+                autoFocus
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && searchExercises()}
@@ -873,6 +1054,7 @@ function ChangeExerciseModal({ onChange, onClose }) {
               <input
                 type="text"
                 placeholder="Search for replacement..."
+                autoFocus
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && searchExercises()}

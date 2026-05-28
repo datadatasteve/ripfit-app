@@ -590,3 +590,40 @@
   background-color: #3d8b40;
 }
  
+.note-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.general-note-btn {
+  background-color: #2196F3 !important;
+}
+
+.general-note-btn:hover {
+  background-color: #1976D2 !important;
+}
+
+.workout-notes-btn {
+  padding: 6px 12px;
+  background-color: #FF9800;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.set-pill.caution {
+  background-color: #fff3e0;
+  border: 1px solid #ff9800;
+}
+
+.sets-caution {
+  color: #e65100;
+  font-size: 0.9em;
+  margin-top: 4px;
+}
+
+.save-note-btn, .workout-notes-btn {
+  box-sizing: border-box;
+}

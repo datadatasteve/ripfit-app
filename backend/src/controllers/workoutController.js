@@ -19,19 +19,28 @@ const searchExercises = async (req, res) => {
   }
 
   try {
-    // Normalize search term
+    // Normalize search term - abbreviations and jargon
     let searchTerm = q.toLowerCase()
       .replace(/\bbb\b/g, 'barbell')
       .replace(/\bdb\b/g, 'dumbbell')
       .replace(/\bdbs\b/g, 'dumbbell')
-      .replace(/\bcable\b/g, 'cable')
+      .replace(/\bkb\b/g, 'kettlebell')
+      .replace(/\btri\b/g, 'tricep')
+      .replace(/\btris\b/g, 'tricep')
+      .replace(/\bbi\b/g, 'bicep')
+      .replace(/\bbis\b/g, 'bicep')
+      .replace(/\bshldr\b/g, 'shoulder')
+      .replace(/\bshldrs\b/g, 'shoulder')
+      .replace(/\boh\b/g, 'overhead')
+      .replace(/\bmvmt\b/g, '')
       .trim();
 
-    // Handle common plural variations
+    // Handle common plural/variant forms
     const singularizeTerm = (term) => {
       return term
         .replace(/\bflies\b/g, 'fly')
         .replace(/\bflys\b/g, 'fly')
+        .replace(/\bflyes\b/g, 'fly')
         .replace(/\bcrossovers\b/g, 'crossover')
         .replace(/\bpresses\b/g, 'press')
         .replace(/\bcurls\b/g, 'curl')
@@ -39,38 +48,85 @@ const searchExercises = async (req, res) => {
         .replace(/\braises\b/g, 'raise')
         .replace(/\bpulls\b/g, 'pull')
         .replace(/\bextensions\b/g, 'extension')
-        .replace(/\bdips\b/g, 'dip');
+        .replace(/\bdips\b/g, 'dip')
+        .replace(/\bpushdowns\b/g, 'pushdown')
+        .replace(/\bpulldowns\b/g, 'pulldown')
+        .replace(/\bshrugs\b/g, 'shrug')
+        .replace(/\bsquats\b/g, 'squat')
+        .replace(/\blunges\b/g, 'lunge')
+        .replace(/\bdeadlifts\b/g, 'deadlift')
+        .replace(/\btwists\b/g, 'twist');
     };
 
     const singularized = singularizeTerm(searchTerm);
     const words = singularized.split(/\s+/).filter(Boolean);
+    
+    // Deduplicate words
+    const uniqueWords = [...new Set(words)];
 
-    // Build OR conditions for flexibility
-    const orConditions = words.map((_, idx) => `name ILIKE $${idx + 1}`).join(' OR ');
-    const params = words.map(w => `%${w}%`);
+    // Synonym groups: words that should match each other
+    const synonyms = {
+      'bench': ['bench', 'press'],
+      'press': ['press', 'bench'],
+      'fly': ['fly', 'flye', 'butterfly', 'pec deck'],
+      'machine': ['machine', 'cable', 'smith'],
+      'mason': ['mason', 'russian'],
+    };
+
+    // For each search word, build expanded LIKE conditions
+    // Each word matches if the name contains that word OR any synonym
+    const buildWordCondition = (word, paramStartIdx) => {
+      const syns = synonyms[word];
+      if (syns) {
+        return syns.map((s, i) => `LOWER(name) LIKE $${paramStartIdx + i}`).join(' OR ');
+      }
+      return `LOWER(name) LIKE $${paramStartIdx}`;
+    };
+
+    // Build params array with synonyms expanded
+    let allParams = [];
+    let wordConditions = [];
+    let andParts = [];
+    let paramIdx = 1;
+
+    for (const word of uniqueWords) {
+      const syns = synonyms[word] || [word];
+      const conditions = syns.map((s, i) => `LOWER(name) LIKE $${paramIdx + i}`);
+      wordConditions.push(`(${conditions.join(' OR ')})`);
+      andParts.push(`(${conditions.join(' OR ')})`);
+      allParams.push(...syns.map(s => `%${s}%`));
+      paramIdx += syns.length;
+    }
+
+    // OR: any word group matches
+    const orWhere = wordConditions.join(' OR ');
+    // AND: all word groups match
+    const andWhere = andParts.join(' AND ');
+
+    // Also match equipment_type
+    const equipConditions = uniqueWords.map((w, i) => {
+      return `LOWER(equipment_type) LIKE $${paramIdx + i}`;
+    });
+    const equipOr = equipConditions.join(' OR ');
+    allParams.push(...uniqueWords.map(w => `%${w}%`));
+    paramIdx += uniqueWords.length;
+
+    // Limit param
+    allParams.push(limit);
+    const limitParam = paramIdx;
 
     const result = await pool.query(
-      `SELECT id, name, description, category, equipment_type,
-        -- Relevance scoring
-        CASE
-          -- Exact match (highest priority)
-          WHEN LOWER(name) = $${params.length + 1} THEN 1000
-          -- Starts with search term
-          WHEN LOWER(name) LIKE $${params.length + 2} THEN 500
-          -- Contains all words (in order)
-          WHEN LOWER(name) LIKE $${params.length + 3} THEN 400
-          -- Equipment type match boost
-          WHEN ${words.map((_, idx) => `equipment_type ILIKE $${idx + 1}`).join(' OR ')} THEN 300
-          -- Contains all words (any order) - count matches
-          ELSE (
-            ${words.map((_, idx) => `CASE WHEN name ILIKE $${idx + 1} THEN 50 ELSE 0 END`).join(' + ')}
-          )
-        END as relevance_score
+      `SELECT id, name, description, category, equipment_type
        FROM exercises
-       WHERE ${orConditions}
-       ORDER BY relevance_score DESC, category, name
-       LIMIT $${params.length + 4}`,
-      [...params, singularized, `${singularized}%`, `%${singularized}%`, limit]
+       WHERE ${orWhere} OR ${equipOr}
+       ORDER BY 
+         -- All word groups match (AND) first
+         CASE WHEN ${andWhere} THEN 0 ELSE 1 END,
+         -- Equipment type match boost
+         CASE WHEN ${equipOr} THEN 0 ELSE 1 END,
+         category, name
+       LIMIT $${limitParam}`,
+      allParams
     );
 
     res.json({
@@ -340,6 +396,28 @@ const finishWorkout = async (req, res) => {
   }
 };
 
+const updateWorkoutNotes = async (req, res) => {
+  const { workoutId } = req.params;
+  const { overall_notes } = req.body;
+  const user_id = req.user.userId;
+
+  try {
+    const result = await pool.query(
+      `UPDATE workouts SET overall_notes = $1 WHERE id = $2 AND user_id = $3 RETURNING *`,
+      [overall_notes, workoutId, user_id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Workout not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Update workout notes error:', error);
+    res.status(500).json({ error: 'Failed to update workout notes' });
+  }
+};
+
 // Backend endpoint to add exercises to active workout
 const deleteExerciseFromWorkout = async (req, res) => {
   const { workoutId, exerciseId } = req.params;
@@ -436,6 +514,7 @@ module.exports = {
   getWorkouts,
   logWorkoutSet,
   updateExerciseNotes,
+  updateWorkoutNotes,
   finishWorkout,
   addExerciseToWorkout,
   deleteExerciseFromWorkout
