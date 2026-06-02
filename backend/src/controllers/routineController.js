@@ -301,7 +301,7 @@ const startWorkoutFromRoutine = async (req, res) => {
     const lastWorkoutResult = await client.query(
       `SELECT w.id, w.workout_date, w.overall_notes
        FROM workouts w
-       WHERE w.user_id = $1 AND w.routine_id = $2 AND w.workout_date < $3
+       WHERE w.user_id = $1 AND w.routine_id = $2 AND w.workout_date <= $3
        ORDER BY w.workout_date DESC, w.start_time DESC
        LIMIT 1`,
       [user_id, id, workout_date]
@@ -386,6 +386,7 @@ const startWorkoutFromRoutine = async (req, res) => {
       routine_name: routine.name,
       exercises: workoutExercises,
       last_workout_date: lastWorkoutData?.workout_date || null,
+      previous_overall_notes: lastWorkoutData?.overall_notes || null,
       message: 'Workout started from routine'
     });
 

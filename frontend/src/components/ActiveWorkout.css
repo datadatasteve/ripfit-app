@@ -612,7 +612,7 @@
   border-radius: 4px;
   cursor: pointer;
 }
-
+ß
 .set-pill.caution {
   background-color: #fff3e0;
   border: 1px solid #ff9800;
@@ -627,3 +627,143 @@
 .save-note-btn, .workout-notes-btn {
   box-sizing: border-box;
 }
+
+/* Summary and Finish Confirmation */
+
+.workout-summary {
+  padding: 20px;
+}
+
+.workout-summary h2 {
+  text-align: center;
+  margin-bottom: 5px;
+}
+
+.workout-summary h3 {
+  text-align: center;
+  color: #888;
+  margin-bottom: 20px;
+}
+
+.summary-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 25px;
+}
+
+.stat-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 16px;
+  background: #f5f5f5;
+  border-radius: 8px;
+  min-width: 80px;
+}
+
+.stat-value {
+  font-size: 1.4em;
+  font-weight: bold;
+}
+
+.stat-label {
+  font-size: 0.8em;
+  color: #888;
+  margin-top: 4px;
+}
+
+.summary-exercises {
+  margin-bottom: 20px;
+}
+
+.summary-exercise-item {
+  padding: 12px;
+  border-bottom: 1px solid #eee;
+}
+
+.summary-exercise-item strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.summary-category {
+  font-size: 0.85em;
+  color: #888;
+}
+
+.summary-sets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.skipped {
+  color: #999;
+  font-style: italic;
+}
+
+.summary-notes {
+  font-size: 0.9em;
+  color: #666;
+  margin-top: 6px;
+  white-space: pre-wrap;
+}
+
+.summary-workout-notes {
+  padding: 12px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  margin-bottom: 15px;
+}
+
+.summary-workout-notes p {
+  white-space: pre-wrap;
+}
+
+/* Finish confirmation */
+.incomplete-warning {
+  background: #fff3e0;
+  padding: 12px;
+  border-radius: 8px;
+  border-left: 3px solid #ff9800;
+}
+
+.incomplete-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  gap: 10px;
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+  .stat-box {
+    background: #2a2a2a;
+  }
+
+  .summary-exercise-item {
+    border-bottom-color: #333;
+  }
+
+  .summary-workout-notes {
+    background: #2a2a2a;
+  }
+
+  .incomplete-warning {
+    background: #3e2c00;
+  }
+}
+
+.set-entry.rpe-warning {
+  color: #e53935;
+  font-weight: bold;
+}
+
+.set-entry.under-target {
+  color: #ff9800;
+}
+

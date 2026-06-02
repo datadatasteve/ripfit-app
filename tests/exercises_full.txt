@@ -1,0 +1,874 @@
+category,name
+Abs,3/4 Sit-Up
+Abs,Ab Crunch Machine
+Abs,Ab Roller
+Abs,Advanced Kettlebell Windmill
+Abs,Air Bike
+Abs,Alternate Heel Touchers
+Abs,Barbell Ab Rollout
+Abs,Barbell Ab Rollout - On Knees
+Abs,Barbell Rollout from Bench
+Abs,Barbell Side Bend
+Abs,Bent-Knee Hip Raise
+Abs,Bent Press
+Abs,Bosu Ball Cable Crunch With Side Bends
+Abs,Bottoms Up
+Abs,Butt-Ups
+Abs,Cable Crunch
+Abs,Cable Judo Flip
+Abs,Cable Reverse Crunch
+Abs,Cable Russian Twists
+Abs,Cable Seated Crunch
+Abs,Cocoons
+Abs,Cross-Body Crunch
+Abs,Crunches
+Abs,Crunch - Hands Overhead
+Abs,Crunch - Legs On Exercise Ball
+Abs,Dead Bug
+Abs,Decline Crunch
+Abs,Decline Oblique Crunch
+Abs,Decline Reverse Crunch
+Abs,Double Kettlebell Windmill
+Abs,Dumbbell Side Bend
+Abs,Elbow to Knee
+Abs,Exercise Ball Crunch
+Abs,Exercise Ball Pull-In
+Abs,Flat Bench Leg Pull-In
+Abs,Flat Bench Lying Leg Raise
+Abs,Frog Sit-Ups
+Abs,Gorilla Chin/Crunch
+Abs,Hanging Leg Raise
+Abs,Hanging Pike
+Abs,Jackknife Sit-Up
+Abs,Janda Sit-Up
+Abs,Kettlebell Figure 8
+Abs,Kettlebell Pass Between The Legs
+Abs,Kettlebell Windmill
+Abs,Knee/Hip Raise On Parallel Bars
+Abs,Kneeling Cable Crunch With Alternating Oblique Twists
+Abs,Landmine 180's
+Abs,Leg Pull-In
+Abs,Lower Back Curl
+Abs,Medicine Ball Full Twist
+Abs,Oblique Crunches
+Abs,Oblique Crunches - On The Floor
+Abs,One-Arm High-Pulley Cable Side Bends
+Abs,One-Arm Medicine Ball Slam
+Abs,Otis-Up
+Abs,Overhead Stretch
+Abs,Pallof Press
+Abs,Pallof Press With Rotation
+Abs,Plank
+Abs,Plate Twist
+Abs,Press Sit-Up
+Abs,Reverse Crunch
+Abs,Rope Crunch
+Abs,Russian Twist
+Abs,Scissor Kick
+Abs,Seated Barbell Twist
+Abs,Seated Flat Bench Leg Pull-In
+Abs,Seated Leg Tucks
+Abs,Seated Overhead Stretch
+Abs,Side Bridge
+Abs,Side Jackknife
+Abs,Sit-Up
+Abs,Sledgehammer Swings
+Abs,Smith Machine Hip Raise
+Abs,Spell Caster
+Abs,Spider Crawl
+Abs,Standing Cable Lift
+Abs,Standing Cable Wood Chop
+Abs,Standing Lateral Stretch
+Abs,Standing Rope Crunch
+Abs,Stomach Vacuum
+Abs,Supine One-Arm Overhead Throw
+Abs,Supine Two-Arm Overhead Throw
+Abs,Suspended Fallout
+Abs,Suspended Reverse Crunch
+Abs,Toe Touchers
+Abs,Torso Rotation
+Abs,Tuck Crunch
+Abs,Weighted Ball Side Bend
+Abs,Weighted Crunches
+Abs,Weighted Sit-Ups - With Bands
+Abs,Wind Sprints
+Arms,Alternate Hammer Curl
+Arms,Alternate Incline Dumbbell Curl
+Arms,Band Skull Crusher
+Arms,Barbell Curl
+Arms,Barbell Curls Lying Against An Incline
+Arms,Bench Dips
+Arms,Bench Press - Powerlifting
+Arms,Bench Press with Chains
+Arms,Board Press
+Arms,Body Tricep Press
+Arms,Body-Up
+Arms,Bottoms-Up Clean From The Hang Position
+Arms,Brachialis-SMR
+Arms,Cable Hammer Curls - Rope Attachment
+Arms,Cable Incline Triceps Extension
+Arms,Cable Lying Triceps Extension
+Arms,Cable One Arm Tricep Extension
+Arms,Cable Preacher Curl
+Arms,Cable Rope Overhead Triceps Extension
+Arms,Cable Wrist Curl
+Arms,Chain Handle Extension
+Arms,Close-Grip Barbell Bench Press
+Arms,Close-Grip Dumbbell Press
+Arms,Close-Grip EZ Bar Curl
+Arms,Close-Grip EZ-Bar Curl with Band
+Arms,Close-Grip EZ-Bar Press
+Arms,Close-Grip Push-Up off of a Dumbbell
+Arms,Close-Grip Standing Barbell Curl
+Arms,Concentration Curls
+Arms,Cross Body Hammer Curl
+Arms,Decline Close-Grip Bench To Skull Crusher
+Arms,Decline Dumbbell Triceps Extension
+Arms,Decline EZ Bar Triceps Extension
+Arms,Dip Machine
+Arms,Dips - Triceps Version
+Arms,Drag Curl
+Arms,Dumbbell Alternate Bicep Curl
+Arms,Dumbbell Bicep Curl
+Arms,Dumbbell Floor Press
+Arms,Dumbbell Lying Pronation
+Arms,Dumbbell Lying Supination
+Arms,Dumbbell One-Arm Triceps Extension
+Arms,Dumbbell Prone Incline Curl
+Arms,Dumbbell Tricep Extension -Pronated Grip
+Arms,EZ-Bar Curl
+Arms,EZ-Bar Skullcrusher
+Arms,Farmer's Walk
+Arms,Finger Curls
+Arms,Flexor Incline Dumbbell Curls
+Arms,Floor Press
+Arms,Floor Press with Chains
+Arms,Hammer Curls
+Arms,High Cable Curls
+Arms,Incline Barbell Triceps Extension
+Arms,Incline Dumbbell Curl
+Arms,Incline Hammer Curls
+Arms,Incline Inner Biceps Curl
+Arms,Incline Push-Up Close-Grip
+Arms,JM Press
+Arms,Kneeling Cable Triceps Extension
+Arms,Kneeling Forearm Stretch
+Arms,Low Cable Triceps Extension
+Arms,Lying Cable Curl
+Arms,Lying Close-Grip Barbell Triceps Extension Behind The Head
+Arms,Lying Close-Grip Barbell Triceps Press To Chin
+Arms,Lying Close-Grip Bar Curl On High Pulley
+Arms,Lying Dumbbell Tricep Extension
+Arms,Lying High Bench Barbell Curl
+Arms,Lying Supine Dumbbell Curl
+Arms,Lying Triceps Press
+Arms,Machine Bicep Curl
+Arms,Machine Preacher Curls
+Arms,Machine Triceps Extension
+Arms,One Arm Dumbbell Preacher Curl
+Arms,One Arm Floor Press
+Arms,One Arm Pronated Dumbbell Triceps Extension
+Arms,One Arm Supinated Dumbbell Triceps Extension
+Arms,Overhead Cable Curl
+Arms,Overhead Triceps
+Arms,Palms-Down Dumbbell Wrist Curl Over A Bench
+Arms,Palms-Down Wrist Curl Over A Bench
+Arms,Palms-Up Barbell Wrist Curl Over A Bench
+Arms,Palms-Up Dumbbell Wrist Curl Over A Bench
+Arms,Parallel Bar Dip
+Arms,Pin Presses
+Arms,Plate Pinch
+Arms,Preacher Curl
+Arms,Preacher Hammer Dumbbell Curl
+Arms,Push-Ups - Close Triceps Position
+Arms,Reverse Band Bench Press
+Arms,Reverse Barbell Curl
+Arms,Reverse Barbell Preacher Curls
+Arms,Reverse Cable Curl
+Arms,Reverse Grip Triceps Pushdown
+Arms,Reverse Plate Curls
+Arms,Reverse Triceps Bench Press
+Arms,Rickshaw Carry
+Arms,Ring Dips
+Arms,Seated Bent-Over One-Arm Dumbbell Triceps Extension
+Arms,Seated Bent-Over Two-Arm Dumbbell Triceps Extension
+Arms,Seated Biceps
+Arms,Seated Close-Grip Concentration Barbell Curl
+Arms,Seated Dumbbell Curl
+Arms,Seated Dumbbell Inner Biceps Curl
+Arms,Seated Dumbbell Palms-Down Wrist Curl
+Arms,Seated Dumbbell Palms-Up Wrist Curl
+Arms,Seated One-Arm Dumbbell Palms-Down Wrist Curl
+Arms,Seated One-Arm Dumbbell Palms-Up Wrist Curl
+Arms,Seated Palms-Down Barbell Wrist Curl
+Arms,Seated Palm-Up Barbell Wrist Curl
+Arms,Seated Triceps Press
+Arms,Seated Two-Arm Palms-Up Low-Pulley Wrist Curl
+Arms,Sled Overhead Triceps Extension
+Arms,Smith Machine Close-Grip Bench Press
+Arms,Speed Band Overhead Triceps
+Arms,Spider Curl
+Arms,Standing Bent-Over One-Arm Dumbbell Triceps Extension
+Arms,Standing Bent-Over Two-Arm Dumbbell Triceps Extension
+Arms,Standing Biceps Cable Curl
+Arms,Standing Biceps Stretch
+Arms,Standing Concentration Curl
+Arms,Standing Dumbbell Reverse Curl
+Arms,Standing Dumbbell Triceps Extension
+Arms,Standing Inner-Biceps Curl
+Arms,Standing Low-Pulley One-Arm Triceps Extension
+Arms,Standing Olympic Plate Hand Squeeze
+Arms,Standing One-Arm Cable Curl
+Arms,Standing One-Arm Dumbbell Curl Over Incline Bench
+Arms,Standing One-Arm Dumbbell Triceps Extension
+Arms,Standing Overhead Barbell Triceps Extension
+Arms,Standing Palms-Up Barbell Behind The Back Wrist Curl
+Arms,Standing Towel Triceps Extension
+Arms,Supine Chest Throw
+Arms,Tate Press
+Arms,Tricep Dumbbell Kickback
+Arms,Tricep Side Stretch
+Arms,Triceps Overhead Extension with Rope
+Arms,Triceps Pushdown
+Arms,Triceps Pushdown - Rope Attachment
+Arms,Triceps Pushdown - V-Bar Attachment
+Arms,Triceps Stretch
+Arms,Two-Arm Dumbbell Preacher Curl
+Arms,Weighted Bench Dip
+Arms,Wide-Grip Standing Barbell Curl
+Arms,Wrist Circles
+Arms,Wrist Roller
+Arms,Wrist Rotations with Straight Bar
+Arms,Zottman Curl
+Arms,Zottman Preacher Curl
+Back,Alternating Kettlebell Row
+Back,Alternating Renegade Row
+Back,Atlas Stones
+Back,Atlas Stone Trainer
+Back,Axle Deadlift
+Back,Band Assisted Pull-Up
+Back,Barbell Deadlift
+Back,Barbell Shrug
+Back,Barbell Shrug Behind The Back
+Back,Bent-Arm Barbell Pullover
+Back,Bent Over Barbell Row
+Back,Bent Over One-Arm Long Bar Row
+Back,Bent Over Two-Arm Long Bar Row
+Back,Bent Over Two-Dumbbell Row
+Back,Bent Over Two-Dumbbell Row With Palms In
+Back,Bodyweight Mid Row
+Back,Cable Incline Pushdown
+Back,Cable Shrugs
+Back,Calf-Machine Shoulder Shrug
+Back,Catch and Overhead Throw
+Back,Cat Stretch
+Back,Chair Lower Back Stretch
+Back,Child's Pose
+Back,Chin-Up
+Back,Clean Shrug
+Back,Close-Grip Front Lat Pulldown
+Back,Crossover Reverse Lunge
+Back,Dancer's Stretch
+Back,Deadlift with Bands
+Back,Deadlift with Chains
+Back,Deficit Deadlift
+Back,Dumbbell Incline Row
+Back,Dumbbell Shrug
+Back,Dynamic Back Stretch
+Back,Elevated Cable Rows
+Back,Full Range-Of-Motion Lat Pulldown
+Back,Gironda Sternum Chins
+Back,Hug A Ball
+Back,Hug Knees To Chest
+Back,Hyperextensions (Back Extensions)
+Back,Hyperextensions With No Hyperextension Bench
+Back,Incline Bench Pull
+Back,Inverted Row
+Back,Inverted Row with Straps
+Back,Keg Load
+Back,Kettlebell Sumo High Pull
+Back,Kipping Muscle Up
+Back,Kneeling High Pulley Row
+Back,Kneeling Single-Arm High Pulley Row
+Back,Latissimus Dorsi-SMR
+Back,Leverage High Row
+Back,Leverage Iso Row
+Back,Leverage Shrug
+Back,London Bridges
+Back,Lower Back-SMR
+Back,Lying Cambered Barbell Row
+Back,Lying T-Bar Row
+Back,Middle Back Shrug
+Back,Middle Back Stretch
+Back,Mixed Grip Chin
+Back,Muscle Up
+Back,One Arm Against Wall
+Back,One Arm Chin-Up
+Back,One-Arm Dumbbell Row
+Back,One-Arm Kettlebell Row
+Back,One Arm Lat Pulldown
+Back,One-Arm Long Bar Row
+Back,One Handed Hang
+Back,Overhead Lat
+Back,Overhead Slam
+Back,Pelvic Tilt Into Bridge
+Back,Pullups
+Back,Pyramid
+Back,Rack Pulls
+Back,Rack Pull with Bands
+Back,Reverse Band Deadlift
+Back,Reverse Grip Bent-Over Rows
+Back,Rhomboids-SMR
+Back,Rocky Pull-Ups/Pulldowns
+Back,Rope Climb
+Back,Rope Straight-Arm Pulldown
+Back,Scapular Pull-Up
+Back,Seated Cable Rows
+Back,Seated Good Mornings
+Back,Seated One-arm Cable Pulley Rows
+Back,Shotgun Row
+Back,Side-Lying Floor Stretch
+Back,Side To Side Chins
+Back,Sled Row
+Back,Smith Machine Behind the Back Shrug
+Back,Smith Machine Bent Over Row
+Back,Smith Machine Upright Row
+Back,Snatch Shrug
+Back,Spinal Stretch
+Back,Standing Dumbbell Upright Row
+Back,Standing Pelvic Tilt
+Back,Stiff Leg Barbell Good Morning
+Back,Straight-Arm Pulldown
+Back,Straight Bar Bench Mid Rows
+Back,Superman
+Back,Suspended Row
+Back,T-Bar Row with Handle
+Back,Two-Arm Kettlebell Row
+Back,Underhand Cable Pulldowns
+Back,Upper Back Stretch
+Back,Upright Cable Row
+Back,Upright Row - With Bands
+Back,V-Bar Pulldown
+Back,V-Bar Pullup
+Back,Weighted Ball Hyperextension
+Back,Weighted Pull Ups
+Back,Wide-Grip Lat Pulldown
+Back,Wide-Grip Pulldown Behind The Neck
+Back,Wide-Grip Rear Pull-Up
+Chest,Alternating Floor Press
+Chest,Around The Worlds
+Chest,Barbell Bench Press - Medium Grip
+Chest,Barbell Guillotine Bench Press
+Chest,Barbell Incline Bench Press - Medium Grip
+Chest,Behind Head Chest Stretch
+Chest,Bench Press - With Bands
+Chest,Bent-Arm Dumbbell Pullover
+Chest,Bodyweight Flyes
+Chest,Butterfly
+Chest,Cable Chest Press
+Chest,Cable Crossover
+Chest,Cable Iron Cross
+Chest,Chain Press
+Chest,Chest And Front Of Shoulder Stretch
+Chest,Chest Push from 3 point stance
+Chest,Chest Push (multiple response)
+Chest,Chest Push (single response)
+Chest,Chest Push with Run Release
+Chest,Chest Stretch on Stability Ball
+Chest,Clock Push-Up
+Chest,Cross Over - With Bands
+Chest,Decline Barbell Bench Press
+Chest,Decline Dumbbell Bench Press
+Chest,Decline Dumbbell Flyes
+Chest,Decline Push-Up
+Chest,Decline Smith Press
+Chest,Dips - Chest Version
+Chest,Drop Push
+Chest,Dumbbell Bench Press
+Chest,Dumbbell Bench Press with Neutral Grip
+Chest,Dumbbell Flyes
+Chest,Dynamic Chest Stretch
+Chest,Elbows Back
+Chest,Extended Range One-Arm Kettlebell Floor Press
+Chest,Flat Bench Cable Flyes
+Chest,Forward Drag with Press
+Chest,Front Raise And Pullover
+Chest,Hammer Grip Incline DB Bench Press
+Chest,Heavy Bag Thrust
+Chest,Incline Cable Chest Press
+Chest,Incline Cable Flye
+Chest,Incline Dumbbell Bench With Palms Facing In
+Chest,Incline Dumbbell Flyes
+Chest,Incline Dumbbell Flyes - With A Twist
+Chest,Incline Dumbbell Press
+Chest,Incline Push-Up
+Chest,Incline Push-Up Depth Jump
+Chest,Incline Push-Up Medium
+Chest,Incline Push-Up Reverse Grip
+Chest,Incline Push-Up Wide
+Chest,Isometric Chest Squeezes
+Chest,Isometric Wipers
+Chest,Leg-Over Floor Press
+Chest,Leverage Chest Press
+Chest,Leverage Decline Chest Press
+Chest,Leverage Incline Chest Press
+Chest,Low Cable Crossover
+Chest,Machine Bench Press
+Chest,Medicine Ball Chest Pass
+Chest,Neck Press
+Chest,One Arm Dumbbell Bench Press
+Chest,One-Arm Flat Bench Dumbbell Flye
+Chest,One-Arm Kettlebell Floor Press
+Chest,Plyo Kettlebell Pushups
+Chest,Plyo Push-up
+Chest,Pushups
+Chest,Pushups (Close and Wide Hand Positions)
+Chest,Push-Ups With Feet Elevated
+Chest,Push-Ups With Feet On An Exercise Ball
+Chest,Push Up to Side Plank
+Chest,Push-Up Wide
+Chest,Single-Arm Cable Crossover
+Chest,Single-Arm Push-Up
+Chest,Smith Machine Bench Press
+Chest,Smith Machine Decline Press
+Chest,Smith Machine Incline Bench Press
+Chest,Standing Cable Chest Press
+Chest,Straight-Arm Dumbbell Pullover
+Chest,Suspended Push-Up
+Chest,Svend Press
+Chest,Wide-Grip Barbell Bench Press
+Chest,Wide-Grip Decline Barbell Bench Press
+Chest,Wide-Grip Decline Barbell Pullover
+Legs,90/90 Hamstring
+Legs,Adductor
+Legs,Adductor/Groin
+Legs,All Fours Quad Stretch
+Legs,Alternate Leg Diagonal Bound
+Legs,Alternating Hang Clean
+Legs,Ankle Circles
+Legs,Ankle On The Knee
+Legs,Anterior Tibialis-SMR
+Legs,Backward Drag
+Legs,Balance Board
+Legs,Ball Leg Curl
+Legs,Band Good Morning
+Legs,Band Good Morning (Pull Through)
+Legs,Band Hip Adductions
+Legs,Barbell Full Squat
+Legs,Barbell Glute Bridge
+Legs,Barbell Hack Squat
+Legs,Barbell Hip Thrust
+Legs,Barbell Lunge
+Legs,Barbell Seated Calf Raise
+Legs,Barbell Side Split Squat
+Legs,Barbell Squat
+Legs,Barbell Squat To A Bench
+Legs,Barbell Step Ups
+Legs,Barbell Walking Lunge
+Legs,Bear Crawl Sled Drags
+Legs,Bench Jump
+Legs,Bench Sprint
+Legs,Bicycling
+Legs,"Bicycling, Stationary"
+Legs,Bodyweight Squat
+Legs,Bodyweight Walking Lunge
+Legs,Box Jump (Multiple Response)
+Legs,Box Skip
+Legs,Box Squat
+Legs,Box Squat with Bands
+Legs,Box Squat with Chains
+Legs,Butt Lift (Bridge)
+Legs,Cable Deadlifts
+Legs,Cable Hip Adduction
+Legs,Calf Press
+Legs,Calf Press On The Leg Press Machine
+Legs,Calf Raise On A Dumbbell
+Legs,Calf Raises - With Bands
+Legs,Calf Stretch Elbows Against Wall
+Legs,Calf Stretch Hands Against Wall
+Legs,Calves-SMR
+Legs,Car Deadlift
+Legs,Carioca Quick Step
+Legs,Chair Leg Extended Stretch
+Legs,Chair Squat
+Legs,Clean
+Legs,Clean Deadlift
+Legs,Clean from Blocks
+Legs,Clean Pull
+Legs,Conan's Wheel
+Legs,Depth Jump Leap
+Legs,Donkey Calf Raises
+Legs,Double Kettlebell Alternating Hang Clean
+Legs,Double Leg Butt Kick
+Legs,Downward Facing Balance
+Legs,Dumbbell Clean
+Legs,Dumbbell Lunges
+Legs,Dumbbell Rear Lunge
+Legs,Dumbbell Seated Box Jump
+Legs,Dumbbell Seated One-Leg Calf Raise
+Legs,Dumbbell Squat
+Legs,Dumbbell Squat To A Bench
+Legs,Dumbbell Step Ups
+Legs,Elevated Back Lunge
+Legs,Elliptical Trainer
+Legs,Fast Skipping
+Legs,Floor Glute-Ham Raise
+Legs,Flutter Kicks
+Legs,Foot-SMR
+Legs,Frankenstein Squat
+Legs,Freehand Jump Squat
+Legs,Frog Hops
+Legs,Front Barbell Squat
+Legs,Front Barbell Squat To A Bench
+Legs,Front Box Jump
+Legs,Front Cone Hops (or hurdle hops)
+Legs,Front Leg Raises
+Legs,Front Squat (Clean Grip)
+Legs,Front Squats With Two Kettlebells
+Legs,Glute Ham Raise
+Legs,Glute Kickback
+Legs,Goblet Squat
+Legs,Good Morning
+Legs,Good Morning off Pins
+Legs,Groin and Back Stretch
+Legs,Groiners
+Legs,Hack Squat
+Legs,Hamstring-SMR
+Legs,Hamstring Stretch
+Legs,Hang Clean
+Legs,Hang Clean - Below the Knees
+Legs,Hanging Bar Good Morning
+Legs,Hang Snatch
+Legs,Hang Snatch - Below Knees
+Legs,Heaving Snatch Balance
+Legs,Hip Circles (prone)
+Legs,Hip Extension with Bands
+Legs,Hip Flexion with Band
+Legs,Hip Lift with Band
+Legs,Hurdle Hops
+Legs,Iliotibial Tract-SMR
+Legs,Inchworm
+Legs,Intermediate Groin Stretch
+Legs,Intermediate Hip Flexor and Quad Stretch
+Legs,Iron Crosses (stretch)
+Legs,IT Band and Glute Stretch
+Legs,Jefferson Squats
+Legs,Jerk Dip Squat
+Legs,"Jogging, Treadmill"
+Legs,Kettlebell Dead Clean
+Legs,Kettlebell Hang Clean
+Legs,Kettlebell One-Legged Deadlift
+Legs,Kettlebell Pistol Squat
+Legs,Knee Across The Body
+Legs,Knee Circles
+Legs,Kneeling Hip Flexor
+Legs,Kneeling Jump Squat
+Legs,Kneeling Squat
+Legs,Knee Tuck Jump
+Legs,Lateral Bound
+Legs,Lateral Box Jump
+Legs,Lateral Cone Hops
+Legs,Leg Extensions
+Legs,Leg Lift
+Legs,Leg Press
+Legs,Leg-Up Hamstring Stretch
+Legs,Leverage Deadlift
+Legs,Linear 3-Part Start Technique
+Legs,Linear Acceleration Wall Drill
+Legs,Linear Depth Jump
+Legs,Looking At Ceiling
+Legs,Lunge Pass Through
+Legs,Lunge Sprint
+Legs,Lying Bent Leg Groin
+Legs,Lying Crossover
+Legs,Lying Glute
+Legs,Lying Hamstring
+Legs,Lying Leg Curls
+Legs,Lying Machine Squat
+Legs,Lying Prone Quadriceps
+Legs,Monster Walk
+Legs,Mountain Climbers
+Legs,Moving Claw Series
+Legs,Muscle Snatch
+Legs,Narrow Stance Hack Squats
+Legs,Narrow Stance Leg Press
+Legs,Narrow Stance Squats
+Legs,Natural Glute Ham Raise
+Legs,Olympic Squat
+Legs,One-Arm Kettlebell Clean
+Legs,One-Arm Kettlebell Swings
+Legs,One-Arm Open Palm Kettlebell Clean
+Legs,One-Arm Overhead Kettlebell Squats
+Legs,One-Arm Side Deadlift
+Legs,One Half Locust
+Legs,One Knee To Chest
+Legs,One Leg Barbell Squat
+Legs,One-Legged Cable Kickback
+Legs,On-Your-Back Quad Stretch
+Legs,On Your Side Quad Stretch
+Legs,Open Palm Kettlebell Clean
+Legs,Overhead Squat
+Legs,Peroneals-SMR
+Legs,Peroneals Stretch
+Legs,Physioball Hip Bridge
+Legs,Piriformis-SMR
+Legs,Platform Hamstring Slides
+Legs,Plie Dumbbell Squat
+Legs,Posterior Tibialis Stretch
+Legs,Power Clean
+Legs,Power Clean from Blocks
+Legs,Power Jerk
+Legs,Power Snatch
+Legs,Power Snatch from Blocks
+Legs,Power Stairs
+Legs,Prone Manual Hamstring
+Legs,Prowler Sprint
+Legs,Pull Through
+Legs,Quadriceps-SMR
+Legs,Quad Stretch
+Legs,Quick Leap
+Legs,Rear Leg Raises
+Legs,Recumbent Bike
+Legs,Reverse Band Box Squat
+Legs,Reverse Band Power Squat
+Legs,Reverse Band Sumo Deadlift
+Legs,Reverse Hyperextension
+Legs,Rickshaw Deadlift
+Legs,Rocket Jump
+Legs,Rocking Standing Calf Raise
+Legs,Romanian Deadlift
+Legs,Romanian Deadlift from Deficit
+Legs,Rope Jumping
+Legs,"Rowing, Stationary"
+Legs,Runner's Stretch
+Legs,"Running, Treadmill"
+Legs,Sandbag Load
+Legs,Scissors Jump
+Legs,Seated Band Hamstring Curl
+Legs,Seated Calf Raise
+Legs,Seated Calf Stretch
+Legs,Seated Floor Hamstring Stretch
+Legs,Seated Glute
+Legs,Seated Hamstring
+Legs,Seated Hamstring and Calf Stretch
+Legs,Seated Leg Curl
+Legs,Side Hop-Sprint
+Legs,Side Leg Raises
+Legs,Side Lying Groin Stretch
+Legs,Side Standing Long Jump
+Legs,Side to Side Box Shuffle
+Legs,Single-Cone Sprint Drill
+Legs,Single Leg Butt Kick
+Legs,Single Leg Glute Bridge
+Legs,Single-Leg High Box Squat
+Legs,Single-Leg Hop Progression
+Legs,Single-Leg Lateral Hop
+Legs,Single-Leg Leg Extension
+Legs,Single Leg Push-off
+Legs,Single-Leg Stride Jump
+Legs,Sit Squats
+Legs,Skating
+Legs,Sled Drag - Harness
+Legs,Sled Push
+Legs,Smith Machine Calf Raise
+Legs,Smith Machine Hang Power Clean
+Legs,Smith Machine Leg Press
+Legs,Smith Machine Pistol Squat
+Legs,Smith Machine Reverse Calf Raises
+Legs,Smith Machine Squat
+Legs,Smith Machine Stiff-Legged Deadlift
+Legs,Smith Single-Leg Split Squat
+Legs,Snatch
+Legs,Snatch Balance
+Legs,Snatch Deadlift
+Legs,Snatch from Blocks
+Legs,Snatch Pull
+Legs,Speed Box Squat
+Legs,Speed Squats
+Legs,Split Clean
+Legs,Split Jerk
+Legs,Split Jump
+Legs,Split Snatch
+Legs,Split Squats
+Legs,Split Squat with Dumbbells
+Legs,Squat Jerk
+Legs,Squats - With Bands
+Legs,Squat with Bands
+Legs,Squat with Chains
+Legs,Squat with Plate Movers
+Legs,Stairmaster
+Legs,Standing Barbell Calf Raise
+Legs,Standing Calf Raises
+Legs,Standing Dumbbell Calf Raise
+Legs,Standing Elevated Quad Stretch
+Legs,Standing Gastrocnemius Calf Stretch
+Legs,Standing Hamstring and Calf Stretch
+Legs,Standing Hip Circles
+Legs,Standing Hip Flexors
+Legs,Standing Leg Curl
+Legs,Standing Long Jump
+Legs,Standing Soleus And Achilles Stretch
+Legs,Standing Toe Touches
+Legs,Star Jump
+Legs,Step Mill
+Legs,Step-up with Knee Raise
+Legs,Stiff-Legged Barbell Deadlift
+Legs,Stiff-Legged Dumbbell Deadlift
+Legs,Stride Jump Crossover
+Legs,Sumo Deadlift
+Legs,Sumo Deadlift with Bands
+Legs,Sumo Deadlift with Chains
+Legs,Suspended Split Squat
+Legs,The Straddle
+Legs,Thigh Abductor
+Legs,Thigh Adductor
+Legs,Tire Flip
+Legs,Trail Running/Walking
+Legs,Trap Bar Deadlift
+Legs,Upper Back-Leg Grab
+Legs,Vertical Swing
+Legs,"Walking, Treadmill"
+Legs,Weighted Jump Squat
+Legs,Weighted Sissy Squat
+Legs,Weighted Squat
+Legs,Wide Stance Barbell Squat
+Legs,Wide Stance Stiff Legs
+Legs,Windmills
+Legs,World's Greatest Stretch
+Legs,Yoke Walk
+Legs,Zercher Squats
+Neck,Chin To Chest Stretch
+Neck,Isometric Neck Exercise - Front And Back
+Neck,Isometric Neck Exercise - Sides
+Neck,Lying Face Down Plate Neck Resistance
+Neck,Lying Face Up Plate Neck Resistance
+Neck,Neck-SMR
+Neck,Seated Head Harness Neck Resistance
+Neck,Side Neck Stretch
+Shoulders,Alternating Cable Shoulder Press
+Shoulders,Alternating Deltoid Raise
+Shoulders,Alternating Kettlebell Press
+Shoulders,Anti-Gravity Press
+Shoulders,Arm Circles
+Shoulders,Arnold Dumbbell Press
+Shoulders,Back Flyes - With Bands
+Shoulders,Backward Medicine Ball Throw
+Shoulders,Band Pull Apart
+Shoulders,Barbell Incline Shoulder Raise
+Shoulders,Barbell Rear Delt Row
+Shoulders,Barbell Shoulder Press
+Shoulders,Battling Ropes
+Shoulders,Bent Over Dumbbell Rear Delt Raise With Head On Bench
+Shoulders,Bent Over Low-Pulley Side Lateral
+Shoulders,Bradford/Rocky Presses
+Shoulders,Cable Internal Rotation
+Shoulders,Cable Rear Delt Fly
+Shoulders,Cable Rope Rear-Delt Rows
+Shoulders,Cable Seated Lateral Raise
+Shoulders,Cable Shoulder Press
+Shoulders,Car Drivers
+Shoulders,Chair Upper Body Stretch
+Shoulders,Circus Bell
+Shoulders,Clean and Jerk
+Shoulders,Clean and Press
+Shoulders,Crucifix
+Shoulders,Cuban Press
+Shoulders,Double Kettlebell Jerk
+Shoulders,Double Kettlebell Push Press
+Shoulders,Double Kettlebell Snatch
+Shoulders,Dumbbell Incline Shoulder Raise
+Shoulders,Dumbbell Lying One-Arm Rear Lateral Raise
+Shoulders,Dumbbell Lying Rear Lateral Raise
+Shoulders,Dumbbell One-Arm Shoulder Press
+Shoulders,Dumbbell One-Arm Upright Row
+Shoulders,Dumbbell Raise
+Shoulders,Dumbbell Scaption
+Shoulders,Dumbbell Shoulder Press
+Shoulders,Elbow Circles
+Shoulders,External Rotation
+Shoulders,External Rotation with Band
+Shoulders,External Rotation with Cable
+Shoulders,Face Pull
+Shoulders,Front Cable Raise
+Shoulders,Front Dumbbell Raise
+Shoulders,Front Incline Dumbbell Raise
+Shoulders,Front Plate Raise
+Shoulders,Front Two-Dumbbell Raise
+Shoulders,Handstand Push-Ups
+Shoulders,Internal Rotation with Band
+Shoulders,Iron Cross
+Shoulders,Jerk Balance
+Shoulders,Kettlebell Arnold Press
+Shoulders,Kettlebell Pirate Ships
+Shoulders,Kettlebell Seated Press
+Shoulders,Kettlebell Seesaw Press
+Shoulders,Kettlebell Thruster
+Shoulders,Kettlebell Turkish Get-Up (Lunge style)
+Shoulders,Kettlebell Turkish Get-Up (Squat style)
+Shoulders,Kneeling Arm Drill
+Shoulders,Landmine Linear Jammer
+Shoulders,Lateral Raise - With Bands
+Shoulders,Leverage Shoulder Press
+Shoulders,Log Lift
+Shoulders,Low Pulley Row To Neck
+Shoulders,Lying One-Arm Lateral Raise
+Shoulders,Lying Rear Delt Raise
+Shoulders,Machine Shoulder (Military) Press
+Shoulders,Medicine Ball Scoop Throw
+Shoulders,One-Arm Incline Lateral Raise
+Shoulders,One-Arm Kettlebell Clean and Jerk
+Shoulders,One-Arm Kettlebell Jerk
+Shoulders,One-Arm Kettlebell Military Press To The Side
+Shoulders,One-Arm Kettlebell Para Press
+Shoulders,One-Arm Kettlebell Push Press
+Shoulders,One-Arm Kettlebell Snatch
+Shoulders,One-Arm Kettlebell Split Jerk
+Shoulders,One-Arm Kettlebell Split Snatch
+Shoulders,One-Arm Side Laterals
+Shoulders,Power Partials
+Shoulders,Push Press
+Shoulders,Push Press - Behind the Neck
+Shoulders,Rack Delivery
+Shoulders,Return Push from Stance
+Shoulders,Reverse Flyes
+Shoulders,Reverse Flyes With External Rotation
+Shoulders,Reverse Machine Flyes
+Shoulders,Round The World Shoulder Stretch
+Shoulders,Seated Barbell Military Press
+Shoulders,Seated Bent-Over Rear Delt Raise
+Shoulders,Seated Cable Shoulder Press
+Shoulders,Seated Dumbbell Press
+Shoulders,Seated Front Deltoid
+Shoulders,Seated Side Lateral Raise
+Shoulders,See-Saw Press (Alternating Side Press)
+Shoulders,Shoulder Circles
+Shoulders,Shoulder Press - With Bands
+Shoulders,Shoulder Raise
+Shoulders,Shoulder Stretch
+Shoulders,Side Lateral Raise
+Shoulders,Side Laterals to Front Raise
+Shoulders,Side Wrist Pull
+Shoulders,Single-Arm Linear Jammer
+Shoulders,Single Dumbbell Raise
+Shoulders,Sled Overhead Backward Walk
+Shoulders,Sled Reverse Flye
+Shoulders,Smith Incline Shoulder Raise
+Shoulders,Smith Machine One-Arm Upright Row
+Shoulders,Smith Machine Overhead Shoulder Press
+Shoulders,Standing Alternating Dumbbell Press
+Shoulders,Standing Barbell Press Behind Neck
+Shoulders,Standing Bradford Press
+Shoulders,Standing Dumbbell Press
+Shoulders,Standing Dumbbell Straight-Arm Front Delt Raise Above Head
+Shoulders,Standing Front Barbell Raise Over Head
+Shoulders,Standing Low-Pulley Deltoid Raise
+Shoulders,Standing Military Press
+Shoulders,Standing Palm-In One-Arm Dumbbell Press
+Shoulders,Standing Palms-In Dumbbell Press
+Shoulders,Standing Two-Arm Overhead Throw
+Shoulders,Straight Raises on Incline Bench
+Shoulders,Two-Arm Kettlebell Clean
+Shoulders,Two-Arm Kettlebell Jerk
+Shoulders,Two-Arm Kettlebell Military Press
+Shoulders,Upright Barbell Row
+Shoulders,Upward Stretch

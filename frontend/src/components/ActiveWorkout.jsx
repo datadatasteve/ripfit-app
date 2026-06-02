@@ -9,6 +9,7 @@ export default function ActiveWorkout() {
   const [selectedRoutine, setSelectedRoutine] = useState(null);
   const [activeWorkout, setActiveWorkout] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [workoutSummary, setWorkoutSummary] = useState(null);
 
   useEffect(() => {
     if (token) fetchRoutines();
@@ -79,7 +80,7 @@ export default function ActiveWorkout() {
     }
   };
 
-  const finishWorkout = async () => {
+  const finishWorkout = async (workoutNotes) => {
     const token = localStorage.getItem('ripfit_token');
     
     // Save any exercise notes
@@ -99,6 +100,22 @@ export default function ActiveWorkout() {
         }
       }
     }
+
+    // Save workout-level notes
+    if (workoutNotes) {
+      try {
+        await fetch(`${API_BASE}/workouts/${activeWorkout.workout.id}/notes`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ overall_notes: workoutNotes })
+        });
+      } catch (err) {
+        console.error('Failed to save workout notes:', err);
+      }
+    }
     
     try {
       await fetch(`${API_BASE}/workouts/${activeWorkout.workout.id}/finish`, {
@@ -108,7 +125,24 @@ export default function ActiveWorkout() {
           'Authorization': `Bearer ${token}`
         }
       });
-      alert('Workout completed!');
+
+      // Build summary data before clearing workout
+      const duration = Math.round((Date.now() - new Date(activeWorkout.workout.start_time).getTime()) / 60000);
+      setWorkoutSummary({
+        routine_name: activeWorkout.routine_name,
+        duration_minutes: Math.round((Date.now() - new Date(activeWorkout.workout.start_time).getTime()) / 60000),
+        exercises: activeWorkout.exercises.map(ex => ({
+          exercise_name: ex.exercise_name,
+          category: ex.category,
+          logged_sets: ex.logged_sets || [],
+          target_sets: ex.template?.target_sets,
+          target_reps: ex.template?.target_reps,
+          target_weight: ex.template?.target_weight,
+          exercise_notes: ex.exercise_notes
+        })),
+        workout_notes: workoutNotes || '',
+        previous_workout_notes: activeWorkout.previous_overall_notes || null
+      });
       setActiveWorkout(null);
     } catch (err) {
       console.error('Failed to finish workout:', err);
@@ -119,6 +153,97 @@ export default function ActiveWorkout() {
     return (
       <div className="workout-container">
         <p>Please log in to track workouts</p>
+      </div>
+    );
+  }
+
+  if (workoutSummary) {
+    const totalSets = workoutSummary.exercises.reduce((sum, ex) => sum + ex.logged_sets.length, 0);
+    const totalReps = workoutSummary.exercises.reduce((sum, ex) => 
+      sum + ex.logged_sets.reduce((s, set) => s + (set.reps_completed || 0), 0), 0);
+    const totalWeight = workoutSummary.exercises.reduce((sum, ex) => 
+      sum + ex.logged_sets.reduce((s, set) => s + ((set.weight_used || 0) * (set.reps_completed || 0)), 0), 0);
+    const totalSeconds = workoutSummary.duration_minutes * 60;
+    const dHours = Math.floor(totalSeconds / 3600);
+    const dMins = Math.floor((totalSeconds % 3600) / 60);
+    const dSecs = totalSeconds % 60;
+    const durationStr = `${String(dHours).padStart(2,'0')}:${String(dMins).padStart(2,'0')}:${String(dSecs).padStart(2,'0')}`;
+
+    return (
+      <div className="workout-container">
+        <div className="workout-summary">
+          <h2>Workout Complete!</h2>
+          <h3>{workoutSummary.routine_name}</h3>
+          
+          <div className="summary-stats">
+            <div className="stat-box">
+              <span className="stat-value">{durationStr}</span>
+              <span className="stat-label">Duration</span>
+            </div>
+            <div className="stat-box">
+              <span className="stat-value">{workoutSummary.exercises.length}</span>
+              <span className="stat-label">Exercises</span>
+            </div>
+            <div className="stat-box">
+              <span className="stat-value">{totalSets}</span>
+              <span className="stat-label">Sets</span>
+            </div>
+            <div className="stat-box">
+              <span className="stat-value">{totalReps}</span>
+              <span className="stat-label">Total Reps</span>
+            </div>
+          </div>
+
+          <div className="summary-exercises">
+            <h4>Exercise Breakdown</h4>
+            {workoutSummary.exercises.map((ex, idx) => (
+              <div key={idx} className="summary-exercise-item">
+                <strong>{ex.exercise_name}</strong>
+                <span className="summary-category">{ex.category}</span>
+                <div className="summary-sets">
+                  {ex.logged_sets.length > 0 ? (
+                    ex.logged_sets.map((set, sIdx) => (
+                      <span key={sIdx} className="set-pill">
+                        {set.reps_completed} × {set.weight_used} lbs
+                        {set.rpe ? ` @ RPE ${set.rpe}` : ''}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="skipped">Skipped</span>
+                  )}
+                </div>
+                {ex.target_sets && ex.logged_sets.length < ex.target_sets && (
+                  <p className="sets-caution">Completed {ex.logged_sets.length} of {ex.target_sets} target sets</p>
+                )}
+                {ex.exercise_notes && (
+                  <p className="summary-notes">{ex.exercise_notes}</p>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {workoutSummary.workout_notes && (
+            <div className="summary-workout-notes">
+              <h4>Workout Notes</h4>
+              <p style={{color: '#fff', whiteSpace: 'pre-wrap'}}>{workoutSummary.workout_notes}</p>
+            </div>
+          )}
+
+          {workoutSummary.previous_workout_notes && (
+            <div className="summary-workout-notes" style={{marginTop: '10px', borderLeft: '3px solid #888'}}>
+              <h4>Previous Workout Notes</h4>
+              <p style={{color: '#fff', whiteSpace: 'pre-wrap'}}>{workoutSummary.previous_workout_notes}</p>
+            </div>
+          )}
+
+          <button 
+            onClick={() => setWorkoutSummary(null)} 
+            className="finish-btn"
+            style={{width: '100%', padding: '14px', fontSize: '1.1em', marginTop: '20px'}}
+          >
+            Done
+          </button>
+        </div>
       </div>
     );
   }
@@ -173,6 +298,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish }) {
   const [workoutNotes, setWorkoutNotes] = useState('');
   const [showWorkoutNotes, setShowWorkoutNotes] = useState(false);
   const [workoutNotesSaved, setWorkoutNotesSaved] = useState(true);
+  const [showFinishConfirm, setShowFinishConfirm] = useState(false);
 
   const exercises = workout.exercises;
   const currentExercise = exercises[currentExerciseIdx];
@@ -521,7 +647,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish }) {
             Workout Notes {workoutNotes ? '📝' : ''}
           </button>
           <button onClick={() => setShowAllExercises(true)} className="view-all-btn">View All</button>
-          <button onClick={onFinish} className="finish-btn">Finish Workout</button>
+          <button onClick={() => setShowFinishConfirm(true)} className="finish-btn">Finish Workout</button>
         </div>
       </div>
 
@@ -547,6 +673,11 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish }) {
         {currentExercise.last_performance && (
           <div className="last-performance">
             <strong>Last time ({new Date(workout.last_workout_date).toLocaleDateString()}):</strong>
+            {currentExercise.last_performance.exercise_notes?.startsWith('Substituted for') && (
+              <p style={{fontSize: '0.85em', color: '#ff9800', margin: '4px 0'}}>
+                ↔️ {currentExercise.last_performance.exercise_notes.split('\n')[0]}
+              </p>
+            )}
             <div className="sets-history">
               {currentExercise.last_performance.sets_completed.map((set, idx) => {
                 const template = currentExercise.template;
@@ -576,12 +707,21 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish }) {
           {loggedSets.length === 0 ? (
             <p>No sets yet</p>
           ) : (
-            loggedSets.map((set, idx) => (
-              <div key={idx} className="set-entry">
-                Set {set.set_number}: {set.reps_completed} reps × {set.weight_used === 0 ? 'BW' : `${set.weight_used} lbs`}
-                {set.rpe && ` @ RPE ${set.rpe}`}
-              </div>
-            ))
+            loggedSets.map((set, idx) => {
+              const highRPE = set.rpe && parseInt(set.rpe) >= 10;
+              const targetReps = currentExercise.template?.target_reps;
+              const targetWeight = currentExercise.template?.target_weight;
+              const underReps = targetReps && set.reps_completed < parseInt(targetReps);
+              const underWeight = targetWeight && parseFloat(set.weight_used) < parseFloat(targetWeight);
+              const underperformed = underReps || underWeight;
+              return (
+                <div key={idx} className={`set-entry ${highRPE ? 'rpe-warning' : underperformed ? 'under-target' : ''}`}>
+                  Set {set.set_number}: {set.reps_completed} reps × {set.weight_used === 0 ? 'BW' : `${set.weight_used} lbs`}
+                  {set.rpe && ` @ RPE ${set.rpe}`}
+                  {highRPE && ' ⚠️'}
+                </div>
+              );
+            })
           )}
         </div>
 
@@ -818,6 +958,12 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish }) {
         <div className="modal-overlay" onClick={() => setShowWorkoutNotes(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h3>Workout Notes</h3>
+            {workout.previous_overall_notes && (
+              <div className="previous-notes" style={{marginBottom: '12px'}}>
+                <strong>Previous workout notes:</strong>
+                <pre style={{marginTop: '6px', whiteSpace: 'pre-wrap', fontSize: '0.9em'}}>{workout.previous_overall_notes}</pre>
+              </div>
+            )}
             <p style={{fontSize: '0.9em', color: '#888', marginBottom: '10px'}}>
               Overall notes for this entire workout session
             </p>
@@ -872,8 +1018,75 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish }) {
         <ChangeExerciseModal
           onChange={handleChangeExercise}
           onClose={() => setShowChangeExercise(false)}
+          currentExercise={currentExercise}
         />
       )}
+
+      {showFinishConfirm && (() => {
+        const incompleteExercises = exercises.filter(ex => 
+          ex.template?.target_sets && (ex.logged_sets?.length || 0) < ex.template.target_sets
+        );
+        
+        return (
+          <div className="modal-overlay" onClick={() => setShowFinishConfirm(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <h3>Finish Workout</h3>
+              
+              {incompleteExercises.length > 0 && (
+                <div className="incomplete-warning">
+                  <p><strong>⚠️ Incomplete exercises:</strong></p>
+                  {incompleteExercises.map((ex, idx) => (
+                    <div key={idx} className="incomplete-item">
+                      <span>{ex.exercise_name}</span>
+                      <span>{ex.logged_sets?.length || 0} / {ex.template.target_sets} sets</span>
+                      <button 
+                        onClick={() => {
+                          const exerciseIdx = exercises.findIndex(e => e.id === ex.id);
+                          setCurrentExerciseIdx(exerciseIdx);
+                          setShowFinishConfirm(false);
+                        }}
+                        style={{padding: '4px 8px', fontSize: '0.85em'}}
+                      >
+                        Go to
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div style={{marginTop: '15px'}}>
+                <h4>Workout Notes (optional)</h4>
+                <textarea
+                  value={workoutNotes}
+                  onChange={(e) => setWorkoutNotes(e.target.value)}
+                  placeholder="How was the workout overall?"
+                  rows="4"
+                  style={{width: '100%', padding: '10px', marginBottom: '10px'}}
+                />
+              </div>
+
+              <div style={{display: 'flex', gap: '8px'}}>
+                <button 
+                  onClick={() => {
+                    onFinish(workoutNotes);
+                    setShowFinishConfirm(false);
+                  }}
+                  className="finish-btn"
+                  style={{flex: 1, padding: '12px'}}
+                >
+                  {incompleteExercises.length > 0 ? 'Finish Anyway' : 'Finish Workout'}
+                </button>
+                <button 
+                  onClick={() => setShowFinishConfirm(false)}
+                  style={{padding: '12px 16px', background: '#999', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer'}}
+                >
+                  Go Back
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {showAllExercises && (
         <div className="modal-overlay" onClick={() => setShowAllExercises(false)}>
@@ -1021,13 +1234,17 @@ function AddExerciseModal({ onAdd, onClose }) {
   );
 }
 
-function ChangeExerciseModal({ onChange, onClose }) {
+function ChangeExerciseModal({ onChange, onClose, currentExercise }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [selectedExercise, setSelectedExercise] = useState(null);
   const [reason, setReason] = useState('');
   const [muscleFilter, setMuscleFilter] = useState('');
-  const [targets, setTargets] = useState({ sets: '', reps: '', weight: '' });
+  const [targets, setTargets] = useState({
+    sets: currentExercise?.template?.target_sets || '',
+    reps: currentExercise?.template?.target_reps || '',
+    weight: ''
+  });
 
   const searchExercises = async () => {
     if (!searchQuery) return;
@@ -1091,6 +1308,12 @@ function ChangeExerciseModal({ onChange, onClose }) {
         ) : (
           <>
             <h3>Reason for Change (Optional)</h3>
+            <p><strong>Replacing: {currentExercise?.exercise_name}</strong></p>
+            {currentExercise?.template && (
+              <div className="original-targets" style={{background: '#f5f5f5', padding: '8px 12px', borderRadius: '4px', marginBottom: '12px', fontSize: '0.9em', color: '#555'}}>
+                <strong>Original targets:</strong> {currentExercise.template.target_sets || '?'} sets × {currentExercise.template.target_reps || '?'} reps @ {currentExercise.template.target_weight ? `${currentExercise.template.target_weight} lbs` : 'BW'}
+              </div>
+            )}
             <p><strong>Replacing with: {selectedExercise.name}</strong></p>
             
             <div className="targets-input">
