@@ -24,11 +24,6 @@ export default function ExerciseBrowser() {
   const token = localStorage.getItem('ripfit_token');
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
 
-  const getHeaders = () => {
-    const t = localStorage.getItem('ripfit_token');
-    return t ? { Authorization: `Bearer ${t}` } : {};
-  };
-
   // ----------------------------------------------------------------
   // Core fetch — takes explicit args so no stale closure issues
   // ----------------------------------------------------------------
@@ -39,7 +34,7 @@ export default function ExerciseBrowser() {
       if (cat) params.set('category', cat);
       if (subcat) params.set('subcategory', subcat);
 
-      const res = await fetch(`${API_BASE}/workouts/exercises/browse?${params}`, { headers: getHeaders() });
+      const res = await fetch(`${API_BASE}/workouts/exercises/browse?${params}`, { headers: authHeaders });
       const data = await res.json();
       setTotal(data.total ?? 0);
       setOffset(newOffset);
@@ -55,12 +50,14 @@ export default function ExerciseBrowser() {
     try {
       const res = await fetch(
         `${API_BASE}/workouts/exercises/search?q=${encodeURIComponent(q)}&limit=${LIMIT}&offset=${newOffset}`,
-        { headers: getHeaders() }
+        { headers: authHeaders }
       );
       const data = await res.json();
+      // search endpoint returns count not total — use length for now, flag if 50 exactly
       const results = data.exercises || [];
       setOffset(newOffset);
-      setTotal(newOffset + results.length + (results.length === LIMIT ? LIMIT : 0));
+      // If we got exactly LIMIT back there may be more; show load-more
+      setTotal(newOffset + results.length + (results.length === LIMIT ? 1 : 0));
       setExercises(prev => append ? [...prev, ...results] : results);
     } catch (err) {
       console.error('Search failed:', err);
@@ -78,8 +75,6 @@ export default function ExerciseBrowser() {
   // ----------------------------------------------------------------
   const handleCategoryClick = (cat) => {
     setSelectedExercise(null);
-    setSearchInput('');
-    setActiveSearch('');
 
     if (cat === '' || cat === 'All') {
       setCategoryFilter('');
@@ -137,7 +132,7 @@ export default function ExerciseBrowser() {
   const fetchDetail = async (id) => {
     setDetailLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/workouts/exercises/${id}`, { headers: getHeaders() });
+      const res = await fetch(`${API_BASE}/workouts/exercises/${id}`, { headers: authHeaders });
       const data = await res.json();
       setSelectedExercise(data);
     } catch (err) {
@@ -158,17 +153,19 @@ export default function ExerciseBrowser() {
 
         {/* Search bar */}
         <div className="browser-search-bar">
-          <input
-            type="text"
-            placeholder="Search exercises..."
-            value={searchInput}
-            onChange={e => setSearchInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleSearch()}
-          />
+          <div className="search-input-wrapper">
+            <input
+              type="text"
+              placeholder="Search exercises..."
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSearch()}
+            />
+            {searchInput && (
+              <button className="search-clear-x" onClick={handleClearSearch}>✕</button>
+            )}
+          </div>
           <button className="search-btn" onClick={handleSearch}>Search</button>
-          {activeSearch && (
-            <button className="clear-btn" onClick={handleClearSearch}>✕</button>
-          )}
         </div>
 
         {/* Category filter pills — always visible */}
@@ -279,6 +276,43 @@ export default function ExerciseBrowser() {
                 : <p className="detail-missing">No description available yet.</p>
               }
             </div>
+
+            {(selectedExercise.muscles_primary?.length > 0 || selectedExercise.muscles_secondary?.length > 0) && (
+              <div className="detail-section">
+                <h4>Muscles</h4>
+                {selectedExercise.muscles_primary?.length > 0 && (
+                  <div className="muscle-row">
+                    <span className="muscle-label">Primary</span>
+                    <div className="muscle-tags">
+                      {selectedExercise.muscles_primary.map(m => (
+                        <span key={m} className="muscle-tag primary">{m}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {selectedExercise.muscles_secondary?.length > 0 && (
+                  <div className="muscle-row">
+                    <span className="muscle-label">Secondary</span>
+                    <div className="muscle-tags">
+                      {selectedExercise.muscles_secondary.map(m => (
+                        <span key={m} className="muscle-tag secondary">{m}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {(selectedExercise.level || selectedExercise.mechanic || selectedExercise.force) && (
+              <div className="detail-section">
+                <h4>Details</h4>
+                <div className="detail-meta-row">
+                  {selectedExercise.level && <span className="detail-meta-item">Level: <strong>{selectedExercise.level}</strong></span>}
+                  {selectedExercise.mechanic && <span className="detail-meta-item">Mechanic: <strong>{selectedExercise.mechanic}</strong></span>}
+                  {selectedExercise.force && <span className="detail-meta-item">Force: <strong>{selectedExercise.force}</strong></span>}
+                </div>
+              </div>
+            )}
 
             <div className="detail-section detail-coming-soon">
               <h4>Coming Soon</h4>

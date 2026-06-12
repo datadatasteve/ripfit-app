@@ -276,3 +276,93 @@
   font-size: 0.88em;
   color: var(--text-muted, #888);
 }
+
+/* ---- SEARCH INPUT WRAPPER (inline X button) ---- */
+.search-input-wrapper {
+  position: relative;
+  flex: 1;
+}
+
+.search-input-wrapper input {
+  width: 100%;
+  padding: 7px 28px 7px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color, #ccc);
+  background: var(--input-bg, #f5f5f5);
+  color: #000;
+  font-size: 0.9em;
+  box-sizing: border-box;
+}
+
+.search-clear-x {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  font-size: 0.8em;
+  padding: 0;
+  line-height: 1;
+}
+
+.search-clear-x:hover { color: #333; }
+
+/* ---- MUSCLE TAGS ---- */
+.muscle-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.muscle-label {
+  font-size: 0.78em;
+  color: var(--text-muted, #888);
+  min-width: 64px;
+  padding-top: 3px;
+}
+
+.muscle-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.muscle-tag {
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 0.78em;
+  text-transform: capitalize;
+}
+
+.muscle-tag.primary {
+  background: #e8f5e9;
+  border: 1px solid #4caf50;
+  color: #2e7d32;
+}
+
+.muscle-tag.secondary {
+  background: var(--tag-bg, #f0f0f0);
+  border: 1px solid var(--border-color, #ccc);
+  color: var(--text-muted, #666);
+}
+
+/* ---- DETAIL META ROW (level/mechanic/force) ---- */
+.detail-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.detail-meta-item {
+  font-size: 0.85em;
+  color: var(--text-muted, #777);
+  text-transform: capitalize;
+}
+
+.detail-meta-item strong {
+  color: var(--text-primary, #111);
+}

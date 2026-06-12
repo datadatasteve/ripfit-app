@@ -223,7 +223,8 @@ const getExerciseById = async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT id, name, description, category, subcategory, equipment_type
+      `SELECT id, name, description, category, subcategory, equipment_type,
+              muscles_primary, muscles_secondary, force, level, mechanic
        FROM exercises WHERE id = $1`,
       [id]
     );
@@ -239,7 +240,7 @@ const getExerciseById = async (req, res) => {
     if (user_id) {
       const routineResult = await pool.query(
         `SELECT COUNT(DISTINCT r.id) AS count
-         FROM routines r
+         FROM workout_routines r
          JOIN routine_exercises re ON re.routine_id = r.id
          WHERE re.exercise_id = $1 AND r.user_id = $2`,
         [id, user_id]
@@ -318,7 +319,7 @@ const browseExercises = async (req, res) => {
       const routineCheck = await pool.query(
         `SELECT DISTINCT re.exercise_id
          FROM routine_exercises re
-         JOIN routines r ON r.id = re.routine_id
+         JOIN workout_routines r ON r.id = re.routine_id
          WHERE r.user_id = $1 AND re.exercise_id = ANY($2)`,
         [user_id, ids]
       );
