@@ -767,3 +767,50 @@
   color: #ff9800;
 }
 
+/* ============================================================
+   MUSCLE FILTER PILLS
+   Append these to the bottom of ActiveWorkout.css
+   ============================================================ */
+
+.muscle-filter-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.filter-pill {
+  padding: 4px 12px;
+  border-radius: 16px;
+  border: 1px solid #555;
+  background: transparent;
+  color: #000;
+  font-size: 0.82em;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.filter-pill:hover {
+  border-color: #333;
+  color: #000;
+}
+
+.filter-pill.active {
+  background: #4caf50;
+  border-color: #4caf50;
+  color: #fff;
+}
+
+/* Indented sub-pills for Biceps / Triceps */
+.filter-pill-sub {
+  margin-left: 8px;
+  border-style: dashed;
+  font-size: 0.78em;
+  padding: 3px 10px;
+}
+
+.filter-pill-sub.active {
+  background: #2e7d32;
+  border-color: #2e7d32;
+  border-style: solid;
+}

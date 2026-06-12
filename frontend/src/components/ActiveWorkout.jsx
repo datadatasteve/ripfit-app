@@ -1123,6 +1123,62 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish }) {
   );
 }
 
+function MuscleFilterBar({ muscleFilter, setMuscleFilter }) {
+  const [armsExpanded, setArmsExpanded] = useState(false);
+
+  const handleSelect = (value) => {
+    setMuscleFilter(value);
+    if (value !== 'arms' && value !== 'biceps' && value !== 'triceps') {
+      setArmsExpanded(false);
+    }
+  };
+
+  const isActive = (value) => muscleFilter === value;
+
+  return (
+    <div className="filter-box">
+      <label>Filter by muscle:</label>
+      <div className="muscle-filter-pills">
+        {['', 'chest', 'back', 'shoulders', 'legs', 'abs', 'cardio'].map(cat => (
+          <button
+            key={cat || 'all'}
+            className={`filter-pill ${isActive(cat) ? 'active' : ''}`}
+            onClick={() => handleSelect(cat)}
+          >
+            {cat === '' ? 'All' : cat.charAt(0).toUpperCase() + cat.slice(1)}
+          </button>
+        ))}
+        {/* Arms pill with expand toggle */}
+        <button
+          className={`filter-pill ${(isActive('arms') || isActive('biceps') || isActive('triceps')) ? 'active' : ''}`}
+          onClick={() => {
+            setArmsExpanded(prev => !prev);
+            if (!armsExpanded) handleSelect('arms');
+          }}
+        >
+          Arms {armsExpanded ? '▾' : '▸'}
+        </button>
+        {armsExpanded && (
+          <>
+            <button
+              className={`filter-pill filter-pill-sub ${isActive('biceps') ? 'active' : ''}`}
+              onClick={() => handleSelect('biceps')}
+            >
+              ↳ Biceps
+            </button>
+            <button
+              className={`filter-pill filter-pill-sub ${isActive('triceps') ? 'active' : ''}`}
+              onClick={() => handleSelect('triceps')}
+            >
+              ↳ Triceps
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function AddExerciseModal({ onAdd, onClose }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -1141,8 +1197,13 @@ function AddExerciseModal({ onAdd, onClose }) {
     }
   };
 
-  const filteredResults = muscleFilter 
-    ? searchResults.filter(ex => ex.category?.toLowerCase().includes(muscleFilter.toLowerCase()))
+  const filteredResults = muscleFilter
+    ? searchResults.filter(ex => {
+        if (muscleFilter === 'biceps') return ex.subcategory?.toLowerCase() === 'biceps';
+        if (muscleFilter === 'triceps') return ex.subcategory?.toLowerCase() === 'triceps';
+        if (muscleFilter === 'arms') return ex.category?.toLowerCase() === 'arms';
+        return ex.category?.toLowerCase().includes(muscleFilter.toLowerCase());
+      })
     : searchResults;
 
   const handleSelectExercise = (exercise) => {
@@ -1176,26 +1237,14 @@ function AddExerciseModal({ onAdd, onClose }) {
             </div>
             
             {searchResults.length > 0 && (
-              <div className="filter-box">
-                <label>Filter by muscle:</label>
-                <select value={muscleFilter} onChange={(e) => setMuscleFilter(e.target.value)}>
-                  <option value="">All</option>
-                  <option value="chest">Chest</option>
-                  <option value="back">Back</option>
-                  <option value="shoulders">Shoulders</option>
-                  <option value="arms">Arms</option>
-                  <option value="legs">Legs</option>
-                  <option value="abs">Abs</option>
-                  <option value="cardio">Cardio</option>
-                </select>
-              </div>
+              <MuscleFilterBar muscleFilter={muscleFilter} setMuscleFilter={setMuscleFilter} />
             )}
 
             <div className="search-results">
               {filteredResults.map(ex => (
                 <div key={ex.id} className="result-item" onClick={() => handleSelectExercise(ex)}>
                   <strong>{ex.name}</strong>
-                  <span>{ex.category} • {ex.equipment_type}</span>
+                  <span>{ex.category}{ex.subcategory ? ` › ${ex.subcategory}` : ''} • {ex.equipment_type}</span>
                 </div>
               ))}
             </div>
@@ -1257,8 +1306,13 @@ function ChangeExerciseModal({ onChange, onClose, currentExercise }) {
     }
   };
 
-  const filteredResults = muscleFilter 
-    ? searchResults.filter(ex => ex.category?.toLowerCase().includes(muscleFilter.toLowerCase()))
+  const filteredResults = muscleFilter
+    ? searchResults.filter(ex => {
+        if (muscleFilter === 'biceps') return ex.subcategory?.toLowerCase() === 'biceps';
+        if (muscleFilter === 'triceps') return ex.subcategory?.toLowerCase() === 'triceps';
+        if (muscleFilter === 'arms') return ex.category?.toLowerCase() === 'arms';
+        return ex.category?.toLowerCase().includes(muscleFilter.toLowerCase());
+      })
     : searchResults;
 
   return (
@@ -1280,26 +1334,14 @@ function ChangeExerciseModal({ onChange, onClose, currentExercise }) {
             </div>
             
             {searchResults.length > 0 && (
-              <div className="filter-box">
-                <label>Filter by muscle:</label>
-                <select value={muscleFilter} onChange={(e) => setMuscleFilter(e.target.value)}>
-                  <option value="">All</option>
-                  <option value="chest">Chest</option>
-                  <option value="back">Back</option>
-                  <option value="shoulders">Shoulders</option>
-                  <option value="arms">Arms</option>
-                  <option value="legs">Legs</option>
-                  <option value="abs">Abs</option>
-                  <option value="cardio">Cardio</option>
-                </select>
-              </div>
+              <MuscleFilterBar muscleFilter={muscleFilter} setMuscleFilter={setMuscleFilter} />
             )}
             
             <div className="search-results">
               {filteredResults.map(ex => (
                 <div key={ex.id} className="result-item" onClick={() => setSelectedExercise(ex)}>
                   <strong>{ex.name}</strong>
-                  <span>{ex.category} • {ex.equipment_type}</span>
+                  <span>{ex.category}{ex.subcategory ? ` › ${ex.subcategory}` : ''} • {ex.equipment_type}</span>
                 </div>
               ))}
             </div>
@@ -1357,3 +1399,4 @@ function ChangeExerciseModal({ onChange, onClose, currentExercise }) {
     </div>
   );
 }
+

@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import ThemeToggle from './components/ThemeToggle'
 import ActiveWorkout from './components/ActiveWorkout'
+import ExerciseBrowser from './components/ExerciseBrowser'
 import './styles/App.css'
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentView, setCurrentView] = useState('home'); // 'home' or 'workout'
+  const [currentView, setCurrentView] = useState('home');
 
   return (
     <div className="app">
@@ -18,6 +19,7 @@ function App() {
             
             <ul className="nav-menu">
               <li><a href="#" onClick={() => setCurrentView('workout')}>Workouts</a></li>
+              <li><a href="#" onClick={() => setCurrentView('exercises')}>Exercises</a></li>
               <li><a href="#routines">Routines</a></li>
               <li><a href="#progress">Progress</a></li>
             </ul>
@@ -32,6 +34,8 @@ function App() {
       <main className="main">
         {currentView === 'workout' ? (
           <ActiveWorkout />
+        ) : currentView === 'exercises' ? (
+          <ExerciseBrowser />
         ) : (
           <section className="hero">
             <div className="container">

@@ -12,15 +12,33 @@ const { pool } = require('../config/database');
  * GET /api/v1/workouts/exercises/search?q=bench&limit=20
  */
 const searchExercises = async (req, res) => {
-  const { q, limit = 50 } = req.query;
+  const { q, limit = 50, offset = 0 } = req.query;
 
   if (!q) {
     return res.status(400).json({ error: 'Search query required' });
   }
 
   try {
+    const rawTerm = q.toLowerCase().trim();
+
+    // ----------------------------------------------------------------
+    // Subcategory intent detection — check BEFORE abbreviation expansion
+    // so "bi", "bis", "bicep", "biceps" etc. map to a subcategory filter
+    // rather than being expanded into a name search word.
+    // ----------------------------------------------------------------
+    let subcategoryFilter = null; // null = no filter; 'Biceps' | 'Triceps'
+    let armsOnly = false;         // true = category = Arms (both subcategories)
+
+    if (/\b(bi|bis|bicep|biceps)\b/.test(rawTerm)) {
+      subcategoryFilter = 'Biceps';
+    } else if (/\b(tri|tris|tricep|triceps)\b/.test(rawTerm)) {
+      subcategoryFilter = 'Triceps';
+    } else if (/\b(arms?)\b/.test(rawTerm)) {
+      armsOnly = true;
+    }
+
     // Normalize search term - abbreviations and jargon
-    let searchTerm = q.toLowerCase()
+    let searchTerm = rawTerm
       .replace(/\bbb\b/g, 'barbell')
       .replace(/\bdb\b/g, 'dumbbell')
       .replace(/\bdbs\b/g, 'dumbbell')
@@ -58,6 +76,40 @@ const searchExercises = async (req, res) => {
         .replace(/\btwists\b/g, 'twist');
     };
 
+    // ----------------------------------------------------------------
+    // Category-only shortcut: if the entire search term is a category
+    // keyword (arms / biceps / triceps), skip name LIKE search entirely
+    // and just return all exercises in that category/subcategory.
+    // ----------------------------------------------------------------
+    const isCategoryOnlySearch = (subcategoryFilter || armsOnly) &&
+      /^(arms?|bi|bis|bicep|biceps|tri|tris|tricep|triceps)$/.test(rawTerm);
+
+    if (isCategoryOnlySearch) {
+      let catQuery, catParams;
+      if (subcategoryFilter) {
+        catQuery = `SELECT id, name, description, category, subcategory, equipment_type
+                    FROM exercises WHERE subcategory = $1 ORDER BY name LIMIT $2 OFFSET $3`;
+        catParams = [subcategoryFilter, limit, offset];
+      } else {
+        catQuery = `SELECT id, name, description, category, subcategory, equipment_type
+                    FROM exercises WHERE category = 'Arms' ORDER BY subcategory, name LIMIT $1 OFFSET $2`;
+        catParams = [limit, offset];
+      }
+      const catResult = await pool.query(catQuery, catParams);
+      return res.json({
+        query: q,
+        count: catResult.rows.length,
+        exercises: catResult.rows.map(ex => ({
+          id: ex.id,
+          name: ex.name,
+          description: ex.description,
+          category: ex.category,
+          subcategory: ex.subcategory || null,
+          equipment_type: ex.equipment_type
+        }))
+      });
+    }
+
     const singularized = singularizeTerm(searchTerm);
     const words = singularized.split(/\s+/).filter(Boolean);
     
@@ -71,16 +123,6 @@ const searchExercises = async (req, res) => {
       'fly': ['fly', 'flye', 'butterfly', 'pec deck'],
       'machine': ['machine', 'cable', 'smith'],
       'mason': ['mason', 'russian'],
-    };
-
-    // For each search word, build expanded LIKE conditions
-    // Each word matches if the name contains that word OR any synonym
-    const buildWordCondition = (word, paramStartIdx) => {
-      const syns = synonyms[word];
-      if (syns) {
-        return syns.map((s, i) => `LOWER(name) LIKE $${paramStartIdx + i}`).join(' OR ');
-      }
-      return `LOWER(name) LIKE $${paramStartIdx}`;
     };
 
     // Build params array with synonyms expanded
@@ -111,21 +153,34 @@ const searchExercises = async (req, res) => {
     allParams.push(...uniqueWords.map(w => `%${w}%`));
     paramIdx += uniqueWords.length;
 
-    // Limit param
-    allParams.push(limit);
+    // Build subcategory / category WHERE clause (for mixed searches like "db bicep")
+    let categoryClause = '';
+    if (subcategoryFilter) {
+      allParams.push(subcategoryFilter);
+      categoryClause = `AND subcategory = $${paramIdx}`;
+      paramIdx++;
+    } else if (armsOnly) {
+      allParams.push('Arms');
+      categoryClause = `AND category = $${paramIdx}`;
+      paramIdx++;
+    }
+
+    // Limit + offset params
+    allParams.push(parseInt(limit));
     const limitParam = paramIdx;
+    allParams.push(parseInt(offset));
+    const offsetParam = paramIdx + 1;
 
     const result = await pool.query(
-      `SELECT id, name, description, category, equipment_type
+      `SELECT id, name, description, category, subcategory, equipment_type
        FROM exercises
-       WHERE ${orWhere} OR ${equipOr}
+       WHERE (${orWhere} OR ${equipOr})
+       ${categoryClause}
        ORDER BY 
-         -- All word groups match (AND) first
          CASE WHEN ${andWhere} THEN 0 ELSE 1 END,
-         -- Equipment type match boost
          CASE WHEN ${equipOr} THEN 0 ELSE 1 END,
          category, name
-       LIMIT $${limitParam}`,
+       LIMIT $${limitParam} OFFSET $${offsetParam}`,
       allParams
     );
 
@@ -137,6 +192,7 @@ const searchExercises = async (req, res) => {
         name: ex.name,
         description: ex.description,
         category: ex.category,
+        subcategory: ex.subcategory || null,
         equipment_type: ex.equipment_type
       }))
     });
@@ -149,15 +205,26 @@ const searchExercises = async (req, res) => {
 /**
  * Get exercise by ID
  * GET /api/v1/workouts/exercises/:id
+ * Optionally decorated with routine count if user is authenticated
  */
 const getExerciseById = async (req, res) => {
   const { id } = req.params;
+  // Auth header may or may not be present — best-effort
+  let user_id = null;
+  try {
+    const authHeader = req.headers['authorization'];
+    if (authHeader) {
+      const jwt = require('jsonwebtoken');
+      const token = authHeader.split(' ')[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      user_id = decoded.userId;
+    }
+  } catch (_) {}
 
   try {
     const result = await pool.query(
-      `SELECT id, name, description, category, equipment_type
-      FROM exercises
-      WHERE id = $1`,
+      `SELECT id, name, description, category, subcategory, equipment_type
+       FROM exercises WHERE id = $1`,
       [id]
     );
 
@@ -165,10 +232,116 @@ const getExerciseById = async (req, res) => {
       return res.status(404).json({ error: 'Exercise not found' });
     }
 
-    res.json(result.rows[0]);
+    const exercise = result.rows[0];
+
+    // Routine count for this user
+    let routineCount = 0;
+    if (user_id) {
+      const routineResult = await pool.query(
+        `SELECT COUNT(DISTINCT r.id) AS count
+         FROM routines r
+         JOIN routine_exercises re ON re.routine_id = r.id
+         WHERE re.exercise_id = $1 AND r.user_id = $2`,
+        [id, user_id]
+      );
+      routineCount = parseInt(routineResult.rows[0].count) || 0;
+    }
+
+    res.json({ ...exercise, routine_count: routineCount });
   } catch (error) {
     console.error('Get exercise error:', error);
     res.status(500).json({ error: 'Failed to get exercise' });
+  }
+};
+
+/**
+ * Browse all exercises with pagination + filters
+ * GET /api/v1/workouts/exercises?category=Arms&subcategory=Biceps&limit=50&offset=0
+ */
+const browseExercises = async (req, res) => {
+  const { category, subcategory, limit = 50, offset = 0 } = req.query;
+
+  // Optional auth for routine count badges
+  let user_id = null;
+  try {
+    const authHeader = req.headers['authorization'];
+    if (authHeader) {
+      const jwt = require('jsonwebtoken');
+      const token = authHeader.split(' ')[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      user_id = decoded.userId;
+    }
+  } catch (_) {}
+
+  try {
+    // Build WHERE clause
+    const conditions = [];
+    const params = [];
+    let paramIdx = 1;
+
+    if (category) {
+      conditions.push(`LOWER(category) = LOWER($${paramIdx})`);
+      params.push(category);
+      paramIdx++;
+    }
+    if (subcategory) {
+      conditions.push(`LOWER(subcategory) = LOWER($${paramIdx})`);
+      params.push(subcategory);
+      paramIdx++;
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    // Total count for pagination
+    const countResult = await pool.query(
+      `SELECT COUNT(*) FROM exercises ${whereClause}`,
+      params
+    );
+    const total = parseInt(countResult.rows[0].count);
+
+    // Fetch page
+    params.push(parseInt(limit));
+    params.push(parseInt(offset));
+    const result = await pool.query(
+      `SELECT id, name, description, category, subcategory, equipment_type
+       FROM exercises
+       ${whereClause}
+       ORDER BY category, subcategory NULLS LAST, name
+       LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
+      params
+    );
+
+    // If user is logged in, get which exercise IDs are in their routines
+    let inRoutineIds = new Set();
+    if (user_id && result.rows.length > 0) {
+      const ids = result.rows.map(r => r.id);
+      const routineCheck = await pool.query(
+        `SELECT DISTINCT re.exercise_id
+         FROM routine_exercises re
+         JOIN routines r ON r.id = re.routine_id
+         WHERE r.user_id = $1 AND re.exercise_id = ANY($2)`,
+        [user_id, ids]
+      );
+      inRoutineIds = new Set(routineCheck.rows.map(r => r.exercise_id));
+    }
+
+    res.json({
+      total,
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      exercises: result.rows.map(ex => ({
+        id: ex.id,
+        name: ex.name,
+        description: ex.description,
+        category: ex.category,
+        subcategory: ex.subcategory || null,
+        equipment_type: ex.equipment_type,
+        in_user_routine: inRoutineIds.has(ex.id)
+      }))
+    });
+  } catch (error) {
+    console.error('Browse exercises error:', error);
+    res.status(500).json({ error: 'Failed to browse exercises' });
   }
 };
 
@@ -510,6 +683,7 @@ const updateExerciseNotes = async (req, res) => {
 module.exports = {
   searchExercises,
   getExerciseById,
+  browseExercises,
   logWorkout,
   getWorkouts,
   logWorkoutSet,

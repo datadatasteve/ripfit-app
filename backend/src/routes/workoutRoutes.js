@@ -6,8 +6,9 @@ const router = express.Router();
 const workoutController = require('../controllers/workoutController');
 const authenticate = require('../middleware/auth');
 
-// Exercise search and lookup
+// Exercise search, browse, and lookup
 router.get('/exercises/search', workoutController.searchExercises);
+router.get('/exercises/browse', workoutController.browseExercises);
 router.get('/exercises/:id', workoutController.getExerciseById);
 
 // Workout logging

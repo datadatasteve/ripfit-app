@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<!-- saved from url=(0038)http://localhost:8080/ripfit-test.html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RipFit Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        input, button {
+            padding: 10px;
+            margin: 5px 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .error {
+            border-left-color: #dc3545;
+            background: #fff5f5;
+        }
+        .success {
+            border-left-color: #28a745;
+            background: #f0fff4;
+        }
+        .hidden {
+            display: none;
+        }
+        .user-info {
+            background: #e7f3ff;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        .food-item {
+            background: #f8f9fa;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>RipFit API Test Page</h1>
+    
+    <div id="userInfo" class="user-info">
+        <strong>Logged in as:</strong> <span id="userName">testuser1</span> (<span id="userEmail">test1@example.com</span>)
+        <button onclick="logout()" style="width: auto; margin-left: 10px;">Logout</button>
+    </div>
+
+    <!-- AUTH SECTION -->
+    <div id="authSection" class="section hidden">
+        <h2>Authentication</h2>
+        
+        <div>
+            <h3>Register</h3>
+            <input type="email" id="regEmail" placeholder="Email">
+            <input type="text" id="regUsername" placeholder="Username">
+            <input type="password" id="regPassword" placeholder="Password">
+            <button onclick="register()">Register</button>
+        </div>
+
+        <div style="margin-top: 20px;">
+            <h3>Login</h3>
+            <input type="email" id="loginEmail" placeholder="Email">
+            <input type="password" id="loginPassword" placeholder="Password">
+            <button onclick="login()">Login</button>
+        </div>
+
+        <div id="authResult" class="result hidden"></div>
+    </div>
+
+    <!-- FOOD SEARCH SECTION -->
+    <div id="searchSection" class="section">
+        <h2>Food Search</h2>
+        <input type="text" id="searchQuery" placeholder="Search for food (e.g., chicken)">
+        <button onclick="searchFoods()">Search</button>
+        <div id="searchResult" class="result success"><strong>Found 20 foods:</strong><br><br><div class="food-item">
+                            <strong>ID: 407447</strong> - 100% NATURAL BEEF BONE BROTH, BEEF (Del Monte Foods Inc.)<br>
+                            Per 100g: 19.00 cal | P: 4.17g | C: 0.42g | F: 0.00g
+                        </div><div class="food-item">
+                            <strong>ID: 428168</strong> - 100% NATURAL BEEF BROTH (Del Monte Foods Inc.)<br>
+                            Per 100g: 5.00 cal | P: 0.97g | C: 0.24g | F: 0.00g
+                        </div><div class="food-item">
+                            <strong>ID: 404497</strong> - 25% LESS SODIUM CORNED BEEF, 25% LESS SODIUM CORNED (Conagra Brands, Inc.)<br>
+                            Per 100g: 232.00 cal | P: 25.00g | C: 1.79g | F: 14.29g
+                        </div><div class="food-item">
+                            <strong>ID: 336918</strong> - 4 MEAT SAUSAGE, BEEF, PEPPERONI, CANADIAN BACON ORIGINAL PIZZA, 4 MEAT (Nestle USA Inc.)<br>
+                            Per 100g: 224.00 cal | P: 11.20g | C: 21.60g | F: 10.40g
+                        </div><div class="food-item">
+                            <strong>ID: 343156</strong> - 4 MEAT SAUSAGE, BEEF, PEPPERONI, CANADIAN BACON ORIGINAL PIZZA, 4 MEAT (Nestle USA Inc.)<br>
+                            Per 100g: 247.00 cal | P: 11.33g | C: 23.33g | F: 12.00g
+                        </div><div class="food-item">
+                            <strong>ID: 361922</strong> - 4 MEAT SAUSAGE, BEEF, PEPPERONI, CANADIAN BACON ORIGINAL PIZZA, 4 MEAT (Nestle USA Inc.)<br>
+                            Per 100g: 224.00 cal | P: 11.20g | C: 21.60g | F: 10.40g
+                        </div><div class="food-item">
+                            <strong>ID: 370578</strong> - 4 MEAT SAUSAGE, BEEF, PEPPERONI, CANADIAN BACON ORIGINAL PIZZA, 4 MEAT (Nestle USA Inc.)<br>
+                            Per 100g: 247.00 cal | P: 11.33g | C: 23.33g | F: 12.00g
+                        </div><div class="food-item">
+                            <strong>ID: 383411</strong> - 4 MEAT SAUSAGE, BEEF, PEPPERONI, CANADIAN BACON ORIGINAL PIZZA, 4 MEAT (Nestle USA Inc.)<br>
+                            Per 100g: 224.00 cal | P: 11.20g | C: 21.60g | F: 10.40g
+                        </div><div class="food-item">
+                            <strong>ID: 387605</strong> - 4 MEAT SAUSAGE, BEEF, PEPPERONI, CANADIAN BACON ORIGINAL PIZZA, 4 MEAT (Nestle USA Inc.)<br>
+                            Per 100g: 247.00 cal | P: 11.33g | C: 23.33g | F: 12.00g
+                        </div><div class="food-item">
+                            <strong>ID: 405408</strong> - 4 MEAT SAUSAGE, BEEF, PEPPERONI, CANADIAN BACON ORIGINAL PIZZA, 4 MEAT (Nestle USA Inc.)<br>
+                            Per 100g: 247.00 cal | P: 11.33g | C: 23.33g | F: 12.00g
+                        </div><div class="food-item">
+                            <strong>ID: 414093</strong> - 4 MEAT SAUSAGE, BEEF, PEPPERONI, CANADIAN BACON ORIGINAL PIZZA, 4 MEAT (Nestle USA Inc.)<br>
+                            Per 100g: 247.00 cal | P: 11.33g | C: 23.33g | F: 12.00g
+                        </div><div class="food-item">
+                            <strong>ID: 418497</strong> - 4 MEAT SAUSAGE, BEEF, PEPPERONI, CANADIAN BACON ORIGINAL PIZZA, 4 MEAT (Nestle USA Inc.)<br>
+                            Per 100g: 245.00 cal | P: 11.89g | C: 24.48g | F: 11.89g
+                        </div><div class="food-item">
+                            <strong>ID: 424829</strong> - 4 MEAT SAUSAGE, BEEF, PEPPERONI, CANADIAN BACON ORIGINAL PIZZA, 4 MEAT (Nestle USA Inc.)<br>
+                            Per 100g: 224.00 cal | P: 11.20g | C: 21.60g | F: 10.40g
+                        </div><div class="food-item">
+                            <strong>ID: 443922</strong> - 4 MEAT SAUSAGE, BEEF, PEPPERONI, CANADIAN BACON ORIGINAL PIZZA, 4 MEAT (Nestle USA Inc.)<br>
+                            Per 100g: 245.00 cal | P: 11.89g | C: 24.48g | F: 11.89g
+                        </div><div class="food-item">
+                            <strong>ID: 295715</strong> - 99% FAT FREE BEEF BROTH, BEEF (Del Monte Foods Inc.)<br>
+                            Per 100g: 6.00 cal | P: 1.67g | C: 0.00g | F: 0.00g
+                        </div><div class="food-item">
+                            <strong>ID: 328853</strong> - 99% FAT FREE BEEF BROTH, BEEF (Del Monte Foods Inc.)<br>
+                            Per 100g: 6.00 cal | P: 1.67g | C: 0.00g | F: 0.00g
+                        </div><div class="food-item">
+                            <strong>ID: 347690</strong> - 99% FAT FREE BEEF BROTH, BEEF (Del Monte Foods Inc.)<br>
+                            Per 100g: 6.00 cal | P: 1.67g | C: 0.00g | F: 0.00g
+                        </div><div class="food-item">
+                            <strong>ID: 361168</strong> - 99% FAT FREE BEEF BROTH, BEEF (Del Monte Foods Inc.)<br>
+                            Per 100g: 6.00 cal | P: 1.67g | C: 0.00g | F: 0.00g
+                        </div><div class="food-item">
+                            <strong>ID: 382817</strong> - 99% FAT FREE BEEF BROTH, BEEF (Del Monte Foods Inc.)<br>
+                            Per 100g: 6.00 cal | P: 1.67g | C: 0.00g | F: 0.00g
+                        </div><div class="food-item">
+                            <strong>ID: 431407</strong> - 99% FAT FREE BEEF RAVIOLI IN TOMATO &amp; MEAT SAUCE, 99% FAT FREE BEEF (Conagra Brands, Inc.)<br>
+                            Per 100g: 70.00 cal | P: 2.87g | C: 12.70g | F: 0.82g
+                        </div></div>
+    </div>
+
+    <!-- BARCODE SCANNER SECTION -->
+    <div id="barcodeSection" class="section">
+        <h2>Barcode Scanner</h2>
+        <input type="text" id="barcodeInput" placeholder="Enter barcode (e.g., 00051000198808)">
+        <button onclick="scanBarcode()">Scan</button>
+        <div id="barcodeResult" class="result hidden"></div>
+    </div>
+
+    <!-- MEAL LOGGING SECTION -->
+    <div id="mealSection" class="section">
+        <h2>Log Meal</h2>
+        <input type="date" id="mealDate" placeholder="Date">
+        <select id="mealType">
+            <option value="breakfast">Breakfast</option>
+            <option value="lunch">Lunch</option>
+            <option value="dinner">Dinner</option>
+            <option value="snack">Snack</option>
+        </select>
+        <input type="text" id="mealName" placeholder="Meal name (optional)">
+        <input type="number" id="foodId" placeholder="Food ID">
+        <input type="number" id="servingSize" placeholder="Serving size (g)">
+        <button onclick="logMeal()">Log Meal</button>
+        <div id="mealResult" class="result hidden"></div>
+    </div>
+
+    <!-- EXERCISE SEARCH SECTION -->
+    <div id="exerciseSearchSection" class="section">
+        <h2>Exercise Search</h2>
+        <input type="text" id="exerciseQuery" placeholder="Search for exercise (e.g., bench)">
+        <button onclick="searchExercises()">Search</button>
+        <div id="exerciseResult" class="result success"><strong>Found 20 exercises:</strong><br><br><div class="food-item">
+                            <strong>ID: 45</strong> - Barbell Bench Press - Medium Grip<br>
+                            Category: Chest | Equipment: Barbell<br>
+                            Lie back on a flat bench. Using a medium width grip (a grip that creates a 90-degree angle in the middle of the movement between the forearms and the ...
+                        </div><div class="food-item">
+                            <strong>ID: 51</strong> - Barbell Guillotine Bench Press<br>
+                            Category: Chest | Equipment: Barbell<br>
+                            Using a medium width grip (a grip that creates a 90-degree angle in the middle of the movement between the forearms and the upper arms), lift the bar ...
+                        </div><div class="food-item">
+                            <strong>ID: 54</strong> - Barbell Incline Bench Press - Medium Grip<br>
+                            Category: Chest | Equipment: Barbell<br>
+                            Lie back on an incline bench. Using a medium-width grip (a grip that creates a 90-degree angle in the middle of the movement between the forearms and ...
+                        </div><div class="food-item">
+                            <strong>ID: 58</strong> - Barbell Rollout from Bench<br>
+                            Category: Abs | Equipment: Barbell<br>
+                            Place a loaded barbell on the ground, near the end of a bench. Kneel with both legs on the bench, and take a medium to narrow grip on the barbell. Thi...
+                        </div><div class="food-item">
+                            <strong>ID: 66</strong> - Barbell Squat To A Bench<br>
+                            Category: Legs | Equipment: Barbell<br>
+                            This exercise is best performed inside a squat rack for safety purposes. To begin, first place a flat bench or a box behind you. The flat bench is use...
+                        </div><div class="food-item">
+                            <strong>ID: 72</strong> - Bench Dips<br>
+                            Category: Arms | Equipment: Bodyweight<br>
+                            For this exercise you will need to place a bench behind your back. With the bench perpendicular to your body, and while looking away from it, hold on ...
+                        </div><div class="food-item">
+                            <strong>ID: 73</strong> - Bench Jump<br>
+                            Category: Legs | Equipment: Bodyweight<br>
+                            Begin with a box or bench 1-2 feet in front of you. Stand with your feet shoulder width apart. This will be your starting position. Perform a short sq...
+                        </div><div class="food-item">
+                            <strong>ID: 74</strong> - Bench Press - Powerlifting<br>
+                            Category: Arms | Equipment: Barbell<br>
+                            Begin by lying on the bench, getting your head beyond the bar if possible. Tuck your feet underneath you and arch your back. Using the bar to help sup...
+                        </div><div class="food-item">
+                            <strong>ID: 75</strong> - Bench Press - With Bands<br>
+                            Category: Chest | Equipment: Resistance Band<br>
+                            Using a flat bench secure a band under the leg of the bench that is nearest to your head. Once the band is secure, grab it by both handles and lie dow...
+                        </div><div class="food-item">
+                            <strong>ID: 76</strong> - Bench Press with Chains<br>
+                            Category: Arms | Equipment: Barbell<br>
+                            Adjust the leader chain, shortening it to the desired length.Place the chains on the sleeves of the bar. Lying on the bench, get your head beyond the ...
+                        </div><div class="food-item">
+                            <strong>ID: 77</strong> - Bench Sprint<br>
+                            Category: Legs | Equipment: Bodyweight<br>
+                            Stand on the ground with one foot resting on a bench or box with your heel close to the edge. Push off with your foot on top of the bench, extending t...
+                        </div><div class="food-item">
+                            <strong>ID: 82</strong> - Bent Over Dumbbell Rear Delt Raise With Head On Bench<br>
+                            Category: Shoulders | Equipment: Dumbbell<br>
+                            Stand up straight while holding a dumbbell in each hand and with an incline bench in front of you. While keeping your back straight and maintaining th...
+                        </div><div class="food-item">
+                            <strong>ID: 172</strong> - Close-Grip Barbell Bench Press<br>
+                            Category: Arms | Equipment: Barbell<br>
+                            Lie back on a flat bench. Using a close grip (around shoulder width), lift the bar from the rack and hold it straight over you with your arms locked. ...
+                        </div><div class="food-item">
+                            <strong>ID: 196</strong> - Decline Barbell Bench Press<br>
+                            Category: Chest | Equipment: Barbell<br>
+                            Secure your legs at the end of the decline bench and slowly lay down on the bench. Using a medium width grip (a grip that creates a 90-degree angle in...
+                        </div><div class="food-item">
+                            <strong>ID: 197</strong> - Decline Close-Grip Bench To Skull Crusher<br>
+                            Category: Arms | Equipment: Barbell<br>
+                            Secure your legs at the end of the decline bench and slowly lay down on the bench. Using a close grip (a grip that is slightly less than shoulder widt...
+                        </div><div class="food-item">
+                            <strong>ID: 199</strong> - Decline Dumbbell Bench Press<br>
+                            Category: Chest | Equipment: Dumbbell<br>
+                            Secure your legs at the end of the decline bench and lie down with a dumbbell on each hand on top of your thighs. The palms of your hand will be facin...
+                        </div><div class="food-item">
+                            <strong>ID: 223</strong> - Dumbbell Bench Press<br>
+                            Category: Chest | Equipment: Dumbbell<br>
+                            Lie down on a flat bench with a dumbbell in each hand resting on top of your thighs. The palms of your hands will be facing each other. Then, using yo...
+                        </div><div class="food-item">
+                            <strong>ID: 224</strong> - Dumbbell Bench Press with Neutral Grip<br>
+                            Category: Chest | Equipment: Dumbbell<br>
+                            Take a dumbbell in each hand and lay back onto a flat bench. Your feet should be flat on the floor and your shoulder blades retracted. Maintaining a n...
+                        </div><div class="food-item">
+                            <strong>ID: 249</strong> - Dumbbell Squat To A Bench<br>
+                            Category: Legs | Equipment: Dumbbell<br>
+                            Stand up straight with a flat bench behind you while holding a dumbbell on each hand (palms facing the side of your legs). Position your legs using a ...
+                        </div><div class="food-item">
+                            <strong>ID: 272</strong> - Flat Bench Cable Flyes<br>
+                            Category: Chest | Equipment: Cable<br>
+                            Position a flat bench between two low pulleys so that when you are laying on it, your chest will be lined up with the cable pulleys. Lay flat on the b...
+                        </div></div>
+    </div>
+
+    <!-- WORKOUT LOGGING SECTION -->
+    <div id="workoutSection" class="section">
+        <h2>Log Workout</h2>
+        <input type="date" id="workoutDate" placeholder="Date">
+        <input type="number" id="exerciseId" placeholder="Exercise ID">
+        <input type="number" id="reps" placeholder="Reps">
+        <input type="number" id="weight" placeholder="Weight (lbs)">
+        <input type="number" id="rpe" placeholder="RPE (1-10, optional)">
+        <button onclick="logWorkout()">Log Workout</button>
+        <div id="workoutResult" class="result error">Error: null value in column "user_id" of relation "workouts" violates not-null constraint</div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000/api/v1';
+        let authToken = localStorage.getItem('ripfit_token');
+        let currentUser = JSON.parse(localStorage.getItem('ripfit_user') || 'null');
+
+        // Initialize page
+        if (authToken && currentUser) {
+            showLoggedInState();
+        }
+
+        function showLoggedInState() {
+            document.getElementById('authSection').classList.add('hidden');
+            document.getElementById('searchSection').classList.remove('hidden');
+            document.getElementById('barcodeSection').classList.remove('hidden');
+            document.getElementById('mealSection').classList.remove('hidden');
+            document.getElementById('exerciseSearchSection').classList.remove('hidden');
+            document.getElementById('workoutSection').classList.remove('hidden');
+            document.getElementById('userInfo').classList.remove('hidden');
+            document.getElementById('userName').textContent = currentUser.username;
+            document.getElementById('userEmail').textContent = currentUser.email;
+            
+            // Set today's date
+            document.getElementById('mealDate').valueAsDate = new Date();
+            document.getElementById('workoutDate').valueAsDate = new Date();
+        }
+
+        function showLoggedOutState() {
+            document.getElementById('authSection').classList.remove('hidden');
+            document.getElementById('searchSection').classList.add('hidden');
+            document.getElementById('barcodeSection').classList.add('hidden');
+            document.getElementById('mealSection').classList.add('hidden');
+            document.getElementById('userInfo').classList.add('hidden');
+        }
+
+        function logout() {
+            localStorage.removeItem('ripfit_token');
+            localStorage.removeItem('ripfit_user');
+            authToken = null;
+            currentUser = null;
+            showLoggedOutState();
+            showResult('authResult', 'Logged out successfully', 'success');
+        }
+
+        async function register() {
+            const email = document.getElementById('regEmail').value;
+            const username = document.getElementById('regUsername').value;
+            const password = document.getElementById('regPassword').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, username, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    authToken = data.token;
+                    currentUser = data.user;
+                    localStorage.setItem('ripfit_token', authToken);
+                    localStorage.setItem('ripfit_user', JSON.stringify(currentUser));
+                    showResult('authResult', `Registration successful! Welcome ${data.user.username}`, 'success');
+                    setTimeout(showLoggedInState, 1000);
+                } else {
+                    showResult('authResult', `Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult('authResult', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function login() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    authToken = data.token;
+                    currentUser = data.user;
+                    localStorage.setItem('ripfit_token', authToken);
+                    localStorage.setItem('ripfit_user', JSON.stringify(currentUser));
+                    showResult('authResult', `Login successful! Welcome back ${data.user.username}`, 'success');
+                    setTimeout(showLoggedInState, 1000);
+                } else {
+                    showResult('authResult', `Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult('authResult', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function searchFoods() {
+            const query = document.getElementById('searchQuery').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/nutrition/foods/search?q=${query}`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    let html = `<strong>Found ${data.count} foods:</strong><br><br>`;
+                    data.foods.forEach(food => {
+                        html += `<div class="food-item">
+                            <strong>ID: ${food.id}</strong> - ${food.name} ${food.brand ? `(${food.brand})` : ''}<br>
+                            Per 100g: ${food.calories_per_100g} cal | P: ${food.protein_per_100g}g | C: ${food.carbs_per_100g}g | F: ${food.fat_per_100g}g
+                        </div>`;
+                    });
+                    showResult('searchResult', html, 'success');
+                } else {
+                    showResult('searchResult', `Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult('searchResult', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function scanBarcode() {
+            const barcode = document.getElementById('barcodeInput').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/nutrition/foods/barcode/${barcode}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+
+                if (response.ok && data.food) {
+                    const food = data.food;
+                    const html = `<div class="food-item">
+                        <strong>${food.name}</strong> ${food.brand ? `- ${food.brand}` : ''}<br>
+                        <strong>ID: ${food.id}</strong> (use this for meal logging)<br>
+                        Per 100g: ${food.calories_per_100g} cal | P: ${food.protein_per_100g}g | C: ${food.carbs_per_100g}g | F: ${food.fat_per_100g}g<br>
+                        Serving: ${food.serving_size} ${food.serving_unit}
+                    </div>`;
+                    showResult('barcodeResult', html, 'success');
+                    // Pre-fill meal form
+                    document.getElementById('foodId').value = food.id;
+                    document.getElementById('servingSize').value = food.serving_size;
+                } else {
+                    showResult('barcodeResult', `Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult('barcodeResult', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function logMeal() {
+            const meal_date = document.getElementById('mealDate').value;
+            const meal_type = document.getElementById('mealType').value;
+            const meal_name = document.getElementById('mealName').value;
+            const food_id = parseInt(document.getElementById('foodId').value);
+            const serving_size = parseFloat(document.getElementById('servingSize').value);
+
+            const payload = {
+                meal_date,
+                meal_type,
+                meal_name: meal_name || null,
+                foods: [{
+                    food_id,
+                    quantity: serving_size,
+                    serving_size,
+                    serving_unit: 'g'
+                }]
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/nutrition/meals`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showResult('mealResult', `Meal logged successfully!\n${JSON.stringify(data, null, 2)}`, 'success');
+                } else {
+                    showResult('mealResult', `Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult('mealResult', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function searchExercises() {
+            const query = document.getElementById('exerciseQuery').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/workouts/exercises/search?q=${query}`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    let html = `<strong>Found ${data.count} exercises:</strong><br><br>`;
+                    data.exercises.forEach(ex => {
+                        html += `<div class="food-item">
+                            <strong>ID: ${ex.id}</strong> - ${ex.name}<br>
+                            Category: ${ex.category || 'N/A'} | Equipment: ${ex.equipment_type || 'N/A'}<br>
+                            ${ex.description ? ex.description.substring(0, 150) + '...' : ''}
+                        </div>`;
+                    });
+                    showResult('exerciseResult', html, 'success');
+                } else {
+                    showResult('exerciseResult', `Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult('exerciseResult', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function logWorkout() {
+            const workout_date = document.getElementById('workoutDate').value;
+            const exercise_id = parseInt(document.getElementById('exerciseId').value);
+            const reps = parseInt(document.getElementById('reps').value);
+            const weight = parseFloat(document.getElementById('weight').value);
+            const rpe = document.getElementById('rpe').value ? parseInt(document.getElementById('rpe').value) : null;
+
+            const payload = {
+                workout_date,
+                exercises: [{
+                    exercise_id,
+                    sets: [{
+                        reps,
+                        weight,
+                        rpe
+                    }]
+                }]
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/workouts`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showResult('workoutResult', `Workout logged successfully!\n${JSON.stringify(data, null, 2)}`, 'success');
+                } else {
+                    showResult('workoutResult', `Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult('workoutResult', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        function showResult(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = message;
+            element.className = `result ${type}`;
+            element.classList.remove('hidden');
+        }
+    </script>
+
+</body></html>
