@@ -16,6 +16,7 @@ export default function ExerciseBrowser() {
 
   const [categoryFilter, setCategoryFilter] = useState('');
   const [subcategoryFilter, setSubcategoryFilter] = useState('');
+  const [equipmentFilter, setEquipmentFilter] = useState('');
   const [armsExpanded, setArmsExpanded] = useState(false);
 
   const [searchInput, setSearchInput] = useState('');
@@ -27,12 +28,13 @@ export default function ExerciseBrowser() {
   // ----------------------------------------------------------------
   // Core fetch — takes explicit args so no stale closure issues
   // ----------------------------------------------------------------
-  const fetchBrowse = useCallback(async (cat, subcat, newOffset, append) => {
+  const fetchBrowse = useCallback(async (cat, subcat, equip, newOffset, append) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ limit: LIMIT, offset: newOffset });
       if (cat) params.set('category', cat);
       if (subcat) params.set('subcategory', subcat);
+      if (equip) params.set('equipment', equip);
 
       const res = await fetch(`${API_BASE}/workouts/exercises/browse?${params}`, { headers: authHeaders });
       const data = await res.json();
@@ -67,7 +69,7 @@ export default function ExerciseBrowser() {
 
   // Initial load
   useEffect(() => {
-    fetchBrowse('', '', 0, false);
+    fetchBrowse('', '', '', 0, false);
   }, []);
 
   // ----------------------------------------------------------------
@@ -80,18 +82,18 @@ export default function ExerciseBrowser() {
       setCategoryFilter('');
       setSubcategoryFilter('');
       setArmsExpanded(false);
-      fetchBrowse('', '', 0, false);
+      fetchBrowse('', '', equipmentFilter, 0, false);
     } else if (cat === 'Arms') {
       const expanding = !armsExpanded;
       setArmsExpanded(expanding);
       setCategoryFilter('Arms');
       setSubcategoryFilter('');
-      fetchBrowse('Arms', '', 0, false);
+      fetchBrowse('Arms', '', equipmentFilter, 0, false);
     } else {
       setCategoryFilter(cat);
       setSubcategoryFilter('');
       setArmsExpanded(false);
-      fetchBrowse(cat, '', 0, false);
+      fetchBrowse(cat, '', equipmentFilter, 0, false);
     }
   };
 
@@ -99,7 +101,7 @@ export default function ExerciseBrowser() {
     setSubcategoryFilter(sub);
     setCategoryFilter('Arms');
     setSelectedExercise(null);
-    fetchBrowse('Arms', sub, 0, false);
+    fetchBrowse('Arms', sub, equipmentFilter, 0, false);
   };
 
   const handleSearch = () => {
@@ -117,7 +119,14 @@ export default function ExerciseBrowser() {
     setSearchInput('');
     setActiveSearch('');
     setSelectedExercise(null);
-    fetchBrowse(categoryFilter, subcategoryFilter, 0, false);
+    fetchBrowse(categoryFilter, subcategoryFilter, equipmentFilter, 0, false);
+  };
+
+  const handleEquipmentClick = (equip) => {
+    setSelectedExercise(null);
+    const newEquip = equip === equipmentFilter ? '' : equip; // toggle off if already selected
+    setEquipmentFilter(newEquip);
+    fetchBrowse(categoryFilter, subcategoryFilter, newEquip, 0, false);
   };
 
   const handleLoadMore = () => {
@@ -125,7 +134,7 @@ export default function ExerciseBrowser() {
     if (activeSearch) {
       fetchSearch(activeSearch, newOffset, true);
     } else {
-      fetchBrowse(categoryFilter, subcategoryFilter, newOffset, true);
+      fetchBrowse(categoryFilter, subcategoryFilter, equipmentFilter, newOffset, true);
     }
   };
 
@@ -200,7 +209,18 @@ export default function ExerciseBrowser() {
           ))}
         </div>
 
-        {/* Result count */}
+        {/* Equipment filter pills */}
+        <div className="browser-category-filters browser-equipment-filters">
+          {['Barbell', 'Dumbbell', 'Cable', 'Machine', 'Kettlebell', 'Bodyweight', 'Resistance Band', 'Pull-up bar', 'EZ Bar'].map(equip => (
+            <button
+              key={equip}
+              className={`cat-pill ${equipmentFilter === equip ? 'active' : ''}`}
+              onClick={() => handleEquipmentClick(equip)}
+            >
+              {equip}
+            </button>
+          ))}
+        </div>
         <div className="browser-list-header">
           {activeSearch
             ? `Results for "${activeSearch}" — ${exercises.length}${hasMore ? '+' : ''}`

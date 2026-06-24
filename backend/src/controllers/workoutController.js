@@ -260,7 +260,7 @@ const getExerciseById = async (req, res) => {
  * GET /api/v1/workouts/exercises?category=Arms&subcategory=Biceps&limit=50&offset=0
  */
 const browseExercises = async (req, res) => {
-  const { category, subcategory, limit = 50, offset = 0 } = req.query;
+  const { category, subcategory, equipment, limit = 50, offset = 0 } = req.query;
 
   // Optional auth for routine count badges
   let user_id = null;
@@ -288,6 +288,11 @@ const browseExercises = async (req, res) => {
     if (subcategory) {
       conditions.push(`LOWER(subcategory) = LOWER($${paramIdx})`);
       params.push(subcategory);
+      paramIdx++;
+    }
+    if (equipment) {
+      conditions.push(`LOWER(equipment_type) = LOWER($${paramIdx})`);
+      params.push(equipment);
       paramIdx++;
     }
 

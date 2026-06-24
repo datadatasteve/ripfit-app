@@ -340,9 +340,9 @@ const startWorkoutFromRoutine = async (req, res) => {
     // Create new workout
     const workoutResult = await client.query(
       `INSERT INTO workouts (user_id, workout_date, routine_id, start_time)
-       VALUES ($1, $2, $3, NOW())
+       VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [user_id, workout_date, id]
+      [user_id, workout_date, id, new Date().toISOString()]
     );
 
     const workout = workoutResult.rows[0];

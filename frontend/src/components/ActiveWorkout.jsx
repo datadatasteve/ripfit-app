@@ -3,13 +3,11 @@ import './ActiveWorkout.css';
 
 const API_BASE = 'http://localhost:3000/api/v1';
 
-export default function ActiveWorkout() {
+export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workoutSummary, setWorkoutSummary, showNavClock, setShowNavClock }) {
   const [token, setToken] = useState(localStorage.getItem('ripfit_token'));
   const [routines, setRoutines] = useState([]);
   const [selectedRoutine, setSelectedRoutine] = useState(null);
-  const [activeWorkout, setActiveWorkout] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [workoutSummary, setWorkoutSummary] = useState(null);
 
   useEffect(() => {
     if (token) fetchRoutines();
@@ -126,11 +124,13 @@ export default function ActiveWorkout() {
         }
       });
 
-      // Build summary data before clearing workout
-      const duration = Math.round((Date.now() - new Date(activeWorkout.workout.start_time).getTime()) / 60000);
+      // Build summary data before clearing workout (subtract any paused time)
+      const pausedSeconds = activeWorkout.workout.total_paused_seconds || 0;
+      const rawMs = Date.now() - new Date(activeWorkout.workout.start_time).getTime();
+      const duration = Math.round((rawMs / 1000 - pausedSeconds) / 60);
       setWorkoutSummary({
         routine_name: activeWorkout.routine_name,
-        duration_minutes: Math.round((Date.now() - new Date(activeWorkout.workout.start_time).getTime()) / 60000),
+        duration_minutes: duration,
         exercises: activeWorkout.exercises.map(ex => ({
           exercise_name: ex.exercise_name,
           category: ex.category,
@@ -254,6 +254,8 @@ export default function ActiveWorkout() {
       setActiveWorkout={setActiveWorkout}
       onLogSet={logSet}
       onFinish={finishWorkout}
+      showNavClock={showNavClock}
+      setShowNavClock={setShowNavClock}
     />;
   }
 
@@ -283,19 +285,75 @@ export default function ActiveWorkout() {
   );
 }
 
-function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish }) {
+function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, showNavClock, setShowNavClock }) {
   const [currentExerciseIdx, setCurrentExerciseIdx] = useState(0);
   const [setForm, setSetForm] = useState({ reps: '', weight: '', rpe: '' });
   const [showAddExercise, setShowAddExercise] = useState(false);
   const [showChangeExercise, setShowChangeExercise] = useState(false);
   const [showToast, setShowToast] = useState(false);
-  const [restTimer, setRestTimer] = useState(null);
-  const [restSeconds, setRestSeconds] = useState(0);
   const [showAllExercises, setShowAllExercises] = useState(false);
   const [noteInput, setNoteInput] = useState('');
   const [editingNotes, setEditingNotes] = useState(false);
   const [editNotesText, setEditNotesText] = useState('');
   const [workoutNotes, setWorkoutNotes] = useState('');
+  const [showHeaderClockSettings, setShowHeaderClockSettings] = useState(false);
+  const [showHeaderClock, setShowHeaderClock] = useState(true); // toggle: elapsed clock in header
+
+  // Tick once per second purely to force a re-render so the elapsed
+  // clock display stays live. The actual elapsed time is always derived
+  // from workout.workout.start_time / paused_at, never from this tick.
+  const [, setClockTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setClockTick(t => t + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const isPaused = !!workout.workout.paused_at;
+
+  const getElapsedSeconds = () => {
+    const pausedSeconds = workout.workout.total_paused_seconds || 0;
+    const currentPauseSeconds = workout.workout.paused_at
+      ? Math.floor((Date.now() - new Date(workout.workout.paused_at).getTime()) / 1000)
+      : 0;
+    const rawElapsed = Math.floor((Date.now() - new Date(workout.workout.start_time).getTime()) / 1000);
+    return Math.max(0, rawElapsed - pausedSeconds - currentPauseSeconds);
+  };
+
+  const togglePause = () => {
+    if (isPaused) {
+      // Resume: fold the just-finished pause into total_paused_seconds
+      const pauseDurationSeconds = Math.floor((Date.now() - new Date(workout.workout.paused_at).getTime()) / 1000);
+      setActiveWorkout({
+        ...workout,
+        workout: {
+          ...workout.workout,
+          paused_at: null,
+          total_paused_seconds: (workout.workout.total_paused_seconds || 0) + pauseDurationSeconds
+        }
+      });
+    } else {
+      // Pause: record the timestamp pause began
+      setActiveWorkout({
+        ...workout,
+        workout: { ...workout.workout, paused_at: new Date().toISOString() }
+      });
+    }
+  };
+
+  const elapsedSeconds = getElapsedSeconds();
+  const elapsedM = Math.floor(elapsedSeconds / 60);
+  const elapsedS = elapsedSeconds % 60;
+  const elapsedStr = `${elapsedM}:${String(elapsedS).padStart(2, '0')}`;
+
+  const currentPauseSeconds = isPaused
+    ? Math.floor((Date.now() - new Date(workout.workout.paused_at).getTime()) / 1000)
+    : 0;
+  const pauseM = Math.floor(currentPauseSeconds / 60);
+  const pauseS = currentPauseSeconds % 60;
+  const pausedStr = `${pauseM}:${String(pauseS).padStart(2, '0')}`;
+
+  // TEMP DEBUG - remove once start_time field is confirmed
+  window.__ripfitDebug = workout.workout;
   const [showWorkoutNotes, setShowWorkoutNotes] = useState(false);
   const [workoutNotesSaved, setWorkoutNotesSaved] = useState(true);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
@@ -555,28 +613,17 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish }) {
       return;
     }
 
-    // Clear any existing timer before starting new one
-    if (restTimer) {
-      clearInterval(restTimer);
-    }
+    // Start rest timer - timestamp-based so it survives navigation/unmount.
+    // Default 60s; respects per-exercise override and on/off toggle if set.
+    const restEnabled = currentExercise.rest_timer_enabled !== false; // default true
+    const restDuration = currentExercise.rest_timer_seconds || 60;
 
-    // Start rest timer (60 seconds default)
-    const restDuration = 60;
-    setRestSeconds(restDuration);
-    
-    const timer = setInterval(() => {
-      setRestSeconds(prev => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          setRestTimer(null);
-          if (navigator.vibrate) navigator.vibrate(200);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    
-    setRestTimer(timer);
+    if (restEnabled) {
+      setActiveWorkout(prev => ({
+        ...prev,
+        workout: { ...prev.workout, rest_ends_at: new Date(Date.now() + restDuration * 1000).toISOString() }
+      }));
+    }
 
     // Auto-progress if target sets reached (with brief delay)
     // setNumber = loggedSets.length + 1 = the set we just logged
@@ -589,12 +636,31 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish }) {
   };
 
   const skipRest = () => {
-    if (restTimer) {
-      clearInterval(restTimer);
-      setRestTimer(null);
-      setRestSeconds(0);
-    }
+    setActiveWorkout(prev => ({
+      ...prev,
+      workout: { ...prev.workout, rest_ends_at: null }
+    }));
   };
+
+  // Derive remaining rest seconds from the persisted timestamp.
+  // Recomputed every render tick - survives unmount/remount since the
+  // timestamp lives in lifted App.jsx state, not local component state.
+  const restEndsAt = workout.workout.rest_ends_at;
+  const restSeconds = restEndsAt
+    ? Math.max(0, Math.ceil((new Date(restEndsAt).getTime() - Date.now()) / 1000))
+    : 0;
+  const isResting = restEndsAt && restSeconds > 0;
+
+  // Clear the timestamp once it naturally hits 0 (avoids stale "resting" class)
+  useEffect(() => {
+    if (restEndsAt && restSeconds === 0) {
+      if (navigator.vibrate) navigator.vibrate(200);
+      setActiveWorkout(prev => ({
+        ...prev,
+        workout: { ...prev.workout, rest_ends_at: null }
+      }));
+    }
+  }, [restSeconds, restEndsAt]);
 
   // Auto-progress version - no unsaved warning prompts
   const autoNextExercise = () => {
@@ -643,6 +709,34 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish }) {
       <div className="workout-header">
         <h2>{workout.routine_name}</h2>
         <div className="header-buttons">
+          {showHeaderClock && (
+            <>
+              <span className={`workout-elapsed-clock ${isPaused ? 'paused' : ''}`}>
+                {isPaused ? '⏸' : '⏱'} {elapsedStr}
+              </span>
+              {isPaused && (
+                <span className="workout-pause-duration">{pausedStr}</span>
+              )}
+            </>
+          )}
+          <button onClick={togglePause} className={`pause-resume-btn ${isPaused ? 'is-paused' : ''}`}>
+            {isPaused ? '▶ Resume' : '⏸ Pause'}
+          </button>
+          <div className="clock-settings-wrapper">
+            <button onClick={() => setShowHeaderClockSettings(prev => !prev)} className="clock-settings-btn" title="Clock display settings">⚙</button>
+            {showHeaderClockSettings && (
+              <div className="clock-settings-dropdown">
+                <label>
+                  <input type="checkbox" checked={showHeaderClock} onChange={e => setShowHeaderClock(e.target.checked)} />
+                  Show clock in header
+                </label>
+                <label>
+                  <input type="checkbox" checked={showNavClock} onChange={e => setShowNavClock(e.target.checked)} />
+                  Show clock in nav
+                </label>
+              </div>
+            )}
+          </div>
           <button onClick={() => setShowWorkoutNotes(true)} className="workout-notes-btn">
             Workout Notes {workoutNotes ? '📝' : ''}
           </button>
@@ -650,6 +744,12 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish }) {
           <button onClick={() => setShowFinishConfirm(true)} className="finish-btn">Finish Workout</button>
         </div>
       </div>
+
+      {isPaused && (
+        <div className="workout-paused-banner">
+          Workout paused — duration clock stopped. Rest timer (if active) keeps running.
+        </div>
+      )}
 
       <div className="exercise-progress">
         Exercise {currentExerciseIdx + 1} of {exercises.length}
@@ -879,14 +979,14 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish }) {
           </div>
         </div>
 
-        {restTimer && restSeconds > 0 && (
+        {isResting && (
           <div className="rest-timer">
             <div className="timer-display">{restSeconds}s</div>
             <button onClick={skipRest} className="skip-rest-btn">Skip Rest</button>
           </div>
         )}
 
-        <div className={`set-form ${restTimer ? 'resting' : ''}`}>
+        <div className={`set-form ${isResting ? 'resting' : ''}`}>
           <h4>Log Set {loggedSets.length + 1}</h4>
           <div className="form-row">
             <input
@@ -1399,4 +1499,3 @@ function ChangeExerciseModal({ onChange, onClose, currentExercise }) {
     </div>
   );
 }
-
