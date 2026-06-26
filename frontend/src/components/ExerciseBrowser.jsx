@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
+import RoutineBuilder from './RoutineBuilder';
 import './ExerciseBrowser.css';
 
 const API_BASE = 'http://localhost:3000/api/v1';
 const LIMIT = 50;
 const CATEGORIES = ['All', 'Chest', 'Back', 'Shoulders', 'Arms', 'Legs', 'Abs', 'Cardio', 'General'];
 
-export default function ExerciseBrowser() {
+export default function ExerciseBrowser({ activeWorkout, setActiveWorkout }) {
   const [exercises, setExercises] = useState([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -13,6 +14,16 @@ export default function ExerciseBrowser() {
 
   const [selectedExercise, setSelectedExercise] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+
+  const [showAddToWorkout, setShowAddToWorkout] = useState(false);
+  const [addForm, setAddForm] = useState({ sets: '', reps: '', weight: '' });
+  const [addStatus, setAddStatus] = useState(''); // '', 'adding', 'added', 'error'
+  const [showRoutineBuilder, setShowRoutineBuilder] = useState(false);
+  const [showRoutinePicker, setShowRoutinePicker] = useState(false);
+  const [userRoutines, setUserRoutines] = useState([]);
+  const [pickedRoutineId, setPickedRoutineId] = useState(null);
+  const [routineAddForm, setRoutineAddForm] = useState({ sets: '', reps: '', weight: '' });
+  const [routinePickerStatus, setRoutinePickerStatus] = useState('');
 
   const [categoryFilter, setCategoryFilter] = useState('');
   const [subcategoryFilter, setSubcategoryFilter] = useState('');
@@ -140,6 +151,9 @@ export default function ExerciseBrowser() {
 
   const fetchDetail = async (id) => {
     setDetailLoading(true);
+    setShowAddToWorkout(false);
+    setAddStatus('');
+    setAddForm({ sets: '', reps: '', weight: '' });
     try {
       const res = await fetch(`${API_BASE}/workouts/exercises/${id}`, { headers: authHeaders });
       const data = await res.json();
@@ -148,6 +162,120 @@ export default function ExerciseBrowser() {
       console.error('Detail fetch failed:', err);
     }
     setDetailLoading(false);
+  };
+
+  const openRoutinePicker = async () => {
+    setShowRoutinePicker(true);
+    setRoutinePickerStatus('loading');
+    try {
+      const res = await fetch(`${API_BASE}/routines`, { headers: authHeaders });
+      const data = await res.json();
+      setUserRoutines(data.routines || []);
+      setRoutinePickerStatus('');
+    } catch (err) {
+      console.error('Failed to fetch routines:', err);
+      setRoutinePickerStatus('error');
+    }
+  };
+
+  const addToExistingRoutine = async (routineId) => {
+    setRoutinePickerStatus('adding');
+    try {
+      // Fetch current routine to know how many exercises it has (for order_index)
+      const detailRes = await fetch(`${API_BASE}/routines/${routineId}`, { headers: authHeaders });
+      const detail = await detailRes.json();
+      const nextIndex = (detail.exercises?.length || 0) + 1;
+
+      const existingExercises = (detail.exercises || []).map(ex => ({
+        exercise_id: ex.exercise_id,
+        order_index: ex.order_index,
+        target_sets: ex.target_sets,
+        target_reps: ex.target_reps,
+        target_weight: ex.target_weight,
+        superset_group: ex.superset_group,
+        notes: ex.notes
+      }));
+
+      const res = await fetch(`${API_BASE}/routines/${routineId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({
+          exercises: [
+            ...existingExercises,
+            {
+              exercise_id: selectedExercise.id,
+              order_index: nextIndex,
+              target_sets: routineAddForm.sets ? parseInt(routineAddForm.sets) : null,
+              target_reps: routineAddForm.reps ? parseInt(routineAddForm.reps) : null,
+              target_weight: routineAddForm.weight ? parseFloat(routineAddForm.weight) : null
+            }
+          ]
+        })
+      });
+      if (!res.ok) throw new Error('Add failed');
+
+      setRoutinePickerStatus('added');
+      setTimeout(() => {
+        setShowRoutinePicker(false);
+        setPickedRoutineId(null);
+        setRoutineAddForm({ sets: '', reps: '', weight: '' });
+        setRoutinePickerStatus('');
+      }, 1000);
+    } catch (err) {
+      console.error('Failed to add to routine:', err);
+      setRoutinePickerStatus('error');
+    }
+  };
+
+  const addToActiveWorkout = async () => {
+    if (!activeWorkout || !selectedExercise) return;
+    setAddStatus('adding');
+    try {
+      const res = await fetch(`${API_BASE}/workouts/${activeWorkout.workout.id}/exercises`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({
+          exercise_id: selectedExercise.id,
+          order_index: (activeWorkout.exercises?.length || 0) + 1,
+          target_sets: addForm.sets ? parseInt(addForm.sets) : null,
+          target_reps: addForm.reps ? parseInt(addForm.reps) : null,
+          target_weight: addForm.weight ? parseFloat(addForm.weight) : null
+        })
+      });
+      const newWorkoutExercise = await res.json();
+
+      // Mirror the workout-side shape (exercise_name, category, template, logged_sets)
+      // so it renders correctly back on the Workouts page.
+      setActiveWorkout(prev => ({
+        ...prev,
+        exercises: [
+          ...prev.exercises,
+          {
+            ...newWorkoutExercise,
+            exercise_name: selectedExercise.name,
+            category: selectedExercise.category,
+            equipment_type: selectedExercise.equipment_type,
+            is_ad_hoc: true, // flags this for the end-of-workout "save to routine?" prompt
+            template: {
+              target_sets: newWorkoutExercise.target_sets,
+              target_reps: newWorkoutExercise.target_reps,
+              target_weight: newWorkoutExercise.target_weight
+            },
+            logged_sets: []
+          }
+        ]
+      }));
+
+      setAddStatus('added');
+      setTimeout(() => {
+        setShowAddToWorkout(false);
+        setAddStatus('');
+        setAddForm({ sets: '', reps: '', weight: '' });
+      }, 1200);
+    } catch (err) {
+      console.error('Add to workout failed:', err);
+      setAddStatus('error');
+    }
   };
 
   const hasMore = exercises.length > 0 && exercises.length < total;
@@ -289,6 +417,120 @@ export default function ExerciseBrowser() {
               </div>
             )}
 
+            {activeWorkout && (
+              <button className="add-to-workout-btn" onClick={() => setShowAddToWorkout(true)}>
+                + Add to Current Workout
+              </button>
+            )}
+
+            <button className="add-to-routine-btn" onClick={() => setShowRoutineBuilder(true)}>
+              + Add to New Routine
+            </button>
+
+            <button className="add-to-routine-btn add-to-existing-btn" onClick={openRoutinePicker}>
+              + Add to Existing Routine
+            </button>
+
+            {showRoutinePicker && (
+              <div className="routine-picker-modal">
+                <h4>Choose a Routine</h4>
+                {routinePickerStatus === 'loading' && <p className="browser-status">Loading routines...</p>}
+                {routinePickerStatus === 'error' && <p className="add-to-workout-error">Something went wrong — try again.</p>}
+                {routinePickerStatus !== 'loading' && userRoutines.length === 0 && (
+                  <p className="browser-status">No routines yet — create one first.</p>
+                )}
+
+                {!pickedRoutineId && (
+                  <div className="routine-picker-list">
+                    {userRoutines.map(r => (
+                      <button
+                        key={r.id}
+                        className="routine-picker-row"
+                        onClick={() => setPickedRoutineId(r.id)}
+                      >
+                        <span>{r.name}</span>
+                        <span className="routine-picker-meta">{r.exercise_count} exercises</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {pickedRoutineId && routinePickerStatus !== 'added' && (
+                  <div className="routine-picker-targets">
+                    <p className="routine-picker-targets-label">Target sets/reps/weight (optional)</p>
+                    <div className="add-to-workout-fields">
+                      <input
+                        type="number"
+                        placeholder="Sets"
+                        value={routineAddForm.sets}
+                        onChange={e => setRoutineAddForm({ ...routineAddForm, sets: e.target.value })}
+                      />
+                      <input
+                        type="number"
+                        placeholder="Reps"
+                        value={routineAddForm.reps}
+                        onChange={e => setRoutineAddForm({ ...routineAddForm, reps: e.target.value })}
+                      />
+                      <input
+                        type="number"
+                        step="0.5"
+                        placeholder="Weight"
+                        value={routineAddForm.weight}
+                        onChange={e => setRoutineAddForm({ ...routineAddForm, weight: e.target.value })}
+                      />
+                    </div>
+                    <div className="add-to-workout-actions">
+                      <button
+                        onClick={() => addToExistingRoutine(pickedRoutineId)}
+                        disabled={routinePickerStatus === 'adding'}
+                        className="add-to-workout-confirm"
+                      >
+                        {routinePickerStatus === 'adding' ? 'Adding...' : 'Add'}
+                      </button>
+                      <button onClick={() => setPickedRoutineId(null)} className="add-to-workout-cancel">Back</button>
+                    </div>
+                  </div>
+                )}
+
+                {routinePickerStatus === 'added' && <p className="add-to-workout-confirm-text">✓ Added</p>}
+                <button className="routine-picker-cancel" onClick={() => { setShowRoutinePicker(false); setPickedRoutineId(null); setRoutineAddForm({ sets: '', reps: '', weight: '' }); }}>Cancel</button>
+              </div>
+            )}
+
+            {showAddToWorkout && (
+              <div className="add-to-workout-modal">
+                <h4>Add to Workout (optional)</h4>
+                <div className="add-to-workout-fields">
+                  <input
+                    type="number"
+                    placeholder="Sets"
+                    value={addForm.sets}
+                    onChange={e => setAddForm({ ...addForm, sets: e.target.value })}
+                  />
+                  <input
+                    type="number"
+                    placeholder="Reps"
+                    value={addForm.reps}
+                    onChange={e => setAddForm({ ...addForm, reps: e.target.value })}
+                  />
+                  <input
+                    type="number"
+                    step="0.5"
+                    placeholder="Weight"
+                    value={addForm.weight}
+                    onChange={e => setAddForm({ ...addForm, weight: e.target.value })}
+                  />
+                </div>
+                <div className="add-to-workout-actions">
+                  <button onClick={addToActiveWorkout} disabled={addStatus === 'adding'} className="add-to-workout-confirm">
+                    {addStatus === 'adding' ? 'Adding...' : addStatus === 'added' ? '✓ Added' : 'Add'}
+                  </button>
+                  <button onClick={() => setShowAddToWorkout(false)} className="add-to-workout-cancel">Cancel</button>
+                </div>
+                {addStatus === 'error' && <p className="add-to-workout-error">Failed to add — try again.</p>}
+              </div>
+            )}
+
             <div className="detail-section">
               <h4>Description</h4>
               {selectedExercise.description
@@ -345,6 +587,22 @@ export default function ExerciseBrowser() {
           </div>
         )}
       </div>
+
+      {showRoutineBuilder && selectedExercise && (
+        <RoutineBuilder
+          initialExercises={[{
+            exercise_id: selectedExercise.id,
+            name: selectedExercise.name,
+            category: selectedExercise.category,
+            target_sets: '',
+            target_reps: '',
+            target_weight: '',
+            notes: ''
+          }]}
+          onClose={() => setShowRoutineBuilder(false)}
+          onSaved={() => setShowRoutineBuilder(false)}
+        />
+      )}
     </div>
   );
 }

@@ -560,8 +560,8 @@ const finishWorkout = async (req, res) => {
 
   try {
     const result = await pool.query(
-      `UPDATE workouts SET end_time = NOW() WHERE id = $1 AND user_id = $2 RETURNING *`,
-      [workoutId, user_id]
+      `UPDATE workouts SET end_time = $1, status = 'completed' WHERE id = $2 AND user_id = $3 RETURNING *`,
+      [new Date().toISOString(), workoutId, user_id]
     );
 
     if (result.rows.length === 0) {
@@ -572,6 +572,27 @@ const finishWorkout = async (req, res) => {
   } catch (error) {
     console.error('Finish workout error:', error);
     res.status(500).json({ error: 'Failed to finish workout' });
+  }
+};
+
+const cancelWorkout = async (req, res) => {
+  const { workoutId } = req.params;
+  const user_id = req.user.userId;
+
+  try {
+    const result = await pool.query(
+      `UPDATE workouts SET end_time = $1, status = 'cancelled' WHERE id = $2 AND user_id = $3 RETURNING *`,
+      [new Date().toISOString(), workoutId, user_id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Workout not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Cancel workout error:', error);
+    res.status(500).json({ error: 'Failed to cancel workout' });
   }
 };
 
@@ -627,7 +648,7 @@ const deleteExerciseFromWorkout = async (req, res) => {
 // Add exercises to workout
 const addExerciseToWorkout = async (req, res) => {
   const { workoutId } = req.params;
-  const { exercise_id, order_index, exercise_notes } = req.body;
+  const { exercise_id, order_index, exercise_notes, target_sets, target_reps, target_weight } = req.body;
   const user_id = req.user.userId;
 
   try {
@@ -641,9 +662,9 @@ const addExerciseToWorkout = async (req, res) => {
     }
 
     const result = await pool.query(
-      `INSERT INTO workout_exercises (workout_id, exercise_id, order_index, exercise_notes)
-       VALUES ($1, $2, $3, $4) RETURNING *`,
-      [workoutId, exercise_id, order_index, exercise_notes || null]
+      `INSERT INTO workout_exercises (workout_id, exercise_id, order_index, exercise_notes, target_sets, target_reps, target_weight)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [workoutId, exercise_id, order_index, exercise_notes || null, target_sets || null, target_reps || null, target_weight || null]
     );
 
     res.status(201).json(result.rows[0]);
@@ -696,6 +717,7 @@ module.exports = {
   updateExerciseNotes,
   updateWorkoutNotes,
   finishWorkout,
+  cancelWorkout,
   addExerciseToWorkout,
   deleteExerciseFromWorkout
 };

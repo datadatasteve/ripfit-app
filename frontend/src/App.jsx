@@ -92,7 +92,7 @@ function App() {
             setShowNavClock={setShowNavClock}
           />
         ) : currentView === 'exercises' ? (
-          <ExerciseBrowser />
+          <ExerciseBrowser activeWorkout={activeWorkout} setActiveWorkout={setActiveWorkout} />
         ) : (
           <section className="hero">
             <div className="container">

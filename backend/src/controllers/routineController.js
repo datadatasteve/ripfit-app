@@ -194,29 +194,60 @@ const getRoutineById = async (req, res) => {
  */
 const updateRoutine = async (req, res) => {
   const { id } = req.params;
-  const { name, description, is_active } = req.body;
+  const { name, description, is_active, exercises } = req.body;
   const user_id = req.user.userId;
 
+  const client = await pool.connect();
+
   try {
-    const result = await pool.query(
+    await client.query('BEGIN');
+
+    const result = await client.query(
       `UPDATE workout_routines 
        SET name = COALESCE($1, name),
            description = COALESCE($2, description),
            is_active = COALESCE($3, is_active),
-           updated_at = NOW()
-       WHERE id = $4 AND user_id = $5
+           updated_at = $4
+       WHERE id = $5 AND user_id = $6
        RETURNING *`,
-      [name, description, is_active, id, user_id]
+      [name, description, is_active, new Date().toISOString(), id, user_id]
     );
 
     if (result.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Routine not found' });
     }
 
-    res.json(result.rows[0]);
+    const routine = result.rows[0];
+
+    // If a full exercise list was provided, replace the routine's exercises
+    // entirely (delete-and-reinsert, same pattern as createRoutine).
+    if (Array.isArray(exercises)) {
+      await client.query(`DELETE FROM routine_exercises WHERE routine_id = $1`, [id]);
+
+      for (const ex of exercises) {
+        const { exercise_id, order_index, target_sets, target_reps, target_weight, superset_group, notes } = ex;
+        if (!exercise_id || !order_index) {
+          throw new Error('Each exercise must have exercise_id and order_index');
+        }
+        await client.query(
+          `INSERT INTO routine_exercises (
+            routine_id, exercise_id, order_index, target_sets,
+            target_reps, target_weight, superset_group, notes
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [id, exercise_id, order_index, target_sets || null, target_reps || null, target_weight || null, superset_group || null, notes || null]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+    res.json(routine);
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Update routine error:', error);
-    res.status(500).json({ error: 'Failed to update routine' });
+    res.status(500).json({ error: error.message || 'Failed to update routine' });
+  } finally {
+    client.release();
   }
 };
 

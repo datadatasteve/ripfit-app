@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import RoutineBuilder from './RoutineBuilder';
 import './ActiveWorkout.css';
 
 const API_BASE = 'http://localhost:3000/api/v1';
@@ -8,6 +9,21 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
   const [routines, setRoutines] = useState([]);
   const [selectedRoutine, setSelectedRoutine] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showRoutineBuilder, setShowRoutineBuilder] = useState(false);
+  const [editingRoutine, setEditingRoutine] = useState(null);
+
+  const openEditRoutine = async (routineId) => {
+    try {
+      const res = await fetch(`${API_BASE}/routines/${routineId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      setEditingRoutine(data);
+      setShowRoutineBuilder(true);
+    } catch (err) {
+      console.error('Failed to load routine for editing:', err);
+    }
+  };
 
   useEffect(() => {
     if (token) fetchRoutines();
@@ -149,6 +165,22 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
     }
   };
 
+  const cancelWorkout = async () => {
+    const token = localStorage.getItem('ripfit_token');
+    try {
+      await fetch(`${API_BASE}/workouts/${activeWorkout.workout.id}/cancel`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+    } catch (err) {
+      console.error('Failed to cancel workout:', err);
+    }
+    setActiveWorkout(null); // discard locally regardless of network outcome
+  };
+
   if (!token) {
     return (
       <div className="workout-container">
@@ -254,6 +286,7 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
       setActiveWorkout={setActiveWorkout}
       onLogSet={logSet}
       onFinish={finishWorkout}
+      onCancel={cancelWorkout}
       showNavClock={showNavClock}
       setShowNavClock={setShowNavClock}
     />;
@@ -262,7 +295,11 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
   return (
     <div className="workout-container">
       <h2>Start Workout</h2>
-      
+
+      <button className="create-routine-btn" onClick={() => { setEditingRoutine(null); setShowRoutineBuilder(true); }}>
+        + Create New Routine
+      </button>
+
       <div className="routines-list">
         {routines.length === 0 ? (
           <p>No routines yet. Create one first!</p>
@@ -270,22 +307,51 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
           routines.map(routine => (
             <div key={routine.id} className="routine-card">
               <h3>{routine.name}</h3>
+              {routine.description && <p className="routine-card-description">{routine.description}</p>}
               <p>{routine.exercise_count} exercises</p>
-              <button 
-                onClick={() => startWorkout(routine.id)}
-                disabled={loading}
-              >
-                Start Workout
-              </button>
+              <div className="routine-card-actions">
+                <button 
+                  onClick={() => startWorkout(routine.id)}
+                  disabled={loading}
+                >
+                  Start Workout
+                </button>
+                <button
+                  className="routine-card-edit-btn"
+                  onClick={() => openEditRoutine(routine.id)}
+                >
+                  Edit
+                </button>
+              </div>
             </div>
           ))
         )}
       </div>
+
+      {showRoutineBuilder && (
+        <RoutineBuilder
+          existingRoutine={editingRoutine}
+          onClose={() => {
+            setShowRoutineBuilder(false);
+            setEditingRoutine(null);
+          }}
+          onSaved={() => {
+            setShowRoutineBuilder(false);
+            setEditingRoutine(null);
+            fetchRoutines();
+          }}
+          onDeleted={() => {
+            setShowRoutineBuilder(false);
+            setEditingRoutine(null);
+            fetchRoutines();
+          }}
+        />
+      )}
     </div>
   );
 }
 
-function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, showNavClock, setShowNavClock }) {
+function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCancel, showNavClock, setShowNavClock }) {
   const [currentExerciseIdx, setCurrentExerciseIdx] = useState(0);
   const [setForm, setSetForm] = useState({ reps: '', weight: '', rpe: '' });
   const [showAddExercise, setShowAddExercise] = useState(false);
@@ -357,6 +423,10 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, show
   const [showWorkoutNotes, setShowWorkoutNotes] = useState(false);
   const [workoutNotesSaved, setWorkoutNotesSaved] = useState(true);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
+  const [showSaveToRoutinePrompt, setShowSaveToRoutinePrompt] = useState(false);
+  const [adHocChoices, setAdHocChoices] = useState({}); // { [workout_exercise_id]: true/false }
+  const [savingToRoutine, setSavingToRoutine] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   const exercises = workout.exercises;
   const currentExercise = exercises[currentExerciseIdx];
@@ -486,6 +556,66 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, show
     }
   };
 
+  const adHocExercises = exercises.filter(ex => ex.is_ad_hoc);
+
+  // Called when user clicks Finish — if there were ad-hoc additions, show the
+  // routine-save prompt first instead of finishing immediately.
+  const handleFinishClick = () => {
+    setShowFinishConfirm(false);
+    if (adHocExercises.length > 0) {
+      const defaults = {};
+      adHocExercises.forEach(ex => { defaults[ex.id] = false; });
+      setAdHocChoices(defaults);
+      setShowSaveToRoutinePrompt(true);
+    } else {
+      onFinish(workoutNotes);
+    }
+  };
+
+  const finalizeFinish = async () => {
+    const toSave = adHocExercises.filter(ex => adHocChoices[ex.id]);
+
+    if (toSave.length > 0 && workout.workout.routine_id) {
+      setSavingToRoutine(true);
+      try {
+        const token = localStorage.getItem('ripfit_token');
+        const detailRes = await fetch(`${API_BASE}/routines/${workout.workout.routine_id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const detail = await detailRes.json();
+        const existingExercises = (detail.exercises || []).map(ex => ({
+          exercise_id: ex.exercise_id,
+          order_index: ex.order_index,
+          target_sets: ex.target_sets,
+          target_reps: ex.target_reps,
+          target_weight: ex.target_weight,
+          superset_group: ex.superset_group,
+          notes: ex.notes
+        }));
+        let nextIndex = existingExercises.length + 1;
+        const newOnes = toSave.map(ex => ({
+          exercise_id: ex.exercise_id,
+          order_index: nextIndex++,
+          target_sets: ex.template?.target_sets || null,
+          target_reps: ex.template?.target_reps || null,
+          target_weight: ex.template?.target_weight || null
+        }));
+
+        await fetch(`${API_BASE}/routines/${workout.workout.routine_id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ exercises: [...existingExercises, ...newOnes] })
+        });
+      } catch (err) {
+        console.error('Failed to save ad-hoc exercises to routine:', err);
+      }
+      setSavingToRoutine(false);
+    }
+
+    setShowSaveToRoutinePrompt(false);
+    onFinish(workoutNotes);
+  };
+
   const handleAddExercise = async (exercise, targets) => {
     const token = localStorage.getItem('ripfit_token');
     try {
@@ -511,6 +641,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, show
           category: exercise.category,
           equipment_type: exercise.equipment_type,
           logged_sets: [],
+          is_ad_hoc: true, // flags this for the end-of-workout "save to routine?" prompt
           template: {
             target_sets: targets.sets ? parseInt(targets.sets) : null,
             target_reps: targets.reps ? parseInt(targets.reps) : null,
@@ -742,6 +873,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, show
           </button>
           <button onClick={() => setShowAllExercises(true)} className="view-all-btn">View All</button>
           <button onClick={() => setShowFinishConfirm(true)} className="finish-btn">Finish Workout</button>
+          <button onClick={() => setShowCancelConfirm(true)} className="cancel-workout-btn">Cancel Workout</button>
         </div>
       </div>
 
@@ -1167,10 +1299,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, show
 
               <div style={{display: 'flex', gap: '8px'}}>
                 <button 
-                  onClick={() => {
-                    onFinish(workoutNotes);
-                    setShowFinishConfirm(false);
-                  }}
+                  onClick={handleFinishClick}
                   className="finish-btn"
                   style={{flex: 1, padding: '12px'}}
                 >
@@ -1187,6 +1316,61 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, show
           </div>
         );
       })()}
+
+      {showCancelConfirm && (
+        <div className="modal-overlay" onClick={() => setShowCancelConfirm(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>Cancel Workout?</h3>
+            <p>This action will log workout progress and cancel your current workout.</p>
+            <div style={{display: 'flex', gap: '8px', marginTop: '15px'}}>
+              <button
+                onClick={() => {
+                  onCancel();
+                  setShowCancelConfirm(false);
+                }}
+                className="cancel-workout-btn"
+                style={{flex: 1, padding: '12px'}}
+              >
+                Yes, Cancel Workout
+              </button>
+              <button
+                onClick={() => setShowCancelConfirm(false)}
+                style={{padding: '12px 16px', background: '#999', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer'}}
+              >
+                Keep Going
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSaveToRoutinePrompt && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3>Save additions to routine?</h3>
+            <p style={{fontSize: '0.88em', color: '#888'}}>
+              You added these exercises during this workout. Save any to the routine for next time, or leave unchecked to keep this workout-only.
+            </p>
+            <div className="ad-hoc-choice-list">
+              {adHocExercises.map(ex => (
+                <label key={ex.id} className="ad-hoc-choice-row">
+                  <input
+                    type="checkbox"
+                    checked={!!adHocChoices[ex.id]}
+                    onChange={e => setAdHocChoices(prev => ({ ...prev, [ex.id]: e.target.checked }))}
+                  />
+                  {ex.exercise_name}
+                </label>
+              ))}
+            </div>
+            <div style={{display: 'flex', gap: '8px', marginTop: '14px'}}>
+              <button onClick={finalizeFinish} disabled={savingToRoutine} className="finish-btn" style={{flex: 1, padding: '12px'}}>
+                {savingToRoutine ? 'Saving...' : 'Finish Workout'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showAllExercises && (
         <div className="modal-overlay" onClick={() => setShowAllExercises(false)}>
@@ -1286,6 +1470,8 @@ function AddExerciseModal({ onAdd, onClose }) {
   const [targets, setTargets] = useState({ sets: '', reps: '', weight: '' });
   const [muscleFilter, setMuscleFilter] = useState('');
 
+  const token = localStorage.getItem('ripfit_token');
+
   const searchExercises = async () => {
     if (!searchQuery) return;
     try {
@@ -1294,6 +1480,33 @@ function AddExerciseModal({ onAdd, onClose }) {
       setSearchResults(data.exercises || []);
     } catch (err) {
       console.error('Search failed:', err);
+    }
+  };
+
+  // When a muscle filter pill is clicked with no search text entered, browse
+  // by category directly instead of filtering an empty results list.
+  const browseByMuscleFilter = async (value) => {
+    setMuscleFilter(value);
+    if (searchQuery.trim()) return; // a real search is already filtering client-side
+    if (!value) { setSearchResults([]); return; }
+
+    let category = '', subcategory = '';
+    if (value === 'biceps') { category = 'Arms'; subcategory = 'Biceps'; }
+    else if (value === 'triceps') { category = 'Arms'; subcategory = 'Triceps'; }
+    else if (value === 'arms') { category = 'Arms'; }
+    else { category = value.charAt(0).toUpperCase() + value.slice(1); }
+
+    try {
+      const params = new URLSearchParams({ limit: 100 });
+      if (category) params.set('category', category);
+      if (subcategory) params.set('subcategory', subcategory);
+      const res = await fetch(`${API_BASE}/workouts/exercises/browse?${params}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      setSearchResults(data.exercises || []);
+    } catch (err) {
+      console.error('Browse by muscle filter failed:', err);
     }
   };
 
@@ -1336,9 +1549,7 @@ function AddExerciseModal({ onAdd, onClose }) {
               <button onClick={searchExercises}>Search</button>
             </div>
             
-            {searchResults.length > 0 && (
-              <MuscleFilterBar muscleFilter={muscleFilter} setMuscleFilter={setMuscleFilter} />
-            )}
+            <MuscleFilterBar muscleFilter={muscleFilter} setMuscleFilter={browseByMuscleFilter} />
 
             <div className="search-results">
               {filteredResults.map(ex => (
@@ -1395,6 +1606,8 @@ function ChangeExerciseModal({ onChange, onClose, currentExercise }) {
     weight: ''
   });
 
+  const token = localStorage.getItem('ripfit_token');
+
   const searchExercises = async () => {
     if (!searchQuery) return;
     try {
@@ -1403,6 +1616,31 @@ function ChangeExerciseModal({ onChange, onClose, currentExercise }) {
       setSearchResults(data.exercises || []);
     } catch (err) {
       console.error('Search failed:', err);
+    }
+  };
+
+  const browseByMuscleFilter = async (value) => {
+    setMuscleFilter(value);
+    if (searchQuery.trim()) return;
+    if (!value) { setSearchResults([]); return; }
+
+    let category = '', subcategory = '';
+    if (value === 'biceps') { category = 'Arms'; subcategory = 'Biceps'; }
+    else if (value === 'triceps') { category = 'Arms'; subcategory = 'Triceps'; }
+    else if (value === 'arms') { category = 'Arms'; }
+    else { category = value.charAt(0).toUpperCase() + value.slice(1); }
+
+    try {
+      const params = new URLSearchParams({ limit: 100 });
+      if (category) params.set('category', category);
+      if (subcategory) params.set('subcategory', subcategory);
+      const res = await fetch(`${API_BASE}/workouts/exercises/browse?${params}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      setSearchResults(data.exercises || []);
+    } catch (err) {
+      console.error('Browse by muscle filter failed:', err);
     }
   };
 
@@ -1433,9 +1671,7 @@ function ChangeExerciseModal({ onChange, onClose, currentExercise }) {
               <button onClick={searchExercises}>Search</button>
             </div>
             
-            {searchResults.length > 0 && (
-              <MuscleFilterBar muscleFilter={muscleFilter} setMuscleFilter={setMuscleFilter} />
-            )}
+            <MuscleFilterBar muscleFilter={muscleFilter} setMuscleFilter={browseByMuscleFilter} />
             
             <div className="search-results">
               {filteredResults.map(ex => (
@@ -1499,3 +1735,4 @@ function ChangeExerciseModal({ onChange, onClose, currentExercise }) {
     </div>
   );
 }
+

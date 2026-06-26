@@ -526,3 +526,274 @@
   color: #ff9800;
 }
 
+.cancel-workout-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid #e53935;
+  background: transparent;
+  color: #e53935;
+  cursor: pointer;
+  font-size: 0.85em;
+}
+
+.cancel-workout-btn:hover {
+  background: #e53935;
+  color: #fff;
+}
+
+.add-to-workout-btn {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  margin: 14px 0;
+  border-radius: 6px;
+  border: 1px solid #4caf50;
+  background: #4caf50;
+  color: #fff;
+  font-size: 0.9em;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.add-to-workout-btn:hover {
+  background: #43a047;
+}
+
+.add-to-workout-modal {
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 8px;
+  padding: 14px;
+  margin: 10px 0 20px;
+  background: var(--tag-bg, #f7f7f7);
+}
+
+.add-to-workout-modal h4 {
+  margin: 0 0 10px 0;
+  font-size: 0.85em;
+  color: var(--text-muted, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.add-to-workout-fields {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.add-to-workout-fields input {
+  flex: 1;
+  padding: 7px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color, #ccc);
+  background: var(--input-bg, #fff);
+  color: #000;
+  font-size: 0.85em;
+}
+
+.add-to-workout-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.add-to-workout-confirm {
+  flex: 1;
+  padding: 8px;
+  border-radius: 6px;
+  border: none;
+  background: #4caf50;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.85em;
+}
+
+.add-to-workout-confirm:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.add-to-workout-cancel {
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #ccc);
+  background: transparent;
+  color: var(--text-primary, #111);
+  cursor: pointer;
+  font-size: 0.85em;
+}
+
+.add-to-workout-error {
+  color: #e53935;
+  font-size: 0.8em;
+  margin: 8px 0 0;
+}
+
+.add-to-routine-btn {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  margin: 0 0 14px;
+  border-radius: 6px;
+  border: 1px solid #2196f3;
+  background: transparent;
+  color: #2196f3;
+  font-size: 0.9em;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.add-to-routine-btn:hover {
+  background: #2196f3;
+  color: #fff;
+}
+
+/* ---- Routine card: description + edit button ---- */
+.routine-card-description {
+  font-size: 0.85em;
+  color: var(--text-muted, #888);
+  margin: 4px 0;
+}
+
+.routine-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.routine-card-edit-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #ccc);
+  background: transparent;
+  color: var(--text-primary, #111);
+  cursor: pointer;
+  font-size: 0.85em;
+}
+
+/* ---- RoutineBuilder: delete button + confirm ---- */
+.routine-builder-delete {
+  padding: 10px 16px;
+  border-radius: 6px;
+  border: 1px solid #e53935;
+  background: transparent;
+  color: #e53935;
+  cursor: pointer;
+}
+
+.routine-delete-confirm {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #e53935;
+  border-radius: 6px;
+  background: rgba(229, 57, 53, 0.08);
+}
+
+.routine-delete-confirm p {
+  margin: 0 0 10px;
+  font-size: 0.9em;
+}
+
+.routine-builder-delete-confirm-btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: 6px;
+  border: none;
+  background: #e53935;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ---- Add to Existing Routine button + picker modal ---- */
+.add-to-existing-btn {
+  border-color: #9c27b0;
+  color: #9c27b0;
+}
+
+.add-to-existing-btn:hover {
+  background: #9c27b0;
+  color: #fff;
+}
+
+.routine-picker-modal {
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 8px;
+  padding: 14px;
+  margin: 10px 0 20px;
+  background: var(--tag-bg, #f7f7f7);
+}
+
+.routine-picker-modal h4 {
+  margin: 0 0 10px 0;
+  font-size: 0.85em;
+  color: var(--text-muted, #888);
+  text-transform: uppercase;
+}
+
+.routine-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.routine-picker-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 9px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #ccc);
+  background: var(--input-bg, #fff);
+  color: var(--text-primary, #111);
+  cursor: pointer;
+  font-size: 0.88em;
+  text-align: left;
+}
+
+.routine-picker-row:hover {
+  border-color: #9c27b0;
+}
+
+.routine-picker-row:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.routine-picker-meta {
+  color: var(--text-muted, #888);
+  font-size: 0.85em;
+}
+
+.routine-picker-cancel {
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #ccc);
+  background: transparent;
+  color: var(--text-primary, #111);
+  cursor: pointer;
+  font-size: 0.85em;
+}
+
+.add-to-workout-confirm-text {
+  color: #4caf50;
+  font-size: 0.85em;
+  font-weight: 600;
+  margin: 6px 0;
+}
+
+.ad-hoc-choice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+}
+ 
+.ad-hoc-choice-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9em;
+  cursor: pointer;
+}

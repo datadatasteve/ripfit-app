@@ -17,6 +17,7 @@ router.get('/', authenticate, workoutController.getWorkouts);
 
 router.post('/:workoutId/sets', authenticate, workoutController.logWorkoutSet);
 router.put('/:workoutId/finish', authenticate, workoutController.finishWorkout);
+router.put('/:workoutId/cancel', authenticate, workoutController.cancelWorkout);
 router.put('/:workoutId/notes', authenticate, workoutController.updateWorkoutNotes);
 
 router.post('/:workoutId/exercises', authenticate, workoutController.addExerciseToWorkout); // add exercises to active workout
