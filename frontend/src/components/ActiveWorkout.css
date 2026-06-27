@@ -834,3 +834,34 @@
   background: #4caf50;
   color: #fff;
 }
+
+.load-more-btn {
+  width: 100%;
+  padding: 8px;
+  margin-top: 8px;
+  background: #eee;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.search-input-wrapper {
+  position: relative;
+  flex: 1;
+  display: flex;
+}
+.search-input-wrapper input {
+  width: 100%;
+}
+.search-clear-x {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: #888;
+  padding: 0 4px;
+}

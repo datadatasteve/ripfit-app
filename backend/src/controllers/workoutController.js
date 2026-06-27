@@ -12,7 +12,7 @@ const { pool } = require('../config/database');
  * GET /api/v1/workouts/exercises/search?q=bench&limit=20
  */
 const searchExercises = async (req, res) => {
-  const { q, limit = 50, offset = 0 } = req.query;
+  const { q, limit = 50, offset = 0, category: explicitCategory, subcategory: explicitSubcategory, equipment: explicitEquipment } = req.query;
 
   if (!q) {
     return res.status(400).json({ error: 'Search query required' });
@@ -85,6 +85,11 @@ const searchExercises = async (req, res) => {
       /^(arms?|bi|bis|bicep|biceps|tri|tris|tricep|triceps)$/.test(rawTerm);
 
     if (isCategoryOnlySearch) {
+      const countWhere = subcategoryFilter ? 'WHERE subcategory = $1' : `WHERE category = 'Arms'`;
+      const countParams = subcategoryFilter ? [subcategoryFilter] : [];
+      const countResult = await pool.query(`SELECT COUNT(*) FROM exercises ${countWhere}`, countParams);
+      const total = parseInt(countResult.rows[0].count);
+
       let catQuery, catParams;
       if (subcategoryFilter) {
         catQuery = `SELECT id, name, description, category, subcategory, equipment_type
@@ -98,6 +103,7 @@ const searchExercises = async (req, res) => {
       const catResult = await pool.query(catQuery, catParams);
       return res.json({
         query: q,
+        total,
         count: catResult.rows.length,
         exercises: catResult.rows.map(ex => ({
           id: ex.id,
@@ -153,9 +159,19 @@ const searchExercises = async (req, res) => {
     allParams.push(...uniqueWords.map(w => `%${w}%`));
     paramIdx += uniqueWords.length;
 
-    // Build subcategory / category WHERE clause (for mixed searches like "db bicep")
+    // Build subcategory / category WHERE clause. An explicit category/subcategory
+    // (sent when a muscle-filter pill is active alongside typed search text) takes
+    // priority over the filter inferred from the search words themselves.
     let categoryClause = '';
-    if (subcategoryFilter) {
+    if (explicitSubcategory) {
+      allParams.push(explicitSubcategory);
+      categoryClause = `AND subcategory = $${paramIdx}`;
+      paramIdx++;
+    } else if (explicitCategory) {
+      allParams.push(explicitCategory);
+      categoryClause = `AND category = $${paramIdx}`;
+      paramIdx++;
+    } else if (subcategoryFilter) {
       allParams.push(subcategoryFilter);
       categoryClause = `AND subcategory = $${paramIdx}`;
       paramIdx++;
@@ -164,6 +180,21 @@ const searchExercises = async (req, res) => {
       categoryClause = `AND category = $${paramIdx}`;
       paramIdx++;
     }
+
+    // Equipment filter ANDs onto whatever category/subcategory filter is active.
+    let equipmentClause = '';
+    if (explicitEquipment) {
+      allParams.push(explicitEquipment);
+      equipmentClause = `AND LOWER(equipment_type) = LOWER($${paramIdx})`;
+      paramIdx++;
+    }
+
+    // Total count for pagination (same WHERE clause, no LIMIT/OFFSET)
+    const countResult = await pool.query(
+      `SELECT COUNT(*) FROM exercises WHERE (${orWhere} OR ${equipOr}) ${categoryClause} ${equipmentClause}`,
+      allParams
+    );
+    const total = parseInt(countResult.rows[0].count);
 
     // Limit + offset params
     allParams.push(parseInt(limit));
@@ -176,6 +207,7 @@ const searchExercises = async (req, res) => {
        FROM exercises
        WHERE (${orWhere} OR ${equipOr})
        ${categoryClause}
+       ${equipmentClause}
        ORDER BY 
          CASE WHEN ${andWhere} THEN 0 ELSE 1 END,
          CASE WHEN ${equipOr} THEN 0 ELSE 1 END,
@@ -186,6 +218,7 @@ const searchExercises = async (req, res) => {
 
     res.json({
       query: q,
+      total,
       count: result.rows.length,
       exercises: result.rows.map(ex => ({
         id: ex.id,

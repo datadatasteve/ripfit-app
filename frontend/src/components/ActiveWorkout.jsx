@@ -1407,6 +1407,65 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
   );
 }
 
+// Maps a muscle-filter pill value to the category/subcategory pair the
+// backend expects. Shared by AddExerciseModal and ChangeExerciseModal.
+function mapMuscleFilterToCategory(value) {
+  if (value === 'biceps') return { category: 'Arms', subcategory: 'Biceps' };
+  if (value === 'triceps') return { category: 'Arms', subcategory: 'Triceps' };
+  if (value === 'arms') return { category: 'Arms', subcategory: '' };
+  return { category: value.charAt(0).toUpperCase() + value.slice(1), subcategory: '' };
+}
+
+// Shared page size for exercise results in both modals below.
+const RESULTS_LIMIT = 100;
+
+// Fetches one page of exercises. Uses the search endpoint when there's typed
+// text (optionally combined with a category/subcategory), otherwise the
+// browse endpoint. Shared by AddExerciseModal and ChangeExerciseModal so
+// paging logic only needs to be correct in one place.
+async function fetchExercisePage({ q, category, subcategory, equipment, offset = 0, token }) {
+  const params = new URLSearchParams({ limit: RESULTS_LIMIT, offset });
+  let url, headers = {};
+  if (q) {
+    params.set('q', q);
+    if (category) params.set('category', category);
+    if (subcategory) params.set('subcategory', subcategory);
+    if (equipment) params.set('equipment', equipment);
+    url = `${API_BASE}/workouts/exercises/search?${params}`;
+  } else {
+    if (category) params.set('category', category);
+    if (subcategory) params.set('subcategory', subcategory);
+    if (equipment) params.set('equipment', equipment);
+    url = `${API_BASE}/workouts/exercises/browse?${params}`;
+    headers = { Authorization: `Bearer ${token}` };
+  }
+  const res = await fetch(url, { headers });
+  const data = await res.json();
+  return { exercises: data.exercises || [], total: data.total ?? (data.exercises || []).length };
+}
+
+// Same equipment list used in ExerciseBrowser.jsx, kept in sync with it.
+const EQUIPMENT_OPTIONS = ['Barbell', 'Dumbbell', 'Cable', 'Machine', 'Kettlebell', 'Bodyweight', 'Resistance Band', 'Pull-up bar', 'EZ Bar'];
+
+function EquipmentFilterBar({ equipmentFilter, setEquipmentFilter }) {
+  return (
+    <div className="filter-box">
+      <label>Filter by equipment:</label>
+      <div className="muscle-filter-pills">
+        {['', ...EQUIPMENT_OPTIONS].map(equip => (
+          <button
+            key={equip || 'all'}
+            className={`filter-pill ${equipmentFilter === equip ? 'active' : ''}`}
+            onClick={() => setEquipmentFilter(equip)}
+          >
+            {equip === '' ? 'All' : equip}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function MuscleFilterBar({ muscleFilter, setMuscleFilter }) {
   const [armsExpanded, setArmsExpanded] = useState(false);
 
@@ -1466,58 +1525,76 @@ function MuscleFilterBar({ muscleFilter, setMuscleFilter }) {
 function AddExerciseModal({ onAdd, onClose }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
+  const [searchOffset, setSearchOffset] = useState(0);
+  const [searchTotal, setSearchTotal] = useState(0);
   const [selectedExercise, setSelectedExercise] = useState(null);
   const [targets, setTargets] = useState({ sets: '', reps: '', weight: '' });
   const [muscleFilter, setMuscleFilter] = useState('');
+  const [equipmentFilter, setEquipmentFilter] = useState('');
+  const [showMuscleFilters, setShowMuscleFilters] = useState(false);
+  const [showEquipmentFilters, setShowEquipmentFilters] = useState(false);
 
   const token = localStorage.getItem('ripfit_token');
 
-  const searchExercises = async () => {
-    if (!searchQuery) return;
+  // Fetches a page and either replaces or appends to the current results.
+  const runSearch = async ({ category, subcategory, equipment, offset = 0, append = false } = {}) => {
     try {
-      const res = await fetch(`${API_BASE}/workouts/exercises/search?q=${searchQuery}`);
-      const data = await res.json();
-      setSearchResults(data.exercises || []);
+      const { exercises, total } = await fetchExercisePage({
+        q: searchQuery.trim(), category, subcategory, equipment, offset, token
+      });
+      setSearchOffset(offset);
+      setSearchTotal(total);
+      setSearchResults(prev => append ? [...prev, ...exercises] : exercises);
     } catch (err) {
-      console.error('Search failed:', err);
+      console.error('Exercise fetch failed:', err);
     }
   };
 
-  // When a muscle filter pill is clicked with no search text entered, browse
-  // by category directly instead of filtering an empty results list.
+  const searchExercises = async () => {
+    if (!searchQuery.trim()) return;
+    const filter = muscleFilter ? mapMuscleFilterToCategory(muscleFilter) : {};
+    await runSearch({ category: filter.category, subcategory: filter.subcategory, equipment: equipmentFilter });
+  };
+
   const browseByMuscleFilter = async (value) => {
     setMuscleFilter(value);
-    if (searchQuery.trim()) return; // a real search is already filtering client-side
-    if (!value) { setSearchResults([]); return; }
-
-    let category = '', subcategory = '';
-    if (value === 'biceps') { category = 'Arms'; subcategory = 'Biceps'; }
-    else if (value === 'triceps') { category = 'Arms'; subcategory = 'Triceps'; }
-    else if (value === 'arms') { category = 'Arms'; }
-    else { category = value.charAt(0).toUpperCase() + value.slice(1); }
-
-    try {
-      const params = new URLSearchParams({ limit: 100 });
-      if (category) params.set('category', category);
-      if (subcategory) params.set('subcategory', subcategory);
-      const res = await fetch(`${API_BASE}/workouts/exercises/browse?${params}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      setSearchResults(data.exercises || []);
-    } catch (err) {
-      console.error('Browse by muscle filter failed:', err);
+    if (!value && !equipmentFilter) {
+      if (searchQuery.trim()) await runSearch({});
+      else { setSearchResults([]); setSearchTotal(0); }
+      return;
     }
+    const { category, subcategory } = value ? mapMuscleFilterToCategory(value) : {};
+    await runSearch({ category, subcategory, equipment: equipmentFilter });
   };
 
-  const filteredResults = muscleFilter
-    ? searchResults.filter(ex => {
-        if (muscleFilter === 'biceps') return ex.subcategory?.toLowerCase() === 'biceps';
-        if (muscleFilter === 'triceps') return ex.subcategory?.toLowerCase() === 'triceps';
-        if (muscleFilter === 'arms') return ex.category?.toLowerCase() === 'arms';
-        return ex.category?.toLowerCase().includes(muscleFilter.toLowerCase());
-      })
-    : searchResults;
+  const browseByEquipmentFilter = async (value) => {
+    setEquipmentFilter(value);
+    if (!value && !muscleFilter) {
+      if (searchQuery.trim()) await runSearch({});
+      else { setSearchResults([]); setSearchTotal(0); }
+      return;
+    }
+    const filter = muscleFilter ? mapMuscleFilterToCategory(muscleFilter) : {};
+    await runSearch({ category: filter.category, subcategory: filter.subcategory, equipment: value });
+  };
+
+  const loadMoreResults = () => {
+    const filter = muscleFilter ? mapMuscleFilterToCategory(muscleFilter) : {};
+    runSearch({ category: filter.category, subcategory: filter.subcategory, equipment: equipmentFilter, offset: searchOffset + RESULTS_LIMIT, append: true });
+  };
+
+  // Clears the typed text but keeps any active muscle/equipment filter —
+  // falls back to a plain browse of whatever filter is still selected.
+  const clearSearch = () => {
+    setSearchQuery('');
+    const filter = muscleFilter ? mapMuscleFilterToCategory(muscleFilter) : {};
+    if (filter.category || filter.subcategory || equipmentFilter) {
+      runSearch({ category: filter.category, subcategory: filter.subcategory, equipment: equipmentFilter });
+    } else {
+      setSearchResults([]);
+      setSearchTotal(0);
+    }
+  };
 
   const handleSelectExercise = (exercise) => {
     setSelectedExercise(exercise);
@@ -1538,26 +1615,57 @@ function AddExerciseModal({ onAdd, onClose }) {
           <>
             <h3>Add Exercise</h3>
             <div className="search-box">
-              <input
-                type="text"
-                placeholder="Search exercises..."
-                autoFocus
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && searchExercises()}
-              />
+              <div className="search-input-wrapper">
+                <input
+                  type="text"
+                  placeholder="Search exercises..."
+                  autoFocus
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && searchExercises()}
+                />
+                {searchQuery && (
+                  <button type="button" className="search-clear-x" onClick={clearSearch}>✕</button>
+                )}
+              </div>
               <button onClick={searchExercises}>Search</button>
             </div>
             
-            <MuscleFilterBar muscleFilter={muscleFilter} setMuscleFilter={browseByMuscleFilter} />
+            <div className="filter-box">
+              <div className="muscle-filter-pills">
+                <button
+                  className={`filter-pill ${showMuscleFilters ? 'active' : ''}`}
+                  onClick={() => setShowMuscleFilters(v => !v)}
+                >
+                  Muscle {showMuscleFilters ? '▾' : '▸'}
+                </button>
+                <button
+                  className={`filter-pill ${showEquipmentFilters ? 'active' : ''}`}
+                  onClick={() => setShowEquipmentFilters(v => !v)}
+                >
+                  Equipment {showEquipmentFilters ? '▾' : '▸'}
+                </button>
+              </div>
+            </div>
+            {showMuscleFilters && (
+              <MuscleFilterBar muscleFilter={muscleFilter} setMuscleFilter={browseByMuscleFilter} />
+            )}
+            {showEquipmentFilters && (
+              <EquipmentFilterBar equipmentFilter={equipmentFilter} setEquipmentFilter={browseByEquipmentFilter} />
+            )}
 
             <div className="search-results">
-              {filteredResults.map(ex => (
+              {searchResults.map(ex => (
                 <div key={ex.id} className="result-item" onClick={() => handleSelectExercise(ex)}>
                   <strong>{ex.name}</strong>
                   <span>{ex.category}{ex.subcategory ? ` › ${ex.subcategory}` : ''} • {ex.equipment_type}</span>
                 </div>
               ))}
+              {searchResults.length < searchTotal && (
+                <button className="load-more-btn" onClick={loadMoreResults}>
+                  Load more ({searchTotal - searchResults.length} remaining)
+                </button>
+              )}
             </div>
             <button onClick={onClose} className="close-btn">Close</button>
           </>
@@ -1597,9 +1705,14 @@ function AddExerciseModal({ onAdd, onClose }) {
 function ChangeExerciseModal({ onChange, onClose, currentExercise }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
+  const [searchOffset, setSearchOffset] = useState(0);
+  const [searchTotal, setSearchTotal] = useState(0);
   const [selectedExercise, setSelectedExercise] = useState(null);
   const [reason, setReason] = useState('');
   const [muscleFilter, setMuscleFilter] = useState('');
+  const [equipmentFilter, setEquipmentFilter] = useState('');
+  const [showMuscleFilters, setShowMuscleFilters] = useState(false);
+  const [showEquipmentFilters, setShowEquipmentFilters] = useState(false);
   const [targets, setTargets] = useState({
     sets: currentExercise?.template?.target_sets || '',
     reps: currentExercise?.template?.target_reps || '',
@@ -1608,50 +1721,62 @@ function ChangeExerciseModal({ onChange, onClose, currentExercise }) {
 
   const token = localStorage.getItem('ripfit_token');
 
-  const searchExercises = async () => {
-    if (!searchQuery) return;
+  const runSearch = async ({ category, subcategory, equipment, offset = 0, append = false } = {}) => {
     try {
-      const res = await fetch(`${API_BASE}/workouts/exercises/search?q=${searchQuery}`);
-      const data = await res.json();
-      setSearchResults(data.exercises || []);
+      const { exercises, total } = await fetchExercisePage({
+        q: searchQuery.trim(), category, subcategory, equipment, offset, token
+      });
+      setSearchOffset(offset);
+      setSearchTotal(total);
+      setSearchResults(prev => append ? [...prev, ...exercises] : exercises);
     } catch (err) {
-      console.error('Search failed:', err);
+      console.error('Exercise fetch failed:', err);
     }
+  };
+
+  const searchExercises = async () => {
+    if (!searchQuery.trim()) return;
+    const filter = muscleFilter ? mapMuscleFilterToCategory(muscleFilter) : {};
+    await runSearch({ category: filter.category, subcategory: filter.subcategory, equipment: equipmentFilter });
   };
 
   const browseByMuscleFilter = async (value) => {
     setMuscleFilter(value);
-    if (searchQuery.trim()) return;
-    if (!value) { setSearchResults([]); return; }
-
-    let category = '', subcategory = '';
-    if (value === 'biceps') { category = 'Arms'; subcategory = 'Biceps'; }
-    else if (value === 'triceps') { category = 'Arms'; subcategory = 'Triceps'; }
-    else if (value === 'arms') { category = 'Arms'; }
-    else { category = value.charAt(0).toUpperCase() + value.slice(1); }
-
-    try {
-      const params = new URLSearchParams({ limit: 100 });
-      if (category) params.set('category', category);
-      if (subcategory) params.set('subcategory', subcategory);
-      const res = await fetch(`${API_BASE}/workouts/exercises/browse?${params}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      setSearchResults(data.exercises || []);
-    } catch (err) {
-      console.error('Browse by muscle filter failed:', err);
+    if (!value && !equipmentFilter) {
+      if (searchQuery.trim()) await runSearch({});
+      else { setSearchResults([]); setSearchTotal(0); }
+      return;
     }
+    const { category, subcategory } = value ? mapMuscleFilterToCategory(value) : {};
+    await runSearch({ category, subcategory, equipment: equipmentFilter });
   };
 
-  const filteredResults = muscleFilter
-    ? searchResults.filter(ex => {
-        if (muscleFilter === 'biceps') return ex.subcategory?.toLowerCase() === 'biceps';
-        if (muscleFilter === 'triceps') return ex.subcategory?.toLowerCase() === 'triceps';
-        if (muscleFilter === 'arms') return ex.category?.toLowerCase() === 'arms';
-        return ex.category?.toLowerCase().includes(muscleFilter.toLowerCase());
-      })
-    : searchResults;
+  const browseByEquipmentFilter = async (value) => {
+    setEquipmentFilter(value);
+    if (!value && !muscleFilter) {
+      if (searchQuery.trim()) await runSearch({});
+      else { setSearchResults([]); setSearchTotal(0); }
+      return;
+    }
+    const filter = muscleFilter ? mapMuscleFilterToCategory(muscleFilter) : {};
+    await runSearch({ category: filter.category, subcategory: filter.subcategory, equipment: value });
+  };
+
+  const loadMoreResults = () => {
+    const filter = muscleFilter ? mapMuscleFilterToCategory(muscleFilter) : {};
+    runSearch({ category: filter.category, subcategory: filter.subcategory, equipment: equipmentFilter, offset: searchOffset + RESULTS_LIMIT, append: true });
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    const filter = muscleFilter ? mapMuscleFilterToCategory(muscleFilter) : {};
+    if (filter.category || filter.subcategory || equipmentFilter) {
+      runSearch({ category: filter.category, subcategory: filter.subcategory, equipment: equipmentFilter });
+    } else {
+      setSearchResults([]);
+      setSearchTotal(0);
+    }
+  };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -1660,26 +1785,57 @@ function ChangeExerciseModal({ onChange, onClose, currentExercise }) {
           <>
             <h3>Change Exercise</h3>
             <div className="search-box">
-              <input
-                type="text"
-                placeholder="Search for replacement..."
-                autoFocus
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && searchExercises()}
-              />
+              <div className="search-input-wrapper">
+                <input
+                  type="text"
+                  placeholder="Search for replacement..."
+                  autoFocus
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && searchExercises()}
+                />
+                {searchQuery && (
+                  <button type="button" className="search-clear-x" onClick={clearSearch}>✕</button>
+                )}
+              </div>
               <button onClick={searchExercises}>Search</button>
             </div>
             
-            <MuscleFilterBar muscleFilter={muscleFilter} setMuscleFilter={browseByMuscleFilter} />
+            <div className="filter-box">
+              <div className="muscle-filter-pills">
+                <button
+                  className={`filter-pill ${showMuscleFilters ? 'active' : ''}`}
+                  onClick={() => setShowMuscleFilters(v => !v)}
+                >
+                  Muscle {showMuscleFilters ? '▾' : '▸'}
+                </button>
+                <button
+                  className={`filter-pill ${showEquipmentFilters ? 'active' : ''}`}
+                  onClick={() => setShowEquipmentFilters(v => !v)}
+                >
+                  Equipment {showEquipmentFilters ? '▾' : '▸'}
+                </button>
+              </div>
+            </div>
+            {showMuscleFilters && (
+              <MuscleFilterBar muscleFilter={muscleFilter} setMuscleFilter={browseByMuscleFilter} />
+            )}
+            {showEquipmentFilters && (
+              <EquipmentFilterBar equipmentFilter={equipmentFilter} setEquipmentFilter={browseByEquipmentFilter} />
+            )}
             
             <div className="search-results">
-              {filteredResults.map(ex => (
+              {searchResults.map(ex => (
                 <div key={ex.id} className="result-item" onClick={() => setSelectedExercise(ex)}>
                   <strong>{ex.name}</strong>
                   <span>{ex.category}{ex.subcategory ? ` › ${ex.subcategory}` : ''} • {ex.equipment_type}</span>
                 </div>
               ))}
+              {searchResults.length < searchTotal && (
+                <button className="load-more-btn" onClick={loadMoreResults}>
+                  Load more ({searchTotal - searchResults.length} remaining)
+                </button>
+              )}
             </div>
             <button onClick={onClose} className="close-btn">Cancel</button>
           </>
@@ -1735,4 +1891,3 @@ function ChangeExerciseModal({ onChange, onClose, currentExercise }) {
     </div>
   );
 }
-
