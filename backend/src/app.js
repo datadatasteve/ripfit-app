@@ -21,7 +21,7 @@ app.use(helmet());
 
 // CORS configuration
 const corsOptions = {
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:8080'],
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:8080', 'https://datadatasteve.github.io'],
   credentials: true,
   optionsSuccessStatus: 200,
 };
@@ -34,7 +34,7 @@ if (process.env.NODE_ENV !== 'test') {
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
-app.use(cors());  // Keep this here
+
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Rate limiting
@@ -169,3 +169,4 @@ process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
 module.exports = app;
+

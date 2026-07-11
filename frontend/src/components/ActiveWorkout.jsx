@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import RoutineBuilder from './RoutineBuilder';
 import './ActiveWorkout.css';
 
-const API_BASE = 'http://localhost:3000/api/v1';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 
 export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workoutSummary, setWorkoutSummary, showNavClock, setShowNavClock }) {
   const [token, setToken] = useState(localStorage.getItem('ripfit_token'));

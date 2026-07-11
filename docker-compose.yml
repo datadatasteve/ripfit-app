@@ -1,28 +1,23 @@
-
 services:
   postgres:
     image: postgres:14
     container_name: ripfit-db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ripfit_dev
-      POSTGRES_USER: ripfit_user
-      POSTGRES_PASSWORD: ripfit_password
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_HOST_AUTH_METHOD: trust
     ports:
       - "5432:5432"
     volumes:
-      # Persist database data
       - postgres_data:/var/lib/postgresql/data
-      # Optional: Mount init scripts
       - ./backend/database/migrations:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ripfit_user -d ripfit_dev"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
-
-  # Optional: pgAdmin for database management GUI
 
 volumes:
   postgres_data:
@@ -31,3 +26,5 @@ volumes:
 networks:
   default:
     name: ripfit-network
+
+    

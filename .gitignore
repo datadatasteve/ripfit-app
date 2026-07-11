@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Build output — committed separately to gh-pages branch, not main
+frontend/dist/
+
+# Environment files — NEVER commit these
+backend/.env
+frontend/.env.local
+frontend/.env.production
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor
+.vscode/
+.idea/

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import RoutineBuilder from './RoutineBuilder';
 import './ExerciseBrowser.css';
 
-const API_BASE = 'http://localhost:3000/api/v1';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 const LIMIT = 50;
 const CATEGORIES = ['All', 'Chest', 'Back', 'Shoulders', 'Arms', 'Legs', 'Abs', 'Cardio', 'General'];
 
@@ -606,3 +606,4 @@ export default function ExerciseBrowser({ activeWorkout, setActiveWorkout }) {
     </div>
   );
 }
+
