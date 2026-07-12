@@ -73,7 +73,6 @@ async function seedExercisesIfEmpty() {
   });
 
   try {
-    // Check if exercises already exist
     const { rows } = await pool.query('SELECT COUNT(*) FROM exercises');
     const count = parseInt(rows[0].count, 10);
 
@@ -92,20 +91,25 @@ async function seedExercisesIfEmpty() {
     try {
       await client.query('BEGIN');
 
+      // No ON CONFLICT needed — table is empty, duplicates within the source
+      // data are handled by skipping on unique violation (code 23505).
       const insertQuery = `
         INSERT INTO exercises (name, description, category, equipment_type, is_custom, created_by_user_id)
         VALUES ($1, $2, $3, $4, $5, $6)
-        ON CONFLICT (name) DO NOTHING
       `;
 
       let inserted = 0;
       for (const ex of exercises) {
         const t = transformExercise(ex);
         if (!t) continue;
-        const result = await client.query(insertQuery, [
-          t.name, t.description, t.category, t.equipment_type, t.is_custom, t.created_by_user_id
-        ]);
-        if (result.rowCount > 0) inserted++;
+        try {
+          await client.query(insertQuery, [
+            t.name, t.description, t.category, t.equipment_type, t.is_custom, t.created_by_user_id
+          ]);
+          inserted++;
+        } catch (err) {
+          if (err.code !== '23505') throw err; // re-throw anything other than duplicate
+        }
       }
 
       await client.query('COMMIT');
@@ -117,10 +121,10 @@ async function seedExercisesIfEmpty() {
       client.release();
     }
   } catch (err) {
-    // Log but don't crash the server — exercises can be reseeded later
     console.error('Exercise seed failed (server will still start):', err.message);
   } finally {
-    await pool.end();
+    // End this pool quietly — ignore double-end errors
+    try { await pool.end(); } catch (_) {}
   }
 }
 
