@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const db = require('./config/database');
+const runMigrations = require('../database/migrate');
 
 // Create Express app
 const app = express();
@@ -141,8 +142,11 @@ app.use((err, req, res, next) => {
 
 // Only start server if not in test mode
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
-    console.log(`
+  // Run migrations before starting the server.
+  // migrate.js skips files already recorded in schema_migrations so this is safe to run on every boot.
+  runMigrations().then(() => {
+    app.listen(PORT, () => {
+      console.log(`
 ╔════════════════════════════════════════════╗
 ║         RipFit API Server                  ║
 ╠════════════════════════════════════════════╣
@@ -154,7 +158,11 @@ if (process.env.NODE_ENV !== 'test') {
 ║ API Base:    http://localhost:${PORT}/api/${API_VERSION.padEnd(3)}║
 ║ Health:      http://localhost:${PORT}/health     ║
 ╚════════════════════════════════════════════╝
-    `);
+      `);
+    });
+  }).catch(err => {
+    console.error('Migration failed, server not started:', err);
+    process.exit(1);
   });
 }
 
