@@ -10,9 +10,7 @@ const USDA_API_BASE = 'https://api.nal.usda.gov/fdc/v1';
 const API_KEY = process.env.USDA_API_KEY;
 
 if (!API_KEY) {
-  console.error('❌ USDA_API_KEY not found in environment variables');
-  console.error('   Add your API key to .env file: USDA_API_KEY=your-key-here');
-  process.exit(1);
+  console.warn('⚠️  USDA_API_KEY not set — food search and barcode lookup will be unavailable.');
 }
 
 // ============================================================================
