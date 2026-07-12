@@ -7,6 +7,7 @@ require('dotenv').config();
 
 const db = require('./config/database');
 const runMigrations = require('../database/migrate');
+const seedExercises = require('../database/seeds/seed-exercises');
 
 // Create Express app
 const app = express();
@@ -144,7 +145,7 @@ app.use((err, req, res, next) => {
 if (process.env.NODE_ENV !== 'test') {
   // Run migrations before starting the server.
   // migrate.js skips files already recorded in schema_migrations so this is safe to run on every boot.
-  runMigrations().then(() => {
+  runMigrations().then(() => seedExercises()).then(() => {
     app.listen(PORT, () => {
       console.log(`
 ╔════════════════════════════════════════════╗
