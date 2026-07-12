@@ -14,6 +14,7 @@ const config = {
   max: parseInt(process.env.DB_POOL_MAX, 10) || 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
+  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
 };
 
 // Create connection pool
