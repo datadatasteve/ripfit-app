@@ -101,27 +101,29 @@ function App() {
         {!isLoggedIn ? (
           <Login onLogin={handleLogin} />
         ) : (
-        {currentView === 'workout' ? (
-          <ActiveWorkout
-            activeWorkout={activeWorkout}
-            setActiveWorkout={setActiveWorkout}
-            workoutSummary={workoutSummary}
-            setWorkoutSummary={setWorkoutSummary}
-            showNavClock={showNavClock}
-            setShowNavClock={setShowNavClock}
-          />
-        ) : currentView === 'exercises' ? (
-          <ExerciseBrowser activeWorkout={activeWorkout} setActiveWorkout={setActiveWorkout} />
-        ) : (
-          <section className="hero">
-            <div className="container">
-              <h2 className="hero-title">Track Your Fitness Journey</h2>
-              <button className="btn btn-primary btn-lg" onClick={() => setCurrentView('workout')}>
-                Start Workout
-              </button>
-            </div>
-          </section>
-        )}
+          <>
+            {currentView === 'workout' ? (
+              <ActiveWorkout
+                activeWorkout={activeWorkout}
+                setActiveWorkout={setActiveWorkout}
+                workoutSummary={workoutSummary}
+                setWorkoutSummary={setWorkoutSummary}
+                showNavClock={showNavClock}
+                setShowNavClock={setShowNavClock}
+              />
+            ) : currentView === 'exercises' ? (
+              <ExerciseBrowser activeWorkout={activeWorkout} setActiveWorkout={setActiveWorkout} />
+            ) : (
+              <section className="hero">
+                <div className="container">
+                  <h2 className="hero-title">Track Your Fitness Journey</h2>
+                  <button className="btn btn-primary btn-lg" onClick={() => setCurrentView('workout')}>
+                    Start Workout
+                  </button>
+                </div>
+              </section>
+            )}
+          </>
         )}
       </main>
 
@@ -135,4 +137,3 @@ function App() {
 }
 
 export default App
-
