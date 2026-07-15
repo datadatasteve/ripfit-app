@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import ThemeToggle from './components/ThemeToggle'
 import ActiveWorkout from './components/ActiveWorkout'
 import ExerciseBrowser from './components/ExerciseBrowser'
+import Login from './components/Login'
 import './styles/App.css'
 
 // Computes live elapsed workout time from timestamps (not a live-running
@@ -39,7 +40,19 @@ function NavElapsedClock({ workout }) {
 }
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(
+    () => !!localStorage.getItem('ripfit_token')
+  );
+
+  const handleLogin = (user) => {
+    setIsLoggedIn(true);
+    setCurrentView('workout');
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('ripfit_token');
+    setIsLoggedIn(false);
+  };
   const [currentView, setCurrentView] = useState('home');
   const [activeWorkout, setActiveWorkout] = useState(null);
   const [workoutSummary, setWorkoutSummary] = useState(null);
@@ -76,12 +89,18 @@ function App() {
             
             <div className="nav-actions">
               <ThemeToggle />
+              {isLoggedIn && (
+                <button className="btn-logout" onClick={handleLogout}>Log Out</button>
+              )}
             </div>
           </nav>
         </div>
       </header>
 
       <main className="main">
+        {!isLoggedIn ? (
+          <Login onLogin={handleLogin} />
+        ) : (
         {currentView === 'workout' ? (
           <ActiveWorkout
             activeWorkout={activeWorkout}
@@ -103,6 +122,7 @@ function App() {
             </div>
           </section>
         )}
+        )}
       </main>
 
       <footer className="footer">
@@ -115,3 +135,4 @@ function App() {
 }
 
 export default App
+
