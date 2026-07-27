@@ -1,108 +1,123 @@
-import { useState } from 'react';
-import './Login.css';
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-primary, #f5f5f5);
+}
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+.login-card {
+  background: var(--bg-secondary, #fff);
+  border-radius: 12px;
+  padding: 40px 32px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+}
 
-export default function Login({ onLogin }) {
-  const [mode, setMode] = useState('login'); // 'login' or 'register'
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [username, setUsername] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+.login-brand {
+  text-align: center;
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 24px;
+  color: var(--color-primary, #e05c2a);
+}
 
-  const handleSubmit = async () => {
-    setError('');
-    if (!email || !password) { setError('Email and password required.'); return; }
-    if (mode === 'register' && !username) { setError('Username required.'); return; }
+.login-tabs {
+  display: flex;
+  border-bottom: 2px solid var(--border-color, #e0e0e0);
+  margin-bottom: 24px;
+}
 
-    setLoading(true);
-    try {
-      const endpoint = mode === 'login' ? '/auth/login' : '/auth/register';
-      const body = mode === 'login'
-        ? { email, password }
-        : { email, password, username };
+.login-tab {
+  flex: 1;
+  padding: 10px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.95rem;
+  color: var(--text-secondary, #888);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.2s, border-color 0.2s;
+}
 
-      const res = await fetch(`${API_BASE}${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
+.login-tab.active {
+  color: var(--color-primary, #e05c2a);
+  border-bottom-color: var(--color-primary, #e05c2a);
+  font-weight: 600;
+}
 
-      const data = await res.json();
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 
-      if (!res.ok) {
-        setError(data.error || 'Something went wrong.');
-        return;
-      }
+.login-input {
+  padding: 12px 14px;
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  background: var(--bg-primary, #f9f9f9);
+  color: var(--text-primary, #222);
+  outline: none;
+  transition: border-color 0.2s;
+}
 
-      localStorage.setItem('ripfit_token', data.token);
-      onLogin(data.user);
-    } catch (err) {
-      setError('Could not connect to server.');
-    } finally {
-      setLoading(false);
-    }
-  };
+.login-input:focus {
+  border-color: var(--color-primary, #e05c2a);
+}
 
-  return (
-    <div className="login-page">
-      <div className="login-card">
-        <h1 className="login-brand">RipFit</h1>
+.login-error {
+  color: #e05c2a;
+  font-size: 0.875rem;
+  margin: 0;
+}
 
-        <div className="login-tabs">
-          <button
-            className={`login-tab ${mode === 'login' ? 'active' : ''}`}
-            onClick={() => { setMode('login'); setError(''); }}
-          >
-            Log In
-          </button>
-          <button
-            className={`login-tab ${mode === 'register' ? 'active' : ''}`}
-            onClick={() => { setMode('register'); setError(''); }}
-          >
-            Create Account
-          </button>
-        </div>
+.login-submit {
+  padding: 12px;
+  background: var(--color-primary, #e05c2a);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: opacity 0.2s;
+}
 
-        <div className="login-form">
-          {mode === 'register' && (
-            <input
-              type="text"
-              placeholder="Username"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              className="login-input"
-            />
-          )}
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            className="login-input"
-            onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            className="login-input"
-            onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-          />
+.login-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 
-          {error && <p className="login-error">{error}</p>}
+.login-password-wrapper {
+  position: relative;
+  display: flex;
+}
 
-          <button
-            className="login-submit"
-            onClick={handleSubmit}
-            disabled={loading}
-          >
-            {loading ? 'Please wait...' : mode === 'login' ? 'Log In' : 'Create Account'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+.login-password-wrapper .login-input {
+  flex: 1;
+  padding-right: 40px;
+}
+
+.login-eye {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0;
+  line-height: 1;
+}
+
+.login-hint {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #888);
+  margin: 0;
 }

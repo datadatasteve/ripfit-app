@@ -3,18 +3,26 @@ import './Login.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 
+// Password must be 8+ chars with uppercase, lowercase, and special character.
+const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{8,}$/;
+const PASSWORD_HINT = 'Min 8 characters, one uppercase, one lowercase, one special character.';
+
 export default function Login({ onLogin }) {
-  const [mode, setMode] = useState('login'); // 'login' or 'register'
+  const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
     setError('');
     if (!email || !password) { setError('Email and password required.'); return; }
-    if (mode === 'register' && !username) { setError('Username required.'); return; }
+    if (mode === 'register') {
+      if (!username) { setError('Username required.'); return; }
+      if (!PASSWORD_REGEX.test(password)) { setError(PASSWORD_HINT); return; }
+    }
 
     setLoading(true);
     try {
@@ -30,11 +38,7 @@ export default function Login({ onLogin }) {
       });
 
       const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error || 'Something went wrong.');
-        return;
-      }
+      if (!res.ok) { setError(data.error || 'Something went wrong.'); return; }
 
       localStorage.setItem('ripfit_token', data.token);
       onLogin(data.user);
@@ -54,15 +58,11 @@ export default function Login({ onLogin }) {
           <button
             className={`login-tab ${mode === 'login' ? 'active' : ''}`}
             onClick={() => { setMode('login'); setError(''); }}
-          >
-            Log In
-          </button>
+          >Log In</button>
           <button
             className={`login-tab ${mode === 'register' ? 'active' : ''}`}
             onClick={() => { setMode('register'); setError(''); }}
-          >
-            Create Account
-          </button>
+          >Create Account</button>
         </div>
 
         <div className="login-form">
@@ -83,14 +83,27 @@ export default function Login({ onLogin }) {
             className="login-input"
             onKeyDown={e => e.key === 'Enter' && handleSubmit()}
           />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            className="login-input"
-            onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-          />
+          <div className="login-password-wrapper">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              className="login-input"
+              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+            />
+            <button
+              type="button"
+              className="login-eye"
+              onClick={() => setShowPassword(v => !v)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? '🙈' : '👁️'}
+            </button>
+          </div>
+          {mode === 'register' && (
+            <p className="login-hint">{PASSWORD_HINT}</p>
+          )}
 
           {error && <p className="login-error">{error}</p>}
 
