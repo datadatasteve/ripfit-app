@@ -64,7 +64,9 @@ async function runMigrations() {
     console.error('\n✗ Migration failed:', error);
     process.exit(1);
   } finally {
-    await pool.end();
+    // Only close the pool when run directly (e.g. npm run migrate).
+    // When called from app.js at startup, the pool must stay open for API requests.
+    if (require.main === module) await pool.end();
   }
 }
 
