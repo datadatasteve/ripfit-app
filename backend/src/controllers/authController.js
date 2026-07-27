@@ -2,6 +2,8 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const pool = require('../config/database').pool;
 
+const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^a-zA-Z0-9]).{8,}$/;
+
 // Register new user
 const register = async (req, res) => {
   const { email, password, username } = req.body;
@@ -10,8 +12,13 @@ const register = async (req, res) => {
     return res.status(400).json({ error: 'Email and password required' });
   }
 
+  if (!PASSWORD_REGEX.test(password)) {
+    return res.status(400).json({
+      error: 'Password must be at least 8 characters with one uppercase, one lowercase, one number, and one special character.'
+    });
+  }
+
   try {
-    // Check if user exists
     const existing = await pool.query(
       'SELECT id FROM users WHERE email = $1',
       [email]
@@ -21,10 +28,8 @@ const register = async (req, res) => {
       return res.status(400).json({ error: 'Email already registered' });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user
     const result = await pool.query(
       `INSERT INTO users (email, password_hash, username, created_at, updated_at)
        VALUES ($1, $2, $3, NOW(), NOW())
@@ -34,21 +39,16 @@ const register = async (req, res) => {
 
     const user = result.rows[0];
 
-    // Generate JWT
     const token = jwt.sign(
       { userId: user.id, email: user.email },
       process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '90d' }
+      { expiresIn: '30d' }
     );
 
     res.status(201).json({
       message: 'User created',
       token,
-      user: {
-        id: user.id,
-        email: user.email,
-        username: user.username
-      }
+      user: { id: user.id, email: user.email, username: user.username }
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -75,29 +75,22 @@ const login = async (req, res) => {
     }
 
     const user = result.rows[0];
-
-    // Verify password
     const validPassword = await bcrypt.compare(password, user.password_hash);
 
     if (!validPassword) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Generate JWT
     const token = jwt.sign(
       { userId: user.id, email: user.email },
       process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '7d' }
+      { expiresIn: '30d' }
     );
 
     res.json({
       message: 'Login successful',
       token,
-      user: {
-        id: user.id,
-        email: user.email,
-        username: user.username
-      }
+      user: { id: user.id, email: user.email, username: user.username }
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -106,3 +99,4 @@ const login = async (req, res) => {
 };
 
 module.exports = { register, login };
+
