@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import RoutineBuilder from './RoutineBuilder';
+import CardioWorkout from './CardioWorkout';
 import './ActiveWorkout.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
@@ -11,6 +12,7 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
   const [loading, setLoading] = useState(false);
   const [showRoutineBuilder, setShowRoutineBuilder] = useState(false);
   const [editingRoutine, setEditingRoutine] = useState(null);
+  const [showCardio, setShowCardio] = useState(false);
 
   const openEditRoutine = async (routineId) => {
     try {
@@ -294,39 +296,77 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
 
   return (
     <div className="workout-container">
-      <h2>Start Workout</h2>
 
-      <button className="create-routine-btn" onClick={() => { setEditingRoutine(null); setShowRoutineBuilder(true); }}>
-        + Create New Routine
-      </button>
-
-      <div className="routines-list">
-        {routines.length === 0 ? (
-          <p>No routines yet. Create one first!</p>
-        ) : (
-          routines.map(routine => (
-            <div key={routine.id} className="routine-card">
-              <h3>{routine.name}</h3>
-              {routine.description && <p className="routine-card-description">{routine.description}</p>}
-              <p>{routine.exercise_count} exercises</p>
-              <div className="routine-card-actions">
-                <button 
-                  onClick={() => startWorkout(routine.id)}
-                  disabled={loading}
-                >
-                  Start Workout
-                </button>
-                <button
-                  className="routine-card-edit-btn"
-                  onClick={() => openEditRoutine(routine.id)}
-                >
-                  Edit
-                </button>
-              </div>
-            </div>
-          ))
-        )}
+      {/* ── Log a Workout ── */}
+      <div className="log-workout-section">
+        <h2 className="log-workout-title">Log a Workout</h2>
+        <button
+          className="free-lift-btn"
+          onClick={() => startWorkout(null)}
+          disabled={loading}
+        >
+          Free Lift
+        </button>
+        <div className="workout-type-row">
+          <button
+            className="workout-type-btn"
+            onClick={() => { /* scrolls to routines */ document.getElementById('routines-section')?.scrollIntoView({ behavior: 'smooth' }); }}
+          >
+            Strength
+          </button>
+          <button
+            className="workout-type-btn"
+            onClick={() => setShowCardio(true)}
+          >
+            Cardio
+          </button>
+        </div>
       </div>
+
+      {/* ── Routines ── */}
+      <div id="routines-section">
+        <div className="routines-header">
+          <h3>Your Routines</h3>
+          <button className="create-routine-btn" onClick={() => { setEditingRoutine(null); setShowRoutineBuilder(true); }}>
+            + New Routine
+          </button>
+        </div>
+
+        <div className="routines-list">
+          {routines.length === 0 ? (
+            <p>No routines yet. Create one above.</p>
+          ) : (
+            routines.map(routine => (
+              <div key={routine.id} className="routine-card">
+                <h3>{routine.name}</h3>
+                {routine.description && <p className="routine-card-description">{routine.description}</p>}
+                <p>{routine.exercise_count} exercises</p>
+                <div className="routine-card-actions">
+                  <button
+                    onClick={() => startWorkout(routine.id)}
+                    disabled={loading}
+                  >
+                    Start Workout
+                  </button>
+                  <button
+                    className="routine-card-edit-btn"
+                    onClick={() => openEditRoutine(routine.id)}
+                  >
+                    Edit
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {showCardio && (
+        <CardioWorkout onClose={(result) => {
+          setShowCardio(false);
+          // Could show a summary toast here in future
+        }} />
+      )}
 
       {showRoutineBuilder && (
         <RoutineBuilder

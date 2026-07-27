@@ -6,8 +6,6 @@ const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const db = require('./config/database');
-const runMigrations = require('../database/migrate');
-const seedExercises = require('../database/seeds/seed-exercises');
 
 // Create Express app
 const app = express();
@@ -57,10 +55,12 @@ const nutritionRoutes = require('./routes/nutritionRoutes');
 const authRoutes = require('./routes/authRoutes');
 const workoutRoutes = require('./routes/workoutRoutes');
 const routineRoutes = require('./routes/routineRoutes');
+const cardioRoutes = require('./routes/cardioRoutes');
 app.use(`/api/${API_VERSION}/nutrition`, nutritionRoutes);
 app.use(`/api/${API_VERSION}/auth`, authRoutes);
 app.use(`/api/${API_VERSION}/workouts`, workoutRoutes);
 app.use(`/api/${API_VERSION}/routines`, routineRoutes);
+app.use(`/api/${API_VERSION}/cardio`, cardioRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -103,6 +103,7 @@ app.get(`/api/${API_VERSION}`, (req, res) => {
 // app.use(`/api/${API_VERSION}/users`, userRoutes);
 // app.use(`/api/${API_VERSION}/exercises`, exerciseRoutes);
 // app.use(`/api/${API_VERSION}/routines`, routineRoutes);
+app.use(`/api/${API_VERSION}/cardio`, cardioRoutes);
 // app.use(`/api/${API_VERSION}/workouts`, workoutRoutes);
 // app.use(`/api/${API_VERSION}/metrics`, metricsRoutes);
 // app.use(`/api/${API_VERSION}/export`, exportRoutes);
@@ -143,11 +144,8 @@ app.use((err, req, res, next) => {
 
 // Only start server if not in test mode
 if (process.env.NODE_ENV !== 'test') {
-  // Run migrations before starting the server.
-  // migrate.js skips files already recorded in schema_migrations so this is safe to run on every boot.
-  runMigrations().then(() => seedExercises()).then(() => {
-    app.listen(PORT, () => {
-      console.log(`
+  app.listen(PORT, () => {
+    console.log(`
 ╔════════════════════════════════════════════╗
 ║         RipFit API Server                  ║
 ╠════════════════════════════════════════════╣
@@ -159,11 +157,7 @@ if (process.env.NODE_ENV !== 'test') {
 ║ API Base:    http://localhost:${PORT}/api/${API_VERSION.padEnd(3)}║
 ║ Health:      http://localhost:${PORT}/health     ║
 ╚════════════════════════════════════════════╝
-      `);
-    });
-  }).catch(err => {
-    console.error('Migration failed, server not started:', err);
-    process.exit(1);
+    `);
   });
 }
 

@@ -1,0 +1,189 @@
+.cardio-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.cardio-card {
+  background: var(--bg-secondary, #1e1e1e);
+  border-radius: 12px;
+  padding: 24px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cardio-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cardio-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.cardio-close {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: var(--text-secondary, #aaa);
+}
+
+.cardio-timer {
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-primary, #e05c2a);
+}
+
+.cardio-subtitle {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #aaa);
+}
+
+.cardio-type-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.cardio-type-btn {
+  padding: 10px 12px;
+  border: 1px solid var(--border-color, #333);
+  border-radius: 8px;
+  background: var(--bg-primary, #141414);
+  color: var(--text-primary, #eee);
+  cursor: pointer;
+  font-size: 0.9rem;
+  text-align: left;
+  transition: border-color 0.15s;
+}
+
+.cardio-type-btn.active,
+.cardio-type-btn:hover {
+  border-color: var(--color-primary, #e05c2a);
+  color: var(--color-primary, #e05c2a);
+}
+
+.cardio-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cardio-form label {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #aaa);
+  margin-bottom: 2px;
+}
+
+.cardio-form input,
+.cardio-form select,
+.cardio-form textarea {
+  padding: 8px 10px;
+  border: 1px solid var(--border-color, #333);
+  border-radius: 6px;
+  background: var(--bg-primary, #141414);
+  color: var(--text-primary, #eee);
+  font-size: 0.9rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.cardio-form textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+.cardio-row {
+  display: flex;
+  gap: 8px;
+}
+
+.cardio-row input { flex: 1; }
+.cardio-row select { width: 70px; flex-shrink: 0; }
+
+.cardio-hr-zones {
+  border: 1px solid var(--border-color, #333);
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.cardio-hr-zones summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #aaa);
+}
+
+.cardio-zones-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.cardio-zones-grid label {
+  font-size: 0.75rem;
+}
+
+.cardio-btn-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.cardio-primary-btn {
+  flex: 1;
+  padding: 12px;
+  background: var(--color-primary, #e05c2a);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cardio-primary-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cardio-secondary-btn {
+  padding: 10px 16px;
+  background: none;
+  border: 1px solid var(--border-color, #444);
+  border-radius: 8px;
+  color: var(--text-primary, #eee);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.cardio-cancel-btn {
+  padding: 10px 16px;
+  background: none;
+  border: 1px solid #c0392b;
+  border-radius: 8px;
+  color: #c0392b;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.cardio-error {
+  color: #c0392b;
+  font-size: 0.85rem;
+  margin: 0;
+}
