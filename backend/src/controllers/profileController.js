@@ -67,8 +67,8 @@ async function updateProfile(req, res) {
          goals              = COALESCE($9, goals),
          email              = COALESCE($10, email),
          email_verified     = CASE WHEN $10 IS NOT NULL AND $10 != email THEN FALSE ELSE email_verified END,
-         email_verify_token = CASE WHEN $11 IS NOT NULL THEN $11 ELSE email_verify_token END,
-         email_verify_sent_at = CASE WHEN $11 IS NOT NULL THEN NOW() ELSE email_verify_sent_at END
+         email_verify_token = CASE WHEN $11::TEXT IS NOT NULL THEN $11::TEXT ELSE email_verify_token END,
+         email_verify_sent_at = CASE WHEN $11::TEXT IS NOT NULL THEN NOW() ELSE email_verify_sent_at END
        WHERE id = $12
        RETURNING id, username, email, display_name, height_cm, weight_kg,
                  date_of_birth, gender, units_weight, units_distance,
@@ -276,3 +276,4 @@ module.exports = {
   getProfile, updateProfile, updateProfilePicture,
   updatePassword, verifyEmail, resendVerification, adminVerifyUser
 };
+
