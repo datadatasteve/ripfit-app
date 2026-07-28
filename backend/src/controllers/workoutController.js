@@ -739,6 +739,33 @@ const updateExerciseNotes = async (req, res) => {
   }
 };
 
+const startFreeLift = async (req, res) => {
+  const { workout_date } = req.body;
+  const user_id = req.user.userId;
+
+  if (!workout_date) {
+    return res.status(400).json({ error: 'workout_date required' });
+  }
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO workouts (user_id, workout_date, routine_id, start_time)
+       VALUES ($1, $2, NULL, $3) RETURNING *`,
+      [user_id, workout_date, new Date().toISOString()]
+    );
+    res.status(201).json({
+      workout: result.rows[0],
+      routine_name: 'Free Lift',
+      exercises: [],
+      last_workout_date: null,
+      previous_overall_notes: null,
+    });
+  } catch (err) {
+    console.error('Start free lift error:', err);
+    res.status(500).json({ error: 'Failed to start free lift workout' });
+  }
+};
+
 // Add to module.exports
 module.exports = {
   searchExercises,
@@ -752,5 +779,6 @@ module.exports = {
   finishWorkout,
   cancelWorkout,
   addExerciseToWorkout,
-  deleteExerciseFromWorkout
+  deleteExerciseFromWorkout,
+  startFreeLift
 };

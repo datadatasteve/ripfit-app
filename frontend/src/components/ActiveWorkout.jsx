@@ -44,26 +44,27 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
   };
 
   const startWorkout = async (routineId) => {
-    setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/routines/${routineId}/start-workout`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          workout_date: new Date().toISOString().split('T')[0]
-        })
-      });
+      let res;
+      if (routineId === null) {
+        res = await fetch(`${API_BASE}/workouts/start-free`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ workout_date: new Date().toISOString().split('T')[0] }),
+        });
+      } else {
+        res = await fetch(`${API_BASE}/routines/${routineId}/start-workout`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ workout_date: new Date().toISOString().split('T')[0] }),
+        });
+      }
       const data = await res.json();
       setActiveWorkout(data);
-      setSelectedRoutine(null);
     } catch (err) {
       console.error('Failed to start workout:', err);
       alert('Failed to start workout');
     }
-    setLoading(false);
   };
 
   const logSet = async (exerciseIdx, setData) => {
