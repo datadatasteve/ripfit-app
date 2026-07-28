@@ -15,7 +15,7 @@ async function getProfile(req, res) {
          units_weight, units_distance, theme_preference, goals,
          email_verified, created_at
        FROM users WHERE id = $1`,
-      [req.user.id]
+      [req.user.userId]
     );
 
     if (result.rows.length === 0) {
@@ -43,9 +43,9 @@ async function updateProfile(req, res) {
     let newVerifyToken = null;
 
     if (email) {
-      const current = await pool.query('SELECT email FROM users WHERE id = $1', [req.user.id]);
+      const current = await pool.query('SELECT email FROM users WHERE id = $1', [req.user.userId]);
       if (current.rows[0].email !== email) {
-        const taken = await pool.query('SELECT id FROM users WHERE email = $1 AND id != $2', [email, req.user.id]);
+        const taken = await pool.query('SELECT id FROM users WHERE email = $1 AND id != $2', [email, req.user.userId]);
         if (taken.rows.length > 0) {
           return res.status(409).json({ error: 'Email already in use' });
         }
@@ -85,7 +85,7 @@ async function updateProfile(req, res) {
         goals ? JSON.stringify(goals) : null,
         email || null,
         newVerifyToken,
-        req.user.id
+        req.user.userId
       ]
     );
 
@@ -131,7 +131,7 @@ async function updateProfilePicture(req, res) {
   try {
     await pool.query(
       'UPDATE users SET profile_picture = $1 WHERE id = $2',
-      [image, req.user.id]
+      [image, req.user.userId]
     );
     res.json({ ok: true });
   } catch (err) {
@@ -157,7 +157,7 @@ async function updatePassword(req, res) {
   }
 
   try {
-    const result = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
+    const result = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.user.userId]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -168,7 +168,7 @@ async function updatePassword(req, res) {
     }
 
     const newHash = await bcrypt.hash(new_password, 12);
-    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, req.user.id]);
+    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, req.user.userId]);
 
     res.json({ ok: true, message: 'Password updated' });
   } catch (err) {
@@ -213,7 +213,7 @@ async function resendVerification(req, res) {
   try {
     const user = await pool.query(
       'SELECT email, email_verified, email_verify_sent_at FROM users WHERE id = $1',
-      [req.user.id]
+      [req.user.userId]
     );
 
     if (user.rows[0].email_verified) {
@@ -229,7 +229,7 @@ async function resendVerification(req, res) {
     const token = crypto.randomUUID();
     await pool.query(
       `UPDATE users SET email_verify_token = $1, email_verify_sent_at = NOW() WHERE id = $2`,
-      [token, req.user.id]
+      [token, req.user.userId]
     );
 
     await sendVerificationEmail(user.rows[0].email, token);

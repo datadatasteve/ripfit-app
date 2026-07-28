@@ -14,7 +14,7 @@ function NavElapsedClock({ workout }) {
     return () => clearInterval(id);
   }, []);
 
-  if (!workout?.start_time) return null;
+  if (!workout || !workout.start_time) return null;
 
   const pausedSeconds = workout.total_paused_seconds || 0;
   const currentPauseSeconds = workout.paused_at

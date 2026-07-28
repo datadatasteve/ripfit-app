@@ -54,7 +54,7 @@ async function register(req, res) {
 
     // Issue JWT so they can call /me/resend-verification if needed,
     // but they'll be blocked from the main app until verified.
-    const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: JWT_EXPIRY });
+    const token = jwt.sign({ userId: user.id, username: user.username }, JWT_SECRET, { expiresIn: JWT_EXPIRY });
 
     res.status(201).json({
       token,
@@ -101,7 +101,7 @@ async function login(req, res) {
       });
     }
 
-    const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: JWT_EXPIRY });
+    const token = jwt.sign({ userId: user.id, username: user.username }, JWT_SECRET, { expiresIn: JWT_EXPIRY });
 
     res.json({
       token,
