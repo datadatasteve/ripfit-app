@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import ThemeToggle from './components/ThemeToggle'
+import ProfileMenu from './components/ProfileMenu'
 import ActiveWorkout from './components/ActiveWorkout'
 import ExerciseBrowser from './components/ExerciseBrowser'
 import WorkoutHistory from './components/WorkoutHistory'
@@ -42,10 +42,40 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(
     () => !!localStorage.getItem('ripfit_token')
   );
-  const [currentView, setCurrentView] = useState('home');
+  const [currentView, setCurrentView] = useState('workout');
   const [activeWorkout, setActiveWorkout] = useState(null);
   const [workoutSummary, setWorkoutSummary] = useState(null);
   const [showNavClock, setShowNavClock] = useState(true);
+  const [theme, setTheme] = useState(
+    () => localStorage.getItem('ripfit_theme') || 'system'
+  );
+
+  const [verifiedToast, setVerifiedToast] = useState(false);
+
+  // Handle ?verified=true redirect from email verification link
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('verified') === 'true') {
+      setVerifiedToast(true);
+      setTimeout(() => setVerifiedToast(false), 6000);
+      // Clean the URL without reloading
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
+  // Apply theme to <html> data-theme attribute whenever it changes
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'system') {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      root.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+    } else {
+      root.setAttribute('data-theme', theme);
+    }
+    localStorage.setItem('ripfit_theme', theme);
+  }, [theme]);
+
+  const handleThemeChange = (t) => setTheme(t);
 
   const handleLogin = (user) => {
     setIsLoggedIn(true);
@@ -68,7 +98,8 @@ function App() {
         <div className="container">
           <nav className="nav">
             <div className="nav-brand">
-              <h1>RipFit</h1>
+              {/* RipFit click → home (no-op until home page is built) */}
+              <h1 style={{ cursor: 'pointer' }} onClick={() => setCurrentView('home')}>RipFit</h1>
             </div>
 
             <ul className="nav-menu">
@@ -87,9 +118,12 @@ function App() {
             </ul>
 
             <div className="nav-actions">
-              <ThemeToggle />
               {isLoggedIn && (
-                <button className="btn-logout" onClick={handleLogout}>Log Out</button>
+                <ProfileMenu
+                  onLogout={handleLogout}
+                  onThemeChange={handleThemeChange}
+                  currentTheme={theme}
+                />
               )}
             </div>
           </nav>
@@ -133,6 +167,12 @@ function App() {
         )}
       </main>
 
+      {verifiedToast && (
+        <div className="verified-toast">
+          Email verified — you can now log in.
+        </div>
+      )}
+
       <footer className="footer">
         <div className="container">
           <p>© 2026 RipFit</p>
@@ -143,3 +183,4 @@ function App() {
 }
 
 export default App
+

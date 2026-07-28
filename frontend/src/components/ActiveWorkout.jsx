@@ -500,7 +500,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
 
   // Set edit text when opening editor
   useEffect(() => {
-    if (editingNotes) {
+    if (editingNotes && currentExercise.id) {
       setEditNotesText(currentExercise.exercise_notes || '');
     }
   }, [editingNotes]);
@@ -527,6 +527,9 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
   const targetSets = currentExercise.template?.target_sets || 3;
 
   useEffect(() => {
+    // Don't run if there's no real exercise yet (Free Lift empty state)
+    if (!currentExercise.id) return;
+
     // Pre-fill from last set, or from template if first set
     const defaultWeight = loggedSets.length > 0 
       ? loggedSets[loggedSets.length - 1].weight_used 
@@ -875,6 +878,75 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
       setCurrentExerciseIdx(currentExerciseIdx - 1);
     }
   };
+
+  // Free Lift (or any workout) started with no exercises yet — render a
+  // safe empty state instead of crashing on currentExercise.logged_sets.
+  if (exercises.length === 0) {
+    return (
+      <div className="workout-container">
+        <div className="workout-header">
+          <h2>{workout.routine_name || 'Free Lift'}</h2>
+          <div className="header-buttons">
+            <button onClick={togglePause} className={`pause-resume-btn ${isPaused ? 'is-paused' : ''}`}>
+              {isPaused ? '▶ Resume' : '⏸ Pause'}
+            </button>
+            <button onClick={() => setShowFinishConfirm(true)} className="finish-btn">Finish Workout</button>
+            <button onClick={() => setShowCancelConfirm(true)} className="cancel-workout-btn">Cancel Workout</button>
+          </div>
+        </div>
+
+        <div className="current-exercise" style={{ textAlign: 'center', padding: '40px 20px' }}>
+          <p style={{ fontSize: '1.1em', color: '#888', marginBottom: '20px' }}>
+            No exercises yet — add one to get started.
+          </p>
+          <button onClick={() => setShowAddExercise(true)} className="add-exercise-btn" style={{ fontSize: '1em', padding: '12px 24px' }}>
+            + Add Exercise
+          </button>
+        </div>
+
+        {showAddExercise && (
+          <AddExerciseModal
+            onAdd={handleAddExercise}
+            onClose={() => setShowAddExercise(false)}
+          />
+        )}
+
+        {showFinishConfirm && (
+          <div className="modal-overlay" onClick={() => setShowFinishConfirm(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <h3>Finish Workout</h3>
+              <p>No exercises were logged. Are you sure you want to finish?</p>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '15px' }}>
+                <button onClick={() => onFinish(workoutNotes)} className="finish-btn" style={{ flex: 1, padding: '12px' }}>
+                  Finish Anyway
+                </button>
+                <button onClick={() => setShowFinishConfirm(false)} style={{ padding: '12px 16px', background: '#999', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                  Go Back
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showCancelConfirm && (
+          <div className="modal-overlay" onClick={() => setShowCancelConfirm(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <h3>Cancel Workout?</h3>
+              <p>This will cancel your current workout.</p>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '15px' }}>
+                <button onClick={() => { onCancel(); setShowCancelConfirm(false); }} className="cancel-workout-btn" style={{ flex: 1, padding: '12px' }}>
+                  Yes, Cancel
+                </button>
+                <button onClick={() => setShowCancelConfirm(false)} style={{ padding: '12px 16px', background: '#999', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                  Keep Going
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="workout-container">
