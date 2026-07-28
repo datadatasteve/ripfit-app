@@ -2,11 +2,10 @@ import { useState, useEffect } from 'react'
 import ThemeToggle from './components/ThemeToggle'
 import ActiveWorkout from './components/ActiveWorkout'
 import ExerciseBrowser from './components/ExerciseBrowser'
+import WorkoutHistory from './components/WorkoutHistory'
 import Login from './components/Login'
 import './styles/App.css'
 
-// Computes live elapsed workout time from timestamps (not a live-running
-// interval state) so it's always correct even after remounts/navigation.
 function NavElapsedClock({ workout }) {
   const [, setTick] = useState(0);
 
@@ -43,6 +42,10 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(
     () => !!localStorage.getItem('ripfit_token')
   );
+  const [currentView, setCurrentView] = useState('home');
+  const [activeWorkout, setActiveWorkout] = useState(null);
+  const [workoutSummary, setWorkoutSummary] = useState(null);
+  const [showNavClock, setShowNavClock] = useState(true);
 
   const handleLogin = (user) => {
     setIsLoggedIn(true);
@@ -53,13 +56,9 @@ function App() {
     localStorage.removeItem('ripfit_token');
     setIsLoggedIn(false);
   };
-  const [currentView, setCurrentView] = useState('home');
-  const [activeWorkout, setActiveWorkout] = useState(null);
-  const [workoutSummary, setWorkoutSummary] = useState(null);
-  const [showNavClock, setShowNavClock] = useState(true); // toggle: elapsed clock in nav badge
 
   const goToWorkouts = () => {
-    if (workoutSummary) setWorkoutSummary(null); // clicking Workouts tab acts like "Done"
+    if (workoutSummary) setWorkoutSummary(null);
     setCurrentView('workout');
   };
 
@@ -71,7 +70,7 @@ function App() {
             <div className="nav-brand">
               <h1>RipFit</h1>
             </div>
-            
+
             <ul className="nav-menu">
               <li>
                 <a href="#" onClick={goToWorkouts}>
@@ -83,10 +82,10 @@ function App() {
                 </a>
               </li>
               <li><a href="#" onClick={() => setCurrentView('exercises')}>Exercises</a></li>
-              <li><a href="#routines">Routines</a></li>
-              <li><a href="#progress">Progress</a></li>
+              <li><a href="#" onClick={() => setCurrentView('stats')}>Stats</a></li>
+              <li><a href="#" onClick={() => setCurrentView('nutrition')}>Nutrition</a></li>
             </ul>
-            
+
             <div className="nav-actions">
               <ThemeToggle />
               {isLoggedIn && (
@@ -113,6 +112,13 @@ function App() {
               />
             ) : currentView === 'exercises' ? (
               <ExerciseBrowser activeWorkout={activeWorkout} setActiveWorkout={setActiveWorkout} />
+            ) : currentView === 'stats' ? (
+              <WorkoutHistory />
+            ) : currentView === 'nutrition' ? (
+              <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-secondary, #aaa)' }}>
+                <h2>Nutrition</h2>
+                <p>Coming soon.</p>
+              </div>
             ) : (
               <section className="hero">
                 <div className="container">

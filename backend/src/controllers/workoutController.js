@@ -12,7 +12,7 @@ const { pool } = require('../config/database');
  * GET /api/v1/workouts/exercises/search?q=bench&limit=20
  */
 const searchExercises = async (req, res) => {
-  const { q, limit = 50, offset = 0, category: explicitCategory, subcategory: explicitSubcategory, equipment: explicitEquipment } = req.query;
+  const { q, limit = 50, offset = 0 } = req.query;
 
   if (!q) {
     return res.status(400).json({ error: 'Search query required' });
@@ -85,11 +85,6 @@ const searchExercises = async (req, res) => {
       /^(arms?|bi|bis|bicep|biceps|tri|tris|tricep|triceps)$/.test(rawTerm);
 
     if (isCategoryOnlySearch) {
-      const countWhere = subcategoryFilter ? 'WHERE subcategory = $1' : `WHERE category = 'Arms'`;
-      const countParams = subcategoryFilter ? [subcategoryFilter] : [];
-      const countResult = await pool.query(`SELECT COUNT(*) FROM exercises ${countWhere}`, countParams);
-      const total = parseInt(countResult.rows[0].count);
-
       let catQuery, catParams;
       if (subcategoryFilter) {
         catQuery = `SELECT id, name, description, category, subcategory, equipment_type
@@ -103,7 +98,6 @@ const searchExercises = async (req, res) => {
       const catResult = await pool.query(catQuery, catParams);
       return res.json({
         query: q,
-        total,
         count: catResult.rows.length,
         exercises: catResult.rows.map(ex => ({
           id: ex.id,
@@ -159,19 +153,9 @@ const searchExercises = async (req, res) => {
     allParams.push(...uniqueWords.map(w => `%${w}%`));
     paramIdx += uniqueWords.length;
 
-    // Build subcategory / category WHERE clause. An explicit category/subcategory
-    // (sent when a muscle-filter pill is active alongside typed search text) takes
-    // priority over the filter inferred from the search words themselves.
+    // Build subcategory / category WHERE clause (for mixed searches like "db bicep")
     let categoryClause = '';
-    if (explicitSubcategory) {
-      allParams.push(explicitSubcategory);
-      categoryClause = `AND subcategory = $${paramIdx}`;
-      paramIdx++;
-    } else if (explicitCategory) {
-      allParams.push(explicitCategory);
-      categoryClause = `AND category = $${paramIdx}`;
-      paramIdx++;
-    } else if (subcategoryFilter) {
+    if (subcategoryFilter) {
       allParams.push(subcategoryFilter);
       categoryClause = `AND subcategory = $${paramIdx}`;
       paramIdx++;
@@ -180,21 +164,6 @@ const searchExercises = async (req, res) => {
       categoryClause = `AND category = $${paramIdx}`;
       paramIdx++;
     }
-
-    // Equipment filter ANDs onto whatever category/subcategory filter is active.
-    let equipmentClause = '';
-    if (explicitEquipment) {
-      allParams.push(explicitEquipment);
-      equipmentClause = `AND LOWER(equipment_type) = LOWER($${paramIdx})`;
-      paramIdx++;
-    }
-
-    // Total count for pagination (same WHERE clause, no LIMIT/OFFSET)
-    const countResult = await pool.query(
-      `SELECT COUNT(*) FROM exercises WHERE (${orWhere} OR ${equipOr}) ${categoryClause} ${equipmentClause}`,
-      allParams
-    );
-    const total = parseInt(countResult.rows[0].count);
 
     // Limit + offset params
     allParams.push(parseInt(limit));
@@ -207,7 +176,6 @@ const searchExercises = async (req, res) => {
        FROM exercises
        WHERE (${orWhere} OR ${equipOr})
        ${categoryClause}
-       ${equipmentClause}
        ORDER BY 
          CASE WHEN ${andWhere} THEN 0 ELSE 1 END,
          CASE WHEN ${equipOr} THEN 0 ELSE 1 END,
@@ -218,7 +186,6 @@ const searchExercises = async (req, res) => {
 
     res.json({
       query: q,
-      total,
       count: result.rows.length,
       exercises: result.rows.map(ex => ({
         id: ex.id,
@@ -739,34 +706,128 @@ const updateExerciseNotes = async (req, res) => {
   }
 };
 
-const startFreeLift = async (req, res) => {
-  const { workout_date } = req.body;
-  const user_id = req.user.userId;
 
-  if (!workout_date) {
-    return res.status(400).json({ error: 'workout_date required' });
-  }
+// GET /api/v1/workouts/history
+// Combined chronological list of strength workouts + cardio sessions
+const getCombinedHistory = async (req, res) => {
+  const user_id = req.user.userId;
+  const { limit = 50, offset = 0 } = req.query;
 
   try {
-    const result = await pool.query(
-      `INSERT INTO workouts (user_id, workout_date, routine_id, start_time)
-       VALUES ($1, $2, NULL, $3) RETURNING *`,
-      [user_id, workout_date, new Date().toISOString()]
+    const strengthResult = await pool.query(
+      `SELECT
+        w.id,
+        'strength' AS type,
+        w.workout_date AS date,
+        w.start_time,
+        w.end_time,
+        EXTRACT(EPOCH FROM (w.end_time - w.start_time))::INTEGER AS duration_seconds,
+        COALESCE(wr.name, 'Free Lift') AS title,
+        COUNT(DISTINCT we.id) AS exercise_count,
+        w.overall_notes,
+        w.status
+       FROM workouts w
+       LEFT JOIN workout_routines wr ON w.routine_id = wr.id
+       LEFT JOIN workout_exercises we ON w.id = we.workout_id
+       WHERE w.user_id = $1 AND w.status != 'cancelled'
+       GROUP BY w.id, wr.name
+       ORDER BY w.workout_date DESC, w.start_time DESC`,
+      [user_id]
     );
-    res.status(201).json({
-      workout: result.rows[0],
-      routine_name: 'Free Lift',
-      exercises: [],
-      last_workout_date: null,
-      previous_overall_notes: null,
+
+    const cardioResult = await pool.query(
+      `SELECT
+        id,
+        'cardio' AS type,
+        session_date AS date,
+        start_time,
+        end_time,
+        duration_seconds,
+        cardio_type AS title,
+        distance,
+        distance_unit,
+        calories_burned,
+        avg_heart_rate,
+        pre_session_notes,
+        mid_session_notes,
+        post_session_notes,
+        status
+       FROM cardio_sessions
+       WHERE user_id = $1 AND status != 'cancelled'
+       ORDER BY session_date DESC, start_time DESC`,
+      [user_id]
+    );
+
+    // Merge and sort by date desc
+    const combined = [
+      ...strengthResult.rows,
+      ...cardioResult.rows,
+    ].sort((a, b) => {
+      const da = new Date(a.start_time || a.date);
+      const db = new Date(b.start_time || b.date);
+      return db - da;
+    });
+
+    res.json({
+      total: combined.length,
+      entries: combined.slice(parseInt(offset), parseInt(offset) + parseInt(limit)),
     });
   } catch (err) {
-    console.error('Start free lift error:', err);
-    res.status(500).json({ error: 'Failed to start free lift workout' });
+    console.error('Combined history error:', err);
+    res.status(500).json({ error: 'Failed to fetch workout history' });
   }
 };
 
-// Add to module.exports
+// GET /api/v1/workouts/history/:id
+// Full detail for a single strength workout
+const getWorkoutDetail = async (req, res) => {
+  const { id } = req.params;
+  const user_id = req.user.userId;
+
+  try {
+    const workoutResult = await pool.query(
+      `SELECT w.*, COALESCE(wr.name, 'Free Lift') AS routine_name
+       FROM workouts w
+       LEFT JOIN workout_routines wr ON w.routine_id = wr.id
+       WHERE w.id = $1 AND w.user_id = $2`,
+      [id, user_id]
+    );
+
+    if (workoutResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Workout not found' });
+    }
+
+    const exercisesResult = await pool.query(
+      `SELECT
+        we.id, we.exercise_id, we.order_index, we.exercise_notes,
+        e.name AS exercise_name, e.category,
+        json_agg(
+          json_build_object(
+            'set_number', ws.set_number,
+            'reps', ws.reps_completed,
+            'weight', ws.weight_used,
+            'rpe', ws.rpe
+          ) ORDER BY ws.set_number
+        ) FILTER (WHERE ws.id IS NOT NULL) AS sets
+       FROM workout_exercises we
+       JOIN exercises e ON we.exercise_id = e.id
+       LEFT JOIN workout_sets ws ON we.id = ws.workout_exercise_id
+       WHERE we.workout_id = $1
+       GROUP BY we.id, we.exercise_id, we.order_index, we.exercise_notes, e.name, e.category
+       ORDER BY we.order_index`,
+      [id]
+    );
+
+    res.json({
+      ...workoutResult.rows[0],
+      exercises: exercisesResult.rows,
+    });
+  } catch (err) {
+    console.error('Workout detail error:', err);
+    res.status(500).json({ error: 'Failed to fetch workout detail' });
+  }
+};
+
 module.exports = {
   searchExercises,
   getExerciseById,
@@ -780,5 +841,6 @@ module.exports = {
   cancelWorkout,
   addExerciseToWorkout,
   deleteExerciseFromWorkout,
-  startFreeLift
+  getCombinedHistory,
+  getWorkoutDetail
 };

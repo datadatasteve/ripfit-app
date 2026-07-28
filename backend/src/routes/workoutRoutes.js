@@ -11,6 +11,10 @@ router.get('/exercises/search', workoutController.searchExercises);
 router.get('/exercises/browse', workoutController.browseExercises);
 router.get('/exercises/:id', workoutController.getExerciseById);
 
+// Workout history (must be before /:workoutId routes)
+router.get('/history', authenticate, workoutController.getCombinedHistory);
+router.get('/history/:id', authenticate, workoutController.getWorkoutDetail);
+
 // Workout logging
 router.post('/', authenticate, workoutController.logWorkout);
 router.get('/', authenticate, workoutController.getWorkouts);
