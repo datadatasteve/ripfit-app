@@ -470,7 +470,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   const exercises = workout.exercises;
-  const currentExercise = exercises[currentExerciseIdx];
+  const currentExercise = exercises[currentExerciseIdx] || {};
 
   // Helper function to format notes based on user preference
   const formatNotesForDisplay = (notes, isPrevious = false) => {
@@ -1932,3 +1932,4 @@ function ChangeExerciseModal({ onChange, onClose, currentExercise }) {
     </div>
   );
 }
+
