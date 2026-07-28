@@ -197,8 +197,8 @@ export default function CardioWorkout({ onClose }) {
         <p className="cardio-subtitle">Set goals (all optional)</p>
         <div className="cardio-form">
           <label>Goal duration (minutes)</label>
-          <input type="number" placeholder="e.g. 45" value={goals.goal_duration_seconds}
-            onChange={e => setGoals(g => ({ ...g, goal_duration_seconds: e.target.value ? e.target.value * 60 : '' }))} />
+          <input type="number" placeholder="e.g. 45" value={goals.goal_duration_seconds ? goals.goal_duration_seconds / 60 : ''}
+            onChange={e => setGoals(g => ({ ...g, goal_duration_seconds: e.target.value ? parseInt(e.target.value) * 60 : '' }))} />
 
           <label>Goal distance</label>
           <div className="cardio-row">
@@ -268,8 +268,8 @@ export default function CardioWorkout({ onClose }) {
         <p className="cardio-subtitle">All fields optional. Timer time used if duration left blank.</p>
         <div className="cardio-form">
           <label>Duration (minutes) — leave blank to use timer</label>
-          <input type="number" placeholder={Math.round(elapsed / 60)} value={metrics.duration_seconds}
-            onChange={e => setMetrics(m => ({ ...m, duration_seconds: e.target.value ? e.target.value * 60 : '' }))} />
+          <input type="number" placeholder={Math.round(elapsed / 60)} value={metrics.duration_seconds ? metrics.duration_seconds / 60 : ''}
+            onChange={e => setMetrics(m => ({ ...m, duration_seconds: e.target.value ? parseInt(e.target.value) * 60 : '' }))} />
 
           <label>Distance</label>
           <div className="cardio-row">

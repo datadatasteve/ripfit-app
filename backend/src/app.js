@@ -6,6 +6,8 @@ const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const db = require('./config/database');
+const runMigrations = require('../database/migrate');
+const seedExercises = require('../database/seeds/seed-exercises');
 
 // Create Express app
 const app = express();
@@ -34,12 +36,14 @@ if (process.env.NODE_ENV !== 'test') {
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
-
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Trust proxy — required for rate limiter behind Northflank's load balancer
+app.set('trust proxy', 1);
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000, // 15 minutes
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000,
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) || 100,
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
@@ -56,6 +60,7 @@ const authRoutes = require('./routes/authRoutes');
 const workoutRoutes = require('./routes/workoutRoutes');
 const routineRoutes = require('./routes/routineRoutes');
 const cardioRoutes = require('./routes/cardioRoutes');
+
 app.use(`/api/${API_VERSION}/nutrition`, nutritionRoutes);
 app.use(`/api/${API_VERSION}/auth`, authRoutes);
 app.use(`/api/${API_VERSION}/workouts`, workoutRoutes);
@@ -80,39 +85,18 @@ app.get(`/api/${API_VERSION}`, (req, res) => {
     endpoints: {
       health: '/health',
       auth: `/api/${API_VERSION}/auth`,
-      users: `/api/${API_VERSION}/users`,
-      exercises: `/api/${API_VERSION}/exercises`,
       routines: `/api/${API_VERSION}/routines`,
       workouts: `/api/${API_VERSION}/workouts`,
-      metrics: `/api/${API_VERSION}/metrics`,
-      export: `/api/${API_VERSION}/export`,
+      cardio: `/api/${API_VERSION}/cardio`,
+      nutrition: `/api/${API_VERSION}/nutrition`,
     },
   });
 });
-
-// TODO: Import and use route modules
-// const authRoutes = require('./routes/auth');
-// const userRoutes = require('./routes/users');
-// const exerciseRoutes = require('./routes/exercises');
-// const routineRoutes = require('./routes/routines');
-// const workoutRoutes = require('./routes/workouts');
-// const metricsRoutes = require('./routes/metrics');
-// const exportRoutes = require('./routes/export');
-
-// app.use(`/api/${API_VERSION}/auth`, authRoutes);
-// app.use(`/api/${API_VERSION}/users`, userRoutes);
-// app.use(`/api/${API_VERSION}/exercises`, exerciseRoutes);
-// app.use(`/api/${API_VERSION}/routines`, routineRoutes);
-app.use(`/api/${API_VERSION}/cardio`, cardioRoutes);
-// app.use(`/api/${API_VERSION}/workouts`, workoutRoutes);
-// app.use(`/api/${API_VERSION}/metrics`, metricsRoutes);
-// app.use(`/api/${API_VERSION}/export`, exportRoutes);
 
 // ============================================================================
 // ERROR HANDLING
 // ============================================================================
 
-// 404 handler
 app.use((req, res) => {
   res.status(404).json({
     error: 'Not Found',
@@ -121,31 +105,26 @@ app.use((req, res) => {
   });
 });
 
-// Global error handler
 app.use((err, req, res, next) => {
   console.error('Error:', err);
-
-  // Default error
   const statusCode = err.statusCode || 500;
   const message = err.message || 'Internal Server Error';
-
-  // Don't leak error details in production
-  const response = {
+  res.status(statusCode).json({
     error: message,
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
-  };
-
-  res.status(statusCode).json(response);
+  });
 });
 
 // ============================================================================
 // SERVER
 // ============================================================================
 
-// Only start server if not in test mode
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
-    console.log(`
+  runMigrations()
+    .then(() => seedExercises())
+    .then(() => {
+      app.listen(PORT, () => {
+        console.log(`
 ╔════════════════════════════════════════════╗
 ║         RipFit API Server                  ║
 ╠════════════════════════════════════════════╣
@@ -157,8 +136,13 @@ if (process.env.NODE_ENV !== 'test') {
 ║ API Base:    http://localhost:${PORT}/api/${API_VERSION.padEnd(3)}║
 ║ Health:      http://localhost:${PORT}/health     ║
 ╚════════════════════════════════════════════╝
-    `);
-  });
+        `);
+      });
+    })
+    .catch(err => {
+      console.error('Migration failed, server not started:', err);
+      process.exit(1);
+    });
 }
 
 // Graceful shutdown
@@ -172,4 +156,3 @@ process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
 module.exports = app;
-
