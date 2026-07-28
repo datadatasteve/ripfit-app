@@ -1,6 +1,3 @@
-// ============================================================================
-// Workout Routes
-// ============================================================================
 const express = require('express');
 const router = express.Router();
 const workoutController = require('../controllers/workoutController');
@@ -11,9 +8,12 @@ router.get('/exercises/search', workoutController.searchExercises);
 router.get('/exercises/browse', workoutController.browseExercises);
 router.get('/exercises/:id', workoutController.getExerciseById);
 
-// Workout history (must be before /:workoutId routes)
+// History — must come before /:workoutId routes
 router.get('/history', authenticate, workoutController.getCombinedHistory);
 router.get('/history/:id', authenticate, workoutController.getWorkoutDetail);
+
+// Free lift (no routine) — must come before /:workoutId routes
+router.post('/start-free', authenticate, workoutController.startFreeLift);
 
 // Workout logging
 router.post('/', authenticate, workoutController.logWorkout);
@@ -24,8 +24,9 @@ router.put('/:workoutId/finish', authenticate, workoutController.finishWorkout);
 router.put('/:workoutId/cancel', authenticate, workoutController.cancelWorkout);
 router.put('/:workoutId/notes', authenticate, workoutController.updateWorkoutNotes);
 
-router.post('/:workoutId/exercises', authenticate, workoutController.addExerciseToWorkout); // add exercises to active workout
-router.delete('/:workoutId/exercises/:exerciseId', authenticate, workoutController.deleteExerciseFromWorkout); // delete exercise from active workout
+router.post('/:workoutId/exercises', authenticate, workoutController.addExerciseToWorkout);
+router.delete('/:workoutId/exercises/:exerciseId', authenticate, workoutController.deleteExerciseFromWorkout);
 router.put('/:workoutId/exercises/:exerciseId/notes', authenticate, workoutController.updateExerciseNotes);
 
 module.exports = router;
+

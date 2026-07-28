@@ -708,24 +708,18 @@ const updateExerciseNotes = async (req, res) => {
 
 
 // GET /api/v1/workouts/history
-// Combined chronological list of strength workouts + cardio sessions
 const getCombinedHistory = async (req, res) => {
   const user_id = req.user.userId;
   const { limit = 50, offset = 0 } = req.query;
-
   try {
     const strengthResult = await pool.query(
       `SELECT
-        w.id,
-        'strength' AS type,
-        w.workout_date AS date,
-        w.start_time,
-        w.end_time,
+        w.id, 'strength' AS type, w.workout_date AS date,
+        w.start_time, w.end_time,
         EXTRACT(EPOCH FROM (w.end_time - w.start_time))::INTEGER AS duration_seconds,
         COALESCE(wr.name, 'Free Lift') AS title,
         COUNT(DISTINCT we.id) AS exercise_count,
-        w.overall_notes,
-        w.status
+        w.overall_notes, w.status
        FROM workouts w
        LEFT JOIN workout_routines wr ON w.routine_id = wr.id
        LEFT JOIN workout_exercises we ON w.id = we.workout_id
@@ -734,31 +728,18 @@ const getCombinedHistory = async (req, res) => {
        ORDER BY w.workout_date DESC, w.start_time DESC`,
       [user_id]
     );
-
     const cardioResult = await pool.query(
       `SELECT
-        id,
-        'cardio' AS type,
-        session_date AS date,
-        start_time,
-        end_time,
-        duration_seconds,
-        cardio_type AS title,
-        distance,
-        distance_unit,
-        calories_burned,
-        avg_heart_rate,
-        pre_session_notes,
-        mid_session_notes,
-        post_session_notes,
-        status
+        id, 'cardio' AS type, session_date AS date,
+        start_time, end_time, duration_seconds,
+        cardio_type AS title, distance, distance_unit,
+        calories_burned, avg_heart_rate,
+        pre_session_notes, mid_session_notes, post_session_notes, status
        FROM cardio_sessions
        WHERE user_id = $1 AND status != 'cancelled'
        ORDER BY session_date DESC, start_time DESC`,
       [user_id]
     );
-
-    // Merge and sort by date desc
     const combined = [
       ...strengthResult.rows,
       ...cardioResult.rows,
@@ -767,7 +748,6 @@ const getCombinedHistory = async (req, res) => {
       const db = new Date(b.start_time || b.date);
       return db - da;
     });
-
     res.json({
       total: combined.length,
       entries: combined.slice(parseInt(offset), parseInt(offset) + parseInt(limit)),
@@ -778,12 +758,10 @@ const getCombinedHistory = async (req, res) => {
   }
 };
 
-// GET /api/v1/workouts/history/:id
-// Full detail for a single strength workout
+// GET /api/v1/workouts/history/:id  (strength workout detail)
 const getWorkoutDetail = async (req, res) => {
   const { id } = req.params;
   const user_id = req.user.userId;
-
   try {
     const workoutResult = await pool.query(
       `SELECT w.*, COALESCE(wr.name, 'Free Lift') AS routine_name
@@ -792,11 +770,9 @@ const getWorkoutDetail = async (req, res) => {
        WHERE w.id = $1 AND w.user_id = $2`,
       [id, user_id]
     );
-
     if (workoutResult.rows.length === 0) {
       return res.status(404).json({ error: 'Workout not found' });
     }
-
     const exercisesResult = await pool.query(
       `SELECT
         we.id, we.exercise_id, we.order_index, we.exercise_notes,
@@ -817,14 +793,36 @@ const getWorkoutDetail = async (req, res) => {
        ORDER BY we.order_index`,
       [id]
     );
-
-    res.json({
-      ...workoutResult.rows[0],
-      exercises: exercisesResult.rows,
-    });
+    res.json({ ...workoutResult.rows[0], exercises: exercisesResult.rows });
   } catch (err) {
     console.error('Workout detail error:', err);
     res.status(500).json({ error: 'Failed to fetch workout detail' });
+  }
+};
+
+// POST /api/v1/workouts/start-free  (free lift - no routine)
+const startFreeLift = async (req, res) => {
+  const { workout_date } = req.body;
+  const user_id = req.user.userId;
+  if (!workout_date) {
+    return res.status(400).json({ error: 'workout_date required' });
+  }
+  try {
+    const result = await pool.query(
+      `INSERT INTO workouts (user_id, workout_date, routine_id, start_time)
+       VALUES ($1, $2, NULL, $3) RETURNING *`,
+      [user_id, workout_date, new Date().toISOString()]
+    );
+    res.status(201).json({
+      workout: result.rows[0],
+      routine_name: 'Free Lift',
+      exercises: [],
+      last_workout_date: null,
+      previous_overall_notes: null,
+    });
+  } catch (err) {
+    console.error('Start free lift error:', err);
+    res.status(500).json({ error: 'Failed to start free lift workout' });
   }
 };
 
@@ -842,5 +840,6 @@ module.exports = {
   addExerciseToWorkout,
   deleteExerciseFromWorkout,
   getCombinedHistory,
-  getWorkoutDetail
+  getWorkoutDetail,
+  startFreeLift
 };

@@ -48,21 +48,18 @@ export default function WorkoutHistory() {
 
   const openDetail = async (entry) => {
     setSelectedEntry(entry);
-    if (entry.type === 'strength') {
-      setDetailLoading(true);
-      try {
-        const res = await fetch(`${API_BASE}/workouts/history/${entry.id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-        setDetailData(data);
-      } catch (err) {
-        console.error('Failed to fetch detail:', err);
-      } finally {
-        setDetailLoading(false);
-      }
-    } else {
-      setDetailData(entry);
+    setDetailLoading(true);
+    try {
+      const url = entry.type === 'strength'
+        ? `${API_BASE}/workouts/history/${entry.id}`
+        : `${API_BASE}/cardio/${entry.id}`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      setDetailData(data);
+    } catch (err) {
+      console.error('Failed to fetch detail:', err);
+    } finally {
+      setDetailLoading(false);
     }
   };
 
@@ -273,3 +270,4 @@ export default function WorkoutHistory() {
     </div>
   );
 }
+
