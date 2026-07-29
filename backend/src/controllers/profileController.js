@@ -54,40 +54,45 @@ async function updateProfile(req, res) {
       }
     }
 
+    // Param order:
+    // $1 display_name  $2 initials      $3 height_cm    $4 weight_kg
+    // $5 date_of_birth $6 gender        $7 units_weight  $8 units_distance
+    // $9 theme         $10 goals        $11 email        $12 verifyToken
+    // $13 userId
     const result = await pool.query(
       `UPDATE users SET
-         display_name       = COALESCE($1, display_name),
-         initials           = COALESCE($13::TEXT, initials),
-         height_cm          = COALESCE($2, height_cm),
-         weight_kg          = COALESCE($3, weight_kg),
-         date_of_birth      = COALESCE($4, date_of_birth),
-         gender             = COALESCE($5, gender),
-         units_weight       = COALESCE($6, units_weight),
-         units_distance     = COALESCE($7, units_distance),
-         theme_preference   = COALESCE($8, theme_preference),
-         goals              = COALESCE($9, goals),
-         email              = COALESCE($10, email),
-         email_verified     = CASE WHEN $10 IS NOT NULL AND $10 != email THEN FALSE ELSE email_verified END,
-         email_verify_token = CASE WHEN $11::TEXT IS NOT NULL THEN $11::TEXT ELSE email_verify_token END,
-         email_verify_sent_at = CASE WHEN $11::TEXT IS NOT NULL THEN NOW() ELSE email_verify_sent_at END
+         display_name       = COALESCE($1,        display_name),
+         initials           = COALESCE($2::TEXT,  initials),
+         height_cm          = COALESCE($3,        height_cm),
+         weight_kg          = COALESCE($4,        weight_kg),
+         date_of_birth      = COALESCE($5,        date_of_birth),
+         gender             = COALESCE($6,        gender),
+         units_weight       = COALESCE($7,        units_weight),
+         units_distance     = COALESCE($8,        units_distance),
+         theme_preference   = COALESCE($9,        theme_preference),
+         goals              = COALESCE($10,       goals),
+         email              = COALESCE($11,       email),
+         email_verified     = CASE WHEN $11 IS NOT NULL AND $11 != email THEN FALSE ELSE email_verified END,
+         email_verify_token = CASE WHEN $12::TEXT IS NOT NULL THEN $12::TEXT ELSE email_verify_token END,
+         email_verify_sent_at = CASE WHEN $12::TEXT IS NOT NULL THEN NOW() ELSE email_verify_sent_at END
        WHERE id = $13
-       RETURNING id, username, email, display_name, height_cm, weight_kg,
+       RETURNING id, username, email, display_name, initials, height_cm, weight_kg,
                  date_of_birth, gender, units_weight, units_distance,
-                 initials, theme_preference, goals, email_verified`,
+                 theme_preference, goals, email_verified`,
       [
-        display_name || null,
-        height_cm || null,
-        weight_kg || null,
-        date_of_birth || null,
-        gender || null,
-        units_weight || null,
-        units_distance || null,
-        theme_preference || null,
-        goals ? JSON.stringify(goals) : null,
-        email || null,
-        newVerifyToken,
-        initials || null,
-        req.user.userId
+        display_name || null,   // $1
+        initials     || null,   // $2
+        height_cm    || null,   // $3
+        weight_kg    || null,   // $4
+        date_of_birth|| null,   // $5
+        gender       || null,   // $6
+        units_weight || null,   // $7
+        units_distance||null,   // $8
+        theme_preference||null, // $9
+        goals ? JSON.stringify(goals) : null, // $10
+        email        || null,   // $11
+        newVerifyToken,         // $12
+        req.user.userId         // $13
       ]
     );
 

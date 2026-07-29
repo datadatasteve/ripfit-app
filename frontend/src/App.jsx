@@ -14,7 +14,7 @@ function NavElapsedClock({ workout }) {
     return () => clearInterval(id);
   }, []);
 
-  if (!workout || !workout.start_time) return null;
+  if (!workout?.start_time) return null;
 
   const pausedSeconds = workout.total_paused_seconds || 0;
   const currentPauseSeconds = workout.paused_at
@@ -83,10 +83,10 @@ function App() {
   };
 
   const handleLogout = () => {
-  localStorage.removeItem('ripfit_token');
-  setIsLoggedIn(false);
-  setActiveWorkout(null);
-  setWorkoutSummary(null);
+    localStorage.removeItem('ripfit_token');
+    setIsLoggedIn(false);
+    setActiveWorkout(null);
+    setWorkoutSummary(null);
   };
 
   const goToWorkouts = () => {
