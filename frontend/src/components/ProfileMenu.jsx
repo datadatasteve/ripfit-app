@@ -31,7 +31,7 @@ export default function ProfileMenu({ onLogout, onThemeChange, currentTheme }) {
 
   // Profile form state
   const [form, setForm] = useState({
-    display_name: '', height_cm: '', weight_kg: '',
+    display_name: '', initials: '', height_cm: '', weight_kg: '',
     date_of_birth: '', gender: '', units_weight: 'lbs',
     units_distance: 'mi', goals: [],
   });
@@ -72,6 +72,7 @@ export default function ProfileMenu({ onLogout, onThemeChange, currentTheme }) {
       setUser(data);
       setForm({
         display_name:  data.display_name  || '',
+        initials:      data.initials      || '',
         height_cm:     data.height_cm     || '',
         weight_kg:     data.weight_kg     || '',
         date_of_birth: data.date_of_birth ? data.date_of_birth.split('T')[0] : '',
@@ -150,7 +151,10 @@ export default function ProfileMenu({ onLogout, onThemeChange, currentTheme }) {
     try {
       // Resize client-side to max 400x400 before converting to base64.
       // This keeps the stored blob small regardless of source image size.
-      const base64 = await resizeImage(file, 400, 400, 0.85);
+      let base64 = await resizeImage(file, 300, 300, 0.75);
+      if (base64.length > 1_000_000) {
+        base64 = await resizeImage(file, 200, 200, 0.6);
+      }
 
       const res = await fetch(`${API_BASE}/users/me/picture`, {
         method: 'PUT',
@@ -311,6 +315,18 @@ export default function ProfileMenu({ onLogout, onThemeChange, currentTheme }) {
                       value={form.display_name}
                       onChange={e => setForm(f => ({ ...f, display_name: e.target.value }))}
                       placeholder="How you want to be called"
+                    />
+                  </div>
+
+                  <div className="profile-field-group">
+                    <label>Initials <span className="profile-label-hint">(shown on plate icon)</span></label>
+                    <input
+                      type="text"
+                      maxLength={3}
+                      value={form.initials}
+                      onChange={e => setForm(f => ({ ...f, initials: e.target.value.toUpperCase() }))}
+                      placeholder="e.g. SR"
+                      style={{ width: '80px' }}
                     />
                   </div>
 
@@ -641,4 +657,3 @@ function WeightLossCalc({ details, unit }) {
     </div>
   );
 }
-

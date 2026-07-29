@@ -13,7 +13,7 @@ async function getProfile(req, res) {
          id, username, email, display_name, profile_picture,
          height_cm, weight_kg, date_of_birth, gender,
          units_weight, units_distance, theme_preference, goals,
-         email_verified, created_at
+         initials, email_verified, created_at
        FROM users WHERE id = $1`,
       [req.user.userId]
     );
@@ -33,7 +33,7 @@ async function getProfile(req, res) {
 // Updates editable profile fields. Email change re-triggers verification.
 async function updateProfile(req, res) {
   const {
-    display_name, height_cm, weight_kg, date_of_birth, gender,
+    display_name, initials, height_cm, weight_kg, date_of_birth, gender,
     units_weight, units_distance, theme_preference, goals, email
   } = req.body;
 
@@ -57,6 +57,7 @@ async function updateProfile(req, res) {
     const result = await pool.query(
       `UPDATE users SET
          display_name       = COALESCE($1, display_name),
+         initials           = COALESCE($13::TEXT, initials),
          height_cm          = COALESCE($2, height_cm),
          weight_kg          = COALESCE($3, weight_kg),
          date_of_birth      = COALESCE($4, date_of_birth),
@@ -69,10 +70,10 @@ async function updateProfile(req, res) {
          email_verified     = CASE WHEN $10 IS NOT NULL AND $10 != email THEN FALSE ELSE email_verified END,
          email_verify_token = CASE WHEN $11::TEXT IS NOT NULL THEN $11::TEXT ELSE email_verify_token END,
          email_verify_sent_at = CASE WHEN $11::TEXT IS NOT NULL THEN NOW() ELSE email_verify_sent_at END
-       WHERE id = $12
+       WHERE id = $13
        RETURNING id, username, email, display_name, height_cm, weight_kg,
                  date_of_birth, gender, units_weight, units_distance,
-                 theme_preference, goals, email_verified`,
+                 initials, theme_preference, goals, email_verified`,
       [
         display_name || null,
         height_cm || null,
@@ -85,6 +86,7 @@ async function updateProfile(req, res) {
         goals ? JSON.stringify(goals) : null,
         email || null,
         newVerifyToken,
+        initials || null,
         req.user.userId
       ]
     );
@@ -276,4 +278,3 @@ module.exports = {
   getProfile, updateProfile, updateProfilePicture,
   updatePassword, verifyEmail, resendVerification, adminVerifyUser
 };
-

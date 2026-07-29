@@ -38,12 +38,16 @@ export default function ProfileCircle({ user, onClick, size = 40 }) {
 // Derives up to 2 initials from display_name, falling back to username.
 function getInitials(user) {
   if (!user) return '?';
-  const name = user.display_name || user.username || '';
-  const parts = name.trim().split(/\s+/);
+  // Explicit initials field takes priority (set in User Preferences)
+  if (user.initials) return user.initials.toUpperCase().slice(0, 3);
+  // Fall back to first+last initial from display_name
+  const name = user.display_name || '';
+  const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length >= 2) {
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   }
-  return name.slice(0, 2).toUpperCase();
+  // Last resort: first two chars of username
+  return (user.username || '?').slice(0, 2).toUpperCase();
 }
 
 // Weight plate SVG. Outer ring with "RipFit" arcing along the top,
@@ -138,4 +142,3 @@ function describeArc(cx, cy, r, startAngle, endAngle) {
   const largeArc = endAngle - startAngle > 180 ? 1 : 0;
   return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 1 ${end.x} ${end.y}`;
 }
-
