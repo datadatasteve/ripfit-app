@@ -4,9 +4,10 @@
 //   User Preferences — personal profile, goals
 //   Logout
 
-import './ProfileMenu.css'; 
+import './ProfileMenu.css';
 import { useState, useEffect, useRef } from 'react';
 import ProfileCircle from './ProfileCircle';
+import { useTheme } from '../contexts/ThemeContext';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 
@@ -21,7 +22,8 @@ const GOAL_TYPES = [
   { id: 'flexibility',       label: 'Flexibility / Mobility' },
 ];
 
-export default function ProfileMenu({ onLogout, onThemeChange, currentTheme }) {
+export default function ProfileMenu({ onLogout }) {
+  const { themeMode, setThemeMode } = useTheme();
   const [open, setOpen]         = useState(false);
   const [panel, setPanel]       = useState(null); // null | 'settings' | 'prefs'
   const [user, setUser]         = useState(null);
@@ -268,8 +270,8 @@ export default function ProfileMenu({ onLogout, onThemeChange, currentTheme }) {
                   {['light', 'dark', 'system'].map(t => (
                     <button
                       key={t}
-                      className={`theme-option-btn ${currentTheme === t ? 'active' : ''}`}
-                      onClick={() => onThemeChange(t)}
+                      className={`theme-option-btn ${themeMode === t ? 'active' : ''}`}
+                      onClick={() => setThemeMode(t)}
                     >
                       {t.charAt(0).toUpperCase() + t.slice(1)}
                     </button>

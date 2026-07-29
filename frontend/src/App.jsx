@@ -46,10 +46,6 @@ function App() {
   const [activeWorkout, setActiveWorkout] = useState(null);
   const [workoutSummary, setWorkoutSummary] = useState(null);
   const [showNavClock, setShowNavClock] = useState(true);
-  const [theme, setTheme] = useState(
-    () => localStorage.getItem('ripfit_theme') || 'system'
-  );
-
   const [verifiedToast, setVerifiedToast] = useState(false);
 
   // Handle ?verified=true redirect from email verification link
@@ -58,24 +54,9 @@ function App() {
     if (params.get('verified') === 'true') {
       setVerifiedToast(true);
       setTimeout(() => setVerifiedToast(false), 6000);
-      // Clean the URL without reloading
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);
-
-  // Apply theme to <html> data-theme attribute whenever it changes
-  useEffect(() => {
-    const root = document.documentElement;
-    if (theme === 'system') {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      root.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
-    } else {
-      root.setAttribute('data-theme', theme);
-    }
-    localStorage.setItem('ripfit_theme', theme);
-  }, [theme]);
-
-  const handleThemeChange = (t) => setTheme(t);
 
   const handleLogin = (user) => {
     setIsLoggedIn(true);
@@ -123,8 +104,6 @@ function App() {
               {isLoggedIn && (
                 <ProfileMenu
                   onLogout={handleLogout}
-                  onThemeChange={handleThemeChange}
-                  currentTheme={theme}
                 />
               )}
             </div>
@@ -185,4 +164,3 @@ function App() {
 }
 
 export default App
-
