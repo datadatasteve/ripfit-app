@@ -797,3 +797,29 @@
   font-size: 0.9em;
   cursor: pointer;
 }
+/* ── Email verified toast ──────────────────────────────────────────────── */
+.verified-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-success);
+  color: white;
+  padding: 12px 24px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  box-shadow: var(--shadow-lg);
+  z-index: var(--z-tooltip);
+}
+
+/* ── Responsive nav fix ────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .nav-menu {
+    gap: var(--space-md);
+  }
+  .nav-menu a {
+    font-size: var(--font-size-sm);
+  }
+}
+

@@ -4,7 +4,6 @@
 //   User Preferences — personal profile, goals
 //   Logout
 
-import './ProfileMenu.css';
 import { useState, useEffect, useRef } from 'react';
 import ProfileCircle from './ProfileCircle';
 
@@ -146,30 +145,52 @@ export default function ProfileMenu({ onLogout, onThemeChange, currentTheme }) {
       return;
     }
 
-    // Convert to base64
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      const base64 = ev.target.result;
-      try {
-        const res = await fetch(`${API_BASE}/users/me/picture`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token()}`
-          },
-          body: JSON.stringify({ image: base64 })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
-        setUser(prev => ({ ...prev, profile_picture: base64 }));
-        setPicMsg('Photo updated.');
-      } catch (err) {
-        setPicMsg(err.message || 'Failed to upload photo');
-      } finally {
-        setTimeout(() => setPicMsg(''), 3000);
-      }
-    };
-    reader.readAsDataURL(file);
+    setPicMsg('Processing…');
+
+    try {
+      // Resize client-side to max 400x400 before converting to base64.
+      // This keeps the stored blob small regardless of source image size.
+      const base64 = await resizeImage(file, 400, 400, 0.85);
+
+      const res = await fetch(`${API_BASE}/users/me/picture`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token()}`
+        },
+        body: JSON.stringify({ image: base64 })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setUser(prev => ({ ...prev, profile_picture: base64 }));
+      setPicMsg('Photo updated.');
+    } catch (err) {
+      setPicMsg(err.message || 'Failed to upload photo');
+    } finally {
+      setTimeout(() => setPicMsg(''), 3000);
+    }
+  }
+
+  // Draws the image onto a canvas at max dimensions, returns base64 JPEG.
+  // maxW/maxH: maximum output dimensions. quality: JPEG compression 0-1.
+  function resizeImage(file, maxW, maxH, quality = 0.85) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const scale = Math.min(1, maxW / img.width, maxH / img.height);
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width  = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = url;
+    });
   }
 
   // ── Goal helpers ──────────────────────────────────────────────────────────
