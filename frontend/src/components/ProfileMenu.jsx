@@ -4,6 +4,7 @@
 //   User Preferences — personal profile, goals
 //   Logout
 
+import './ProfileMenu.css'; 
 import { useState, useEffect, useRef } from 'react';
 import ProfileCircle from './ProfileCircle';
 
