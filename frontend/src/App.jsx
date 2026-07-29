@@ -83,8 +83,10 @@ function App() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('ripfit_token');
-    setIsLoggedIn(false);
+  localStorage.removeItem('ripfit_token');
+  setIsLoggedIn(false);
+  setActiveWorkout(null);
+  setWorkoutSummary(null);
   };
 
   const goToWorkouts = () => {
