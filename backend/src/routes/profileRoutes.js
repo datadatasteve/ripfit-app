@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const {
-  getProfile, updateProfile, updateProfilePicture,
+  getProfile, updateProfile, updateProfilePicture, removeProfilePicture,
   updatePassword, verifyEmail, resendVerification, adminVerifyUser
 } = require('../controllers/profileController');
 
@@ -19,8 +19,8 @@ router.use(auth);
 router.get('/me', getProfile);
 router.put('/me', updateProfile);
 router.put('/me/picture', updateProfilePicture);
+router.delete('/me/picture', removeProfilePicture);
 router.put('/me/password', updatePassword);
 router.post('/me/resend-verification', resendVerification);
 
 module.exports = router;
-

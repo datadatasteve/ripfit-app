@@ -47,6 +47,11 @@ export default function ProfileMenu({ onLogout }) {
   const [picMsg, setPicMsg] = useState('');
   const fileInputRef = useRef(null);
 
+  // Fetch on mount so profile picture shows immediately without opening dropdown
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
   useEffect(() => {
     if (open && !user) fetchProfile();
   }, [open]);
@@ -200,6 +205,24 @@ export default function ProfileMenu({ onLogout }) {
     });
   }
 
+  async function removePhoto() {
+    setPicMsg('Removing...');
+    try {
+      const res = await fetch(`${API_BASE}/users/me/picture`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token()}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setUser(prev => ({ ...prev, profile_picture: null }));
+      setPicMsg('Photo removed.');
+    } catch (err) {
+      setPicMsg(err.message || 'Failed to remove photo');
+    } finally {
+      setTimeout(() => setPicMsg(''), 3000);
+    }
+  }
+
   // ── Goal helpers ──────────────────────────────────────────────────────────
 
   function toggleGoal(goalId) {
@@ -299,6 +322,11 @@ export default function ProfileMenu({ onLogout }) {
                       <button className="profile-pic-upload-btn" onClick={() => fileInputRef.current?.click()}>
                         {user?.profile_picture ? 'Change photo' : 'Upload photo'}
                       </button>
+                      {user?.profile_picture && (
+                        <button className="profile-pic-remove-btn" onClick={removePhoto}>
+                          Remove
+                        </button>
+                      )}
                       <input
                         type="file"
                         accept="image/*"

@@ -147,6 +147,20 @@ async function updateProfilePicture(req, res) {
   }
 }
 
+// ── DELETE /users/me/picture ──────────────────────────────────────────────
+async function removeProfilePicture(req, res) {
+  try {
+    await pool.query(
+      'UPDATE users SET profile_picture = NULL WHERE id = $1',
+      [req.user.userId]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('removeProfilePicture error:', err);
+    res.status(500).json({ error: 'Failed to remove profile picture' });
+  }
+}
+
 // ── PUT /users/me/password ─────────────────────────────────────────────────
 async function updatePassword(req, res) {
   const { current_password, new_password } = req.body;
@@ -280,6 +294,7 @@ async function adminVerifyUser(req, res) {
 }
 
 module.exports = {
-  getProfile, updateProfile, updateProfilePicture,
+  getProfile, updateProfile, updateProfilePicture, removeProfilePicture,
   updatePassword, verifyEmail, resendVerification, adminVerifyUser
 };
+
