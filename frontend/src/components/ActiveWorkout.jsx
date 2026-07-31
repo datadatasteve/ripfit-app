@@ -53,13 +53,15 @@ function SessionRatingWidget({ workoutId }) {
         {saved && <span className="session-rating-saved">Saved ✓</span>}
       </div>
 
+      {/* Hidden element exposes current rating to the Done button handler */}
+      <span data-session-rating={rating || ''} style={{ display: 'none' }} />
       {prefs.display === 'stars' ? (
         <div className="session-rating-stars">
           {ticks.map(v => (
             <button
               key={v}
               className={`star-btn ${rating >= v ? 'active' : ''}`}
-              onClick={() => save(v)}
+              onClick={() => setRating(v)}
               disabled={saved}
               aria-label={`Rate ${v} out of ${scale}`}
             >★</button>
@@ -71,13 +73,13 @@ function SessionRatingWidget({ workoutId }) {
             <button
               key={v}
               className={`number-btn ${rating === v ? 'active' : ''}`}
-              onClick={() => save(v)}
+              onClick={() => setRating(v)}
               disabled={saved}
             >{v}</button>
           ))}
         </div>
       ) : (
-        // Default: slider
+        // Default: slider — value tracked locally, saved when user clicks Done
         <div className="session-rating-slider-wrap">
           <input
             type="range"
@@ -87,8 +89,6 @@ function SessionRatingWidget({ workoutId }) {
             value={rating || Math.ceil(scale / 2)}
             className="session-rating-slider"
             onChange={e => setRating(parseInt(e.target.value))}
-            onMouseUp={e => save(parseInt(e.target.value))}
-            onTouchEnd={e => save(parseInt(e.target.value))}
             disabled={saved}
           />
           <div className="session-rating-ticks">
@@ -373,7 +373,20 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
           <SessionRatingWidget workoutId={workoutSummary.workout_id} />
 
           <button 
-            onClick={() => setWorkoutSummary(null)} 
+            onClick={async () => {
+              // Save the session rating if one was selected
+              const ratingEl = document.querySelector('[data-session-rating]');
+              const ratingVal = ratingEl ? parseInt(ratingEl.dataset.sessionRating) : null;
+              if (ratingVal && workoutSummary.workout_id) {
+                const tok = localStorage.getItem('ripfit_token');
+                await fetch(`${API_BASE}/stats/workouts/${workoutSummary.workout_id}/rating`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
+                  body: JSON.stringify({ session_rating: ratingVal }),
+                }).catch(e => console.error('Failed to save rating:', e));
+              }
+              setWorkoutSummary(null);
+            }}
             className="finish-btn"
             style={{width: '100%', padding: '14px', fontSize: '1.1em', marginTop: '20px'}}
           >

@@ -17,7 +17,7 @@
   position: sticky;
   top: 0;
   background: var(--bg-primary);
-  z-index: var(--z-sticky);
+  z-index: 10; /* below header so profile dropdown renders above */
 }
 .sc-tab-bar::-webkit-scrollbar { display: none; }
 

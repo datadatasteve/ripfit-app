@@ -321,12 +321,47 @@ export default function UserPreferencesPage({ onBack }) {
 
               <div className="prefs-field-row">
                 <div className="prefs-field-group">
-                  <label>Height ({form.units_weight === 'lbs' ? 'in' : 'cm'})</label>
-                  <input type="number" value={form.height_cm} onChange={e => setForm(f => ({ ...f, height_cm: e.target.value }))} placeholder={form.units_weight === 'lbs' ? 'inches' : 'cm'} />
+                  <label>Height</label>
+                  {form.units_weight === 'lbs' ? (
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <input
+                        type="number" min={0} max={9}
+                        value={form.height_cm ? Math.floor(form.height_cm / 30.48) : ''}
+                        onChange={e => {
+                          const ft = parseInt(e.target.value) || 0;
+                          const curIn = form.height_cm ? Math.round((form.height_cm / 2.54) % 12) : 0;
+                          setForm(f => ({ ...f, height_cm: Math.round((ft * 12 + curIn) * 2.54) }));
+                        }}
+                        style={{ width: 64 }}
+                        placeholder="ft"
+                      />
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '0.85em' }}>ft</span>
+                      <input
+                        type="number" min={0} max={11}
+                        value={form.height_cm ? Math.round((form.height_cm / 2.54) % 12) : ''}
+                        onChange={e => {
+                          const inches = parseInt(e.target.value) || 0;
+                          const curFt = form.height_cm ? Math.floor(form.height_cm / 30.48) : 0;
+                          setForm(f => ({ ...f, height_cm: Math.round((curFt * 12 + inches) * 2.54) }));
+                        }}
+                        style={{ width: 64 }}
+                        placeholder="in"
+                      />
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '0.85em' }}>in</span>
+                    </div>
+                  ) : (
+                    <input
+                      type="number"
+                      value={form.height_cm}
+                      onChange={e => setForm(f => ({ ...f, height_cm: e.target.value }))}
+                      placeholder="cm"
+                      style={{ maxWidth: 120 }}
+                    />
+                  )}
                 </div>
                 <div className="prefs-field-group">
                   <label>Weight ({form.units_weight})</label>
-                  <input type="number" step="0.1" value={form.weight_kg} onChange={e => setForm(f => ({ ...f, weight_kg: e.target.value }))} />
+                  <input type="number" step="0.1" value={form.weight_kg} onChange={e => setForm(f => ({ ...f, weight_kg: e.target.value }))} style={{ maxWidth: 120 }} />
                 </div>
               </div>
 
@@ -443,11 +478,23 @@ export default function UserPreferencesPage({ onBack }) {
 function GoalDetails({ goalId, details, onChange, unitsWeight }) {
   const wUnit = unitsWeight || 'lbs';
   const dimUnit = wUnit === 'lbs' ? 'in' : 'cm';
+  // Local draft state so inputs don't lose focus on each keystroke.
+  // Syncs to parent only on blur.
+  const [draft, setDraft] = useState({ ...details });
+  // Keep draft in sync when details change externally (e.g. goal toggled off/on)
+  useEffect(() => { setDraft({ ...details }); }, [goalId]);
 
   const Field = ({ label, field, type = 'text', placeholder, step }) => (
     <div className="prefs-goal-field">
       <label>{label}</label>
-      <input type={type} step={step} placeholder={placeholder || ''} value={details[field] || ''} onChange={e => onChange(field, e.target.value)} />
+      <input
+        type={type}
+        step={step}
+        placeholder={placeholder || ''}
+        value={draft[field] || ''}
+        onChange={e => setDraft(d => ({ ...d, [field]: e.target.value }))}
+        onBlur={e => onChange(field, e.target.value)}
+      />
     </div>
   );
 

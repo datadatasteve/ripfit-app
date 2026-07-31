@@ -90,10 +90,30 @@ function fmtDuration(s) {
 
 function fmtDate(d, includeYear = false) {
   if (!d) return '';
-  // Parse date strings like '2026-07-31' as local date to avoid UTC offset shifting the day
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(d)
-    ? new Date(d + 'T00:00:00')   // treat bare date as local midnight
-    : new Date(d);                  // full ISO string — let browser parse (already has tz info)
+  // Dates from the DB arrive as either:
+  //   '2026-07-31'                  — bare date string (workout_date column)
+  //   '2026-07-31T00:00:00.000Z'    — DATE_TRUNC result stored as UTC midnight
+  //   '2026-07-31T21:09:22.526Z'    — real timestamp (start_time)
+  // For the first two cases, extract the date portion and parse as local midnight
+  // to avoid UTC-to-local offset shifting the displayed day.
+  // For real timestamps, use the date portion of the LOCAL time representation.
+  let dateStr;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+    // bare date — already local
+    dateStr = d;
+  } else if (/T00:00:00/.test(d)) {
+    // midnight UTC — almost certainly a date-only value stored as UTC midnight
+    dateStr = d.slice(0, 10);
+  } else {
+    // real timestamp — convert to local date string first
+    const localDate = new Date(d);
+    const y = localDate.getFullYear();
+    const mo = String(localDate.getMonth() + 1).padStart(2, '0');
+    const day = String(localDate.getDate()).padStart(2, '0');
+    dateStr = `${y}-${mo}-${day}`;
+  }
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const date = new Date(year, month - 1, day); // local midnight, no UTC shift
   const opts = { month: 'short', day: 'numeric' };
   if (includeYear) opts.year = 'numeric';
   return date.toLocaleDateString('en-US', opts);
@@ -205,14 +225,14 @@ function WorkoutHeatmap({ timeOfDay, dayOfWeek }) {
 
 // ── Time window selector ──────────────────────────────────────────────────
 const TIME_WINDOWS = [
-  { label: '1w',  weeks: 1 },
-  { label: '2w',  weeks: 2 },
-  { label: '1m',  weeks: 4 },
-  { label: '2m',  weeks: 8 },
-  { label: '3m',  weeks: 13 },
-  { label: '6m',  weeks: 26 },
-  { label: '9m',  weeks: 39 },
-  { label: '1y',  weeks: 52 },
+  { label: '1W',  weeks: 1 },
+  { label: '2W',  weeks: 2 },
+  { label: '1M',  weeks: 4 },
+  { label: '2M',  weeks: 8 },
+  { label: '3M',  weeks: 13 },
+  { label: '6M',  weeks: 26 },
+  { label: '9M',  weeks: 39 },
+  { label: '1Y',  weeks: 52 },
   { label: 'All', weeks: 520 },
 ];
 
@@ -876,11 +896,39 @@ function RecordsTab() {
 
   // Exercise drill-down from Records
   if (selectedExId && exData) {
+    const seriesData = exData.per_session.map(s => ({
+      date: fmtDate(s.workout_date),
+      max_weight: parseFloat(s.max_weight),
+      avg_weight: parseFloat(s.avg_weight),
+      volume: s.volume,
+      est_1rm: parseFloat(s.est_1rm),
+      avg_rpe: parseFloat(s.avg_rpe),
+      sets: s.sets,
+    }));
+    const [recChartMetric, setRecChartMetric] = useState('max_weight');
+    const [recChartType, setRecChartType] = useState('line');
+    const CHART_OPTIONS = [
+      { value: 'line', label: 'Line', icon: '╱' },
+      { value: 'bar', label: 'Bar', icon: '▮▮' },
+      { value: 'area', label: 'Area', icon: '◬' },
+      { value: 'scatter', label: 'Scatter', icon: '⋯' },
+    ];
+    const METRIC_OPTIONS = [
+      { value: 'max_weight', label: 'Max Weight' },
+      { value: 'avg_weight', label: 'Avg Weight' },
+      { value: 'volume', label: 'Volume' },
+      { value: 'est_1rm', label: 'Est. 1RM' },
+      { value: 'sets', label: 'Sets' },
+    ];
+    const metricLabel = METRIC_OPTIONS.find(m => m.value === recChartMetric)?.label;
+    const strokeColor = 'var(--color-primary)';
+
     return (
       <div>
         <button className="sc-back-btn" onClick={() => { setSelectedExId(null); setExData(null); }}>← Back to Records</button>
         <h3 className="sc-ex-title">{exData.exercise.name}</h3>
         <p className="sc-ex-meta">{exData.exercise.category} · {exData.exercise.equipment_type}</p>
+        {exData.exercise.muscles_primary && <p className="sc-ex-muscles">Primary: {exData.exercise.muscles_primary}</p>}
         <div className="sc-stat-grid">
           <StatCard label="Best Est. 1RM" value={exData.bests.best_est_1rm ? `${exData.bests.best_est_1rm} lbs` : '—'} />
           <StatCard label="Max Weight" value={exData.bests.max_weight ? `${exData.bests.max_weight} lbs` : '—'} />
@@ -888,6 +936,57 @@ function RecordsTab() {
           <StatCard label="Sessions" value={exData.bests.total_sessions ?? '—'} />
           <StatCard label="Total Sets" value={exData.bests.total_sets ?? '—'} />
         </div>
+
+        <Section
+          title={`${metricLabel} Over Time`}
+          controls={
+            <div style={{ display: 'flex', gap: 8 }}>
+              <select className="sc-select" value={recChartMetric} onChange={e => setRecChartMetric(e.target.value)}>
+                {METRIC_OPTIONS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+              </select>
+              <ChartTypeToggle options={CHART_OPTIONS} value={recChartType} onChange={setRecChartType} />
+            </div>
+          }
+        >
+          {seriesData.length === 0 ? <Empty /> : (
+            <ResponsiveContainer width="100%" height={240}>
+              {recChartType === 'bar' ? (
+                <BarChart data={seriesData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
+                  <YAxis tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
+                  <Tooltip contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }} />
+                  <Bar dataKey={recChartMetric} fill={strokeColor} radius={[3,3,0,0]} name={metricLabel} />
+                </BarChart>
+              ) : recChartType === 'area' ? (
+                <AreaChart data={seriesData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
+                  <YAxis tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
+                  <Tooltip contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }} />
+                  <Area type="monotone" dataKey={recChartMetric} stroke={strokeColor} fill={strokeColor} fillOpacity={0.15} name={metricLabel} />
+                </AreaChart>
+              ) : recChartType === 'scatter' ? (
+                <ScatterChart>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
+                  <YAxis dataKey={recChartMetric} tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
+                  <Tooltip contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }} />
+                  <Scatter data={seriesData} fill={strokeColor} name={metricLabel} />
+                </ScatterChart>
+              ) : (
+                <LineChart data={seriesData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
+                  <YAxis tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
+                  <Tooltip contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }} />
+                  <Line type="monotone" dataKey={recChartMetric} stroke={strokeColor} strokeWidth={2} dot={{ r: 3 }} name={metricLabel} />
+                </LineChart>
+              )}
+            </ResponsiveContainer>
+          )}
+        </Section>
+
         <Section title="Session Log">
           <div className="sc-table-wrapper">
             <table className="sc-table">
