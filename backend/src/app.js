@@ -61,6 +61,7 @@ const workoutRoutes = require('./routes/workoutRoutes');
 const routineRoutes = require('./routes/routineRoutes');
 const cardioRoutes = require('./routes/cardioRoutes');
 const profileRoutes = require('./routes/profileRoutes');
+const statsRoutes = require('./routes/statsRoutes');
 
 app.use(`/api/${API_VERSION}/nutrition`, nutritionRoutes);
 app.use(`/api/${API_VERSION}/auth`, authRoutes);
@@ -68,6 +69,8 @@ app.use(`/api/${API_VERSION}/workouts`, workoutRoutes);
 app.use(`/api/${API_VERSION}/routines`, routineRoutes);
 app.use(`/api/${API_VERSION}/cardio`, cardioRoutes);
 app.use('/api/v1/users', profileRoutes);
+app.use('/api/v1/stats', statsRoutes);
+app.use('/api/v1', statsRoutes); // admin reset password (protected by ADMIN_SECRET)
 
 // Health check endpoint
 app.get('/health', (req, res) => {

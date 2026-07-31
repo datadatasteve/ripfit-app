@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import ProfileMenu from './components/ProfileMenu'
 import ActiveWorkout from './components/ActiveWorkout'
 import ExerciseBrowser from './components/ExerciseBrowser'
-import WorkoutHistory from './components/WorkoutHistory'
+import StatsCenter from './components/StatsCenter'
 import Login from './components/Login'
 import './styles/App.css'
 
@@ -128,7 +128,7 @@ function App() {
             ) : currentView === 'exercises' ? (
               <ExerciseBrowser activeWorkout={activeWorkout} setActiveWorkout={setActiveWorkout} />
             ) : currentView === 'stats' ? (
-              <WorkoutHistory />
+              <StatsCenter />
             ) : currentView === 'nutrition' ? (
               <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-secondary, #aaa)' }}>
                 <h2>Nutrition</h2>
@@ -164,3 +164,4 @@ function App() {
 }
 
 export default App
+
