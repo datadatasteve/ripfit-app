@@ -573,8 +573,6 @@ const GoalDetails = memo(function GoalDetails({ goalId, details, onChange, units
     );
     default: return null;
   }
-}
-
 }); // end memo(GoalDetails)
 
 function WeightLossCalc({ details, unit }) {
