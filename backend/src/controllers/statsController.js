@@ -27,22 +27,29 @@ async function getOverview(req, res) {
 
   try {
     // Weekly frequency (strength + cardio combined)
+    // Use workout_date/session_date as fallback if start_time is null
+    const weeksCond = weeks < 500
+      ? `AND COALESCE(start_time, workout_date::timestamptz) >= NOW() - ('${parseInt(weeks)} weeks')::INTERVAL`
+      : '';
+    const weeksCond2 = weeks < 500
+      ? `AND COALESCE(start_time, session_date::timestamptz) >= NOW() - ('${parseInt(weeks)} weeks')::INTERVAL`
+      : '';
+
     const weeklyFreq = await pool.query(`
       SELECT
         DATE_TRUNC('week', d) AS week_start,
         COUNT(*) AS count
       FROM (
-        SELECT start_time AS d FROM workouts
-        WHERE user_id = $1 AND status = 'completed'
-          AND start_time >= NOW() - ($2 || ' weeks')::INTERVAL
+        SELECT COALESCE(start_time, workout_date::timestamptz) AS d FROM workouts
+        WHERE user_id = $1 AND status = 'completed' ${weeksCond}
         UNION ALL
-        SELECT start_time AS d FROM cardio_sessions
-        WHERE user_id = $1 AND status = 'finished'
-          AND start_time >= NOW() - ($2 || ' weeks')::INTERVAL
+        SELECT COALESCE(start_time, session_date::timestamptz) AS d FROM cardio_sessions
+        WHERE user_id = $1 AND status = 'finished' ${weeksCond2}
       ) combined
+      WHERE d IS NOT NULL
       GROUP BY week_start
       ORDER BY week_start
-    `, [userId, weeks]);
+    `, [userId]);
 
     // Time-of-day distribution (0-23 hour buckets)
     const timeOfDay = await pool.query(`
@@ -60,29 +67,36 @@ async function getOverview(req, res) {
       ORDER BY hour
     `, [userId]);
 
-    // Day-of-week distribution (0=Sun … 6=Sat)
+    // Day-of-week — fall back to workout_date when start_time is missing
     const dayOfWeek = await pool.query(`
       SELECT
         EXTRACT(DOW FROM d)::INTEGER AS dow,
         COUNT(*) AS count
       FROM (
-        SELECT start_time AS d FROM workouts
-        WHERE user_id = $1 AND status = 'completed' AND start_time IS NOT NULL
+        SELECT COALESCE(start_time, workout_date::timestamptz) AS d FROM workouts
+        WHERE user_id = $1 AND status = 'completed'
         UNION ALL
-        SELECT start_time AS d FROM cardio_sessions
-        WHERE user_id = $1 AND status = 'finished' AND start_time IS NOT NULL
+        SELECT COALESCE(start_time, session_date::timestamptz) AS d FROM cardio_sessions
+        WHERE user_id = $1 AND status = 'finished'
       ) combined
+      WHERE d IS NOT NULL
       GROUP BY dow
       ORDER BY dow
     `, [userId]);
 
-    // Duration distribution — all completed workout durations in seconds
-    // Used for box-and-whisker, histogram, etc.
+    // Duration distribution — compute from end-start if duration_seconds not set
     const durations = await pool.query(`
-      SELECT duration_seconds, 'strength' AS type, start_time
+      SELECT
+        COALESCE(
+          EXTRACT(EPOCH FROM (end_time - start_time))::INTEGER,
+          duration_seconds
+        ) AS duration_seconds,
+        'strength' AS type,
+        start_time
       FROM workouts
       WHERE user_id = $1 AND status = 'completed'
-        AND duration_seconds IS NOT NULL AND duration_seconds > 0
+        AND end_time IS NOT NULL AND start_time IS NOT NULL
+        AND end_time > start_time
       UNION ALL
       SELECT duration_seconds, 'cardio' AS type, start_time
       FROM cardio_sessions
@@ -115,13 +129,19 @@ async function getOverview(req, res) {
     const totals = await pool.query(`
       SELECT
         COUNT(*)::INTEGER AS total_workouts,
-        COALESCE(SUM(duration_seconds), 0)::INTEGER AS total_seconds,
+        COALESCE(SUM(dur), 0)::INTEGER AS total_seconds,
         ROUND(AVG(session_rating)::NUMERIC, 2) AS avg_rating
       FROM (
-        SELECT duration_seconds, session_rating FROM workouts
+        SELECT
+          COALESCE(
+            EXTRACT(EPOCH FROM (end_time - start_time))::INTEGER,
+            duration_seconds
+          ) AS dur,
+          session_rating
+        FROM workouts
         WHERE user_id = $1 AND status = 'completed'
         UNION ALL
-        SELECT duration_seconds, session_rating FROM cardio_sessions
+        SELECT duration_seconds AS dur, session_rating FROM cardio_sessions
         WHERE user_id = $1 AND status = 'finished'
       ) all_sessions
     `, [userId]);

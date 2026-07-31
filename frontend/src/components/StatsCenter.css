@@ -14,6 +14,10 @@
   border-bottom: 1px solid var(--border-color);
   overflow-x: auto;
   scrollbar-width: none;
+  position: sticky;
+  top: 0;
+  background: var(--bg-primary);
+  z-index: var(--z-sticky);
 }
 .sc-tab-bar::-webkit-scrollbar { display: none; }
 
@@ -486,3 +490,47 @@
   }
 }
 
+/* ── Custom time window ──────────────────────────────────────────────────── */
+.sc-custom-window {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 0;
+}
+.sc-custom-weeks-input {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  padding: 4px 8px;
+  font-size: var(--font-size-xs);
+  width: 70px;
+}
+.sc-custom-weeks-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+/* ── Clickable table rows ────────────────────────────────────────────────── */
+.sc-clickable-row {
+  cursor: pointer;
+}
+.sc-clickable-row:hover td {
+  background: var(--bg-secondary);
+}
+
+/* ── Table header hint ───────────────────────────────────────────────────── */
+.sc-th-hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--text-tertiary);
+  font-size: 9px;
+  color: var(--text-tertiary);
+  cursor: help;
+  margin-left: 4px;
+  vertical-align: middle;
+}

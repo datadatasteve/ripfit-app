@@ -196,6 +196,65 @@ function WorkoutHeatmap({ timeOfDay, dayOfWeek }) {
   );
 }
 
+
+// ── Time window selector ──────────────────────────────────────────────────
+const TIME_WINDOWS = [
+  { label: '1w',  weeks: 1 },
+  { label: '2w',  weeks: 2 },
+  { label: '1m',  weeks: 4 },
+  { label: '2m',  weeks: 8 },
+  { label: '3m',  weeks: 13 },
+  { label: '6m',  weeks: 26 },
+  { label: '9m',  weeks: 39 },
+  { label: '1y',  weeks: 52 },
+  { label: 'All', weeks: 520 },
+];
+
+function TimeWindowSelector({ weeks, setWeeks, customWeeks, setCustomWeeks }) {
+  const [showCustom, setShowCustom] = useState(false);
+  const isCustom = !TIME_WINDOWS.find(w => w.weeks === weeks);
+
+  const applyCustom = () => {
+    const val = parseInt(customWeeks);
+    if (val > 0) { setWeeks(val); setShowCustom(false); }
+  };
+
+  return (
+    <div className="sc-window-selector">
+      {TIME_WINDOWS.map(w => (
+        <button
+          key={w.weeks}
+          className={`sc-window-btn ${weeks === w.weeks && !isCustom ? 'active' : ''}`}
+          onClick={() => { setWeeks(w.weeks); setShowCustom(false); }}
+        >
+          {w.label}
+        </button>
+      ))}
+      <button
+        className={`sc-window-btn ${isCustom || showCustom ? 'active' : ''}`}
+        onClick={() => setShowCustom(s => !s)}
+      >
+        Custom
+      </button>
+      {showCustom && (
+        <div className="sc-custom-window">
+          <input
+            type="number"
+            min={1}
+            max={520}
+            placeholder="Weeks"
+            value={customWeeks}
+            onChange={e => setCustomWeeks(e.target.value)}
+            className="sc-custom-weeks-input"
+            onKeyDown={e => e.key === 'Enter' && applyCustom()}
+          />
+          <button className="sc-window-btn active" onClick={applyCustom}>Apply</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // OVERVIEW TAB
 // ═══════════════════════════════════════════════════════════════════════════
@@ -205,7 +264,8 @@ function OverviewTab() {
   const [freqChart, setFreqChart] = useState('bar');
   const [durationChart, setDurationChart] = useState('boxwhisker');
   const [ratingChart, setRatingChart] = useState('line');
-  const [weeks, setWeeks] = useState(12);
+  const [weeks, setWeeks] = useState(4);
+  const [customWeeks, setCustomWeeks] = useState('');
 
   useEffect(() => {
     setLoading(true);
@@ -257,17 +317,7 @@ function OverviewTab() {
       </div>
 
       {/* Time window */}
-      <div className="sc-window-selector">
-        {[4, 8, 12, 26, 52].map(w => (
-          <button
-            key={w}
-            className={`sc-window-btn ${weeks === w ? 'active' : ''}`}
-            onClick={() => setWeeks(w)}
-          >
-            {w < 52 ? `${w}w` : '1y'}
-          </button>
-        ))}
-      </div>
+      <TimeWindowSelector weeks={weeks} setWeeks={setWeeks} customWeeks={customWeeks} setCustomWeeks={setCustomWeeks} />
 
       {/* Weekly frequency */}
       <Section
@@ -569,13 +619,32 @@ function StrengthTab() {
           value={searchFilter}
           onChange={e => setSearchFilter(e.target.value)}
         />
-        <input
-          className="sc-search"
-          placeholder="Filter by muscle group…"
-          value={muscleFilter}
-          onChange={e => setMuscleFilter(e.target.value)}
-        />
       </div>
+      {/* Muscle group filter pills derived from logged exercise data */}
+      {exercises.length > 0 && (() => {
+        const muscles = [...new Set(
+          exercises
+            .filter(e => e.muscles_primary)
+            .flatMap(e => e.muscles_primary.split(',').map(m => m.trim()))
+            .filter(Boolean)
+        )].sort();
+        if (muscles.length === 0) return null;
+        return (
+          <div className="sc-filter-row" style={{ marginBottom: 16 }}>
+            <button
+              className={`sc-window-btn ${!muscleFilter ? 'active' : ''}`}
+              onClick={() => setMuscleFilter('')}
+            >All</button>
+            {muscles.map(m => (
+              <button
+                key={m}
+                className={`sc-window-btn ${muscleFilter === m ? 'active' : ''}`}
+                onClick={() => setMuscleFilter(prev => prev === m ? '' : m)}
+              >{m}</button>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* Flagged workouts */}
       {flagged_workouts.length > 0 && (
@@ -779,6 +848,18 @@ function RecordsTab() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [selectedExId, setSelectedExId] = useState(null);
+  const [exData, setExData] = useState(null);
+  const [exLoading, setExLoading] = useState(false);
+
+  useEffect(() => {
+    if (!selectedExId) return;
+    setExLoading(true);
+    apiFetch(`/exercise/${selectedExId}`)
+      .then(setExData)
+      .catch(console.error)
+      .finally(() => setExLoading(false));
+  }, [selectedExId]);
 
   useEffect(() => {
     apiFetch('/records').then(setData).catch(console.error).finally(() => setLoading(false));
@@ -786,6 +867,44 @@ function RecordsTab() {
 
   if (loading) return <Loading />;
   if (!data || data.records.length === 0) return <Empty message="No PRs yet. Log some strength workouts to see your records." />;
+
+  // Exercise drill-down from Records
+  if (selectedExId && exData) {
+    return (
+      <div>
+        <button className="sc-back-btn" onClick={() => { setSelectedExId(null); setExData(null); }}>← Back to Records</button>
+        <h3 className="sc-ex-title">{exData.exercise.name}</h3>
+        <p className="sc-ex-meta">{exData.exercise.category} · {exData.exercise.equipment_type}</p>
+        <div className="sc-stat-grid">
+          <StatCard label="Best Est. 1RM" value={exData.bests.best_est_1rm ? `${exData.bests.best_est_1rm} lbs` : '—'} />
+          <StatCard label="Max Weight" value={exData.bests.max_weight ? `${exData.bests.max_weight} lbs` : '—'} />
+          <StatCard label="Max Reps" value={exData.bests.max_reps ?? '—'} />
+          <StatCard label="Sessions" value={exData.bests.total_sessions ?? '—'} />
+          <StatCard label="Total Sets" value={exData.bests.total_sets ?? '—'} />
+        </div>
+        <Section title="Session Log">
+          <div className="sc-table-wrapper">
+            <table className="sc-table">
+              <thead><tr><th>Date</th><th>Sets</th><th>Avg Reps</th><th>Max Weight</th><th>Volume</th><th>Est. 1RM</th></tr></thead>
+              <tbody>
+                {exData.per_session.map((s, i) => (
+                  <tr key={i}>
+                    <td>{fmtDate(s.workout_date)}</td>
+                    <td>{s.sets}</td>
+                    <td>{s.avg_reps}</td>
+                    <td>{s.max_weight} lbs</td>
+                    <td>{s.volume?.toLocaleString()}</td>
+                    <td>{s.est_1rm}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Section>
+      </div>
+    );
+  }
+  if (exLoading) return <Loading />;
 
   const filtered = data.records.filter(r =>
     !search || r.exercise_name.toLowerCase().includes(search.toLowerCase())
@@ -799,16 +918,20 @@ function RecordsTab() {
           <thead>
             <tr>
               <th>Exercise</th>
-              <th>Best Est. 1RM</th>
+              <th>Best Est. 1RM <span className="sc-th-hint" title="Epley formula: weight × (1 + reps/30). An approximation, not a measured lift.">?</span></th>
               <th>Heaviest Set</th>
               <th>Most Reps</th>
-              <th>First Logged</th>
               <th>Last Logged</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map(r => (
-              <tr key={r.exercise_id}>
+              <tr
+                key={r.exercise_id}
+                className="sc-clickable-row"
+                onClick={() => setSelectedExId(r.exercise_id)}
+                title="Click to see full stats"
+              >
                 <td>
                   <span className="sc-ex-name">{r.exercise_name}</span>
                   <span className="sc-ex-cat" style={{ marginLeft: 6 }}>{r.category}</span>
@@ -816,7 +939,6 @@ function RecordsTab() {
                 <td className="sc-pr-value">{r.best_est_1rm ? `${r.best_est_1rm} lbs` : '—'}</td>
                 <td>{r.best_weight ? `${r.best_weight} lbs × ${r.best_weight_reps}` : '—'}</td>
                 <td>{r.most_reps ? `${r.most_reps} @ ${r.most_reps_weight} lbs` : '—'}</td>
-                <td>{fmtDate(r.first_logged)}</td>
                 <td>{fmtDate(r.last_logged)}</td>
               </tr>
             ))}
@@ -833,7 +955,8 @@ function RecordsTab() {
 function CombinedTab() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [weeks, setWeeks] = useState(26);
+  const [weeks, setWeeks] = useState(8);
+  const [customWeeks, setCustomWeeks] = useState('');
   const [chartType, setChartType] = useState('line');
 
   useEffect(() => {
@@ -885,13 +1008,7 @@ function CombinedTab() {
         All sessions on a shared timeline. Look for patterns across strength, cardio, and effort.
       </p>
 
-      <div className="sc-window-selector">
-        {[8, 12, 26, 52].map(w => (
-          <button key={w} className={`sc-window-btn ${weeks === w ? 'active' : ''}`} onClick={() => setWeeks(w)}>
-            {w < 52 ? `${w}w` : '1y'}
-          </button>
-        ))}
-      </div>
+      <TimeWindowSelector weeks={weeks} setWeeks={setWeeks} customWeeks={customWeeks} setCustomWeeks={setCustomWeeks} />
 
       <Section
         title="All Activity"
