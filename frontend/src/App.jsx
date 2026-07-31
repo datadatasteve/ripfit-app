@@ -3,6 +3,7 @@ import ProfileMenu from './components/ProfileMenu'
 import ActiveWorkout from './components/ActiveWorkout'
 import ExerciseBrowser from './components/ExerciseBrowser'
 import StatsCenter from './components/StatsCenter'
+import UserPreferencesPage from './components/UserPreferencesPage'
 import Login from './components/Login'
 import './styles/App.css'
 
@@ -104,6 +105,7 @@ function App() {
               {isLoggedIn && (
                 <ProfileMenu
                   onLogout={handleLogout}
+                  onOpenPrefs={() => setCurrentView('preferences')}
                 />
               )}
             </div>
@@ -129,6 +131,8 @@ function App() {
               <ExerciseBrowser activeWorkout={activeWorkout} setActiveWorkout={setActiveWorkout} />
             ) : currentView === 'stats' ? (
               <StatsCenter />
+            ) : currentView === 'preferences' ? (
+              <UserPreferencesPage onBack={() => setCurrentView('workout')} />
             ) : currentView === 'nutrition' ? (
               <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-secondary, #aaa)' }}>
                 <h2>Nutrition</h2>
@@ -164,4 +168,3 @@ function App() {
 }
 
 export default App
-

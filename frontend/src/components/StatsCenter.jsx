@@ -88,9 +88,15 @@ function fmtDuration(s) {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-function fmtDate(d) {
+function fmtDate(d, includeYear = false) {
   if (!d) return '';
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  // Parse date strings like '2026-07-31' as local date to avoid UTC offset shifting the day
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(d)
+    ? new Date(d + 'T00:00:00')   // treat bare date as local midnight
+    : new Date(d);                  // full ISO string — let browser parse (already has tz info)
+  const opts = { month: 'short', day: 'numeric' };
+  if (includeYear) opts.year = 'numeric';
+  return date.toLocaleDateString('en-US', opts);
 }
 
 // Box-and-whisker calculation from array of values

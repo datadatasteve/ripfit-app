@@ -5,6 +5,104 @@ import './ActiveWorkout.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 
+
+// ── Session Rating Widget ─────────────────────────────────────────────────
+// Shown on the post-workout summary screen. Reads user's rating prefs
+// (label, scale, display type) then submits to /stats/workouts/:id/rating.
+function SessionRatingWidget({ workoutId }) {
+  const [rating, setRating] = useState(null);
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  // Default prefs — will be overridden once fetched
+  const [prefs, setPrefs] = useState({ label: 'Effort & Vibes', scale: 5, display: 'slider' });
+  const token = localStorage.getItem('ripfit_token');
+
+  useEffect(() => {
+    // Fetch user rating prefs
+    fetch(`${API_BASE}/users/me`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(data => { if (data.workout_rating_prefs) setPrefs(data.workout_rating_prefs); })
+      .catch(() => {});
+  }, []);
+
+  const save = async (val) => {
+    if (!workoutId || saved) return;
+    setRating(val);
+    setSaving(true);
+    try {
+      await fetch(`${API_BASE}/stats/workouts/${workoutId}/rating`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ session_rating: val }),
+      });
+      setSaved(true);
+    } catch (e) {
+      console.error('Failed to save rating:', e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const scale = prefs.scale || 5;
+  const ticks = Array.from({ length: scale }, (_, i) => i + 1);
+
+  return (
+    <div className="session-rating-widget">
+      <div className="session-rating-header">
+        <span className="session-rating-label">{prefs.label}</span>
+        {saved && <span className="session-rating-saved">Saved ✓</span>}
+      </div>
+
+      {prefs.display === 'stars' ? (
+        <div className="session-rating-stars">
+          {ticks.map(v => (
+            <button
+              key={v}
+              className={`star-btn ${rating >= v ? 'active' : ''}`}
+              onClick={() => save(v)}
+              disabled={saved}
+              aria-label={`Rate ${v} out of ${scale}`}
+            >★</button>
+          ))}
+        </div>
+      ) : prefs.display === 'number' ? (
+        <div className="session-rating-numbers">
+          {ticks.map(v => (
+            <button
+              key={v}
+              className={`number-btn ${rating === v ? 'active' : ''}`}
+              onClick={() => save(v)}
+              disabled={saved}
+            >{v}</button>
+          ))}
+        </div>
+      ) : (
+        // Default: slider
+        <div className="session-rating-slider-wrap">
+          <input
+            type="range"
+            min={1}
+            max={scale}
+            step={1}
+            value={rating || Math.ceil(scale / 2)}
+            className="session-rating-slider"
+            onChange={e => setRating(parseInt(e.target.value))}
+            onMouseUp={e => save(parseInt(e.target.value))}
+            onTouchEnd={e => save(parseInt(e.target.value))}
+            disabled={saved}
+          />
+          <div className="session-rating-ticks">
+            <span>1</span>
+            <span>{Math.ceil(scale / 2)}</span>
+            <span>{scale}</span>
+          </div>
+          {rating && <div className="session-rating-value">{rating} / {scale}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workoutSummary, setWorkoutSummary, showNavClock, setShowNavClock }) {
   const [token, setToken] = useState(localStorage.getItem('ripfit_token'));
   const [routines, setRoutines] = useState([]);
@@ -148,6 +246,7 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
       const rawMs = Date.now() - new Date(activeWorkout.workout.start_time).getTime();
       const duration = Math.round((rawMs / 1000 - pausedSeconds) / 60);
       setWorkoutSummary({
+        workout_id: activeWorkout.workout.id,
         routine_name: activeWorkout.routine_name,
         duration_minutes: duration,
         exercises: activeWorkout.exercises.map(ex => ({
@@ -270,6 +369,8 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
               <p style={{color: '#fff', whiteSpace: 'pre-wrap'}}>{workoutSummary.previous_workout_notes}</p>
             </div>
           )}
+
+          <SessionRatingWidget workoutId={workoutSummary.workout_id} />
 
           <button 
             onClick={() => setWorkoutSummary(null)} 
@@ -2004,4 +2105,3 @@ function ChangeExerciseModal({ onChange, onClose, currentExercise }) {
     </div>
   );
 }
-

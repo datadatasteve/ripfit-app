@@ -22,7 +22,7 @@ const GOAL_TYPES = [
   { id: 'flexibility',       label: 'Flexibility / Mobility' },
 ];
 
-export default function ProfileMenu({ onLogout }) {
+export default function ProfileMenu({ onLogout, onOpenPrefs }) {
   const { themeMode, setThemeMode } = useTheme();
   const [open, setOpen]         = useState(false);
   const [panel, setPanel]       = useState(null); // null | 'settings' | 'prefs'
@@ -275,37 +275,13 @@ export default function ProfileMenu({ onLogout }) {
           {/* ── Main menu ── */}
           {!panel && (
             <ul className="profile-dropdown-menu">
-              <li onClick={() => setPanel('settings')}>Settings</li>
-              <li onClick={() => setPanel('prefs')}>User Preferences</li>
+              <li onClick={() => { setOpen(false); onOpenPrefs && onOpenPrefs(); }}>Settings &amp; Preferences</li>
               <li className="profile-dropdown-logout" onClick={onLogout}>Log Out</li>
             </ul>
           )}
 
-          {/* ── Settings panel ── */}
-          {panel === 'settings' && (
-            <div className="profile-panel">
-              <button className="profile-panel-back" onClick={() => setPanel(null)}>← Back</button>
-              <h3>Settings</h3>
-
-              <div className="profile-field-group">
-                <label>Theme</label>
-                <div className="theme-options">
-                  {['light', 'dark', 'system'].map(t => (
-                    <button
-                      key={t}
-                      className={`theme-option-btn ${themeMode === t ? 'active' : ''}`}
-                      onClick={() => setThemeMode(t)}
-                    >
-                      {t.charAt(0).toUpperCase() + t.slice(1)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── User Preferences panel ── */}
-          {panel === 'prefs' && (
+          {/* Legacy panels removed — preferences now live on their own page */}
+          {panel === 'prefs_unused' && (
             <div className="profile-panel">
               <button className="profile-panel-back" onClick={() => setPanel(null)}>← Back</button>
               <h3>User Preferences</h3>

@@ -41,7 +41,7 @@ async function getOverview(req, res) {
         COUNT(*) AS count
       FROM (
         SELECT COALESCE(start_time, workout_date::timestamptz) AS d FROM workouts
-        WHERE user_id = $1 AND status = 'completed' ${weeksCond}
+        WHERE user_id = $1 AND (status = 'completed' OR (status IS NULL AND end_time IS NOT NULL)) ${weeksCond}
         UNION ALL
         SELECT COALESCE(start_time, session_date::timestamptz) AS d FROM cardio_sessions
         WHERE user_id = $1 AND status = 'finished' ${weeksCond2}
@@ -58,7 +58,7 @@ async function getOverview(req, res) {
         COUNT(*) AS count
       FROM (
         SELECT start_time AS d FROM workouts
-        WHERE user_id = $1 AND status = 'completed' AND start_time IS NOT NULL
+        WHERE user_id = $1 AND (status = 'completed' OR (status IS NULL AND end_time IS NOT NULL)) AND start_time IS NOT NULL
         UNION ALL
         SELECT start_time AS d FROM cardio_sessions
         WHERE user_id = $1 AND status = 'finished' AND start_time IS NOT NULL
@@ -74,7 +74,7 @@ async function getOverview(req, res) {
         COUNT(*) AS count
       FROM (
         SELECT COALESCE(start_time, workout_date::timestamptz) AS d FROM workouts
-        WHERE user_id = $1 AND status = 'completed'
+        WHERE user_id = $1 AND (status = 'completed' OR (status IS NULL AND end_time IS NOT NULL))
         UNION ALL
         SELECT COALESCE(start_time, session_date::timestamptz) AS d FROM cardio_sessions
         WHERE user_id = $1 AND status = 'finished'
@@ -84,17 +84,14 @@ async function getOverview(req, res) {
       ORDER BY dow
     `, [userId]);
 
-    // Duration distribution — compute from end-start if duration_seconds not set
+    // Duration distribution — strength uses end_time-start_time, cardio has its own column
     const durations = await pool.query(`
       SELECT
-        COALESCE(
-          EXTRACT(EPOCH FROM (end_time - start_time))::INTEGER,
-          duration_seconds
-        ) AS duration_seconds,
+        EXTRACT(EPOCH FROM (end_time - start_time))::INTEGER AS duration_seconds,
         'strength' AS type,
         start_time
       FROM workouts
-      WHERE user_id = $1 AND status = 'completed'
+      WHERE user_id = $1 AND (status = 'completed' OR status IS NULL)
         AND end_time IS NOT NULL AND start_time IS NOT NULL
         AND end_time > start_time
       UNION ALL
@@ -113,7 +110,7 @@ async function getOverview(req, res) {
         'strength' AS type,
         start_time
       FROM workouts
-      WHERE user_id = $1 AND session_rating IS NOT NULL AND status = 'completed'
+      WHERE user_id = $1 AND session_rating IS NOT NULL AND (status = 'completed' OR status IS NULL)
       UNION ALL
       SELECT
         session_date AS date,
@@ -133,13 +130,10 @@ async function getOverview(req, res) {
         ROUND(AVG(session_rating)::NUMERIC, 2) AS avg_rating
       FROM (
         SELECT
-          COALESCE(
-            EXTRACT(EPOCH FROM (end_time - start_time))::INTEGER,
-            duration_seconds
-          ) AS dur,
+          EXTRACT(EPOCH FROM (end_time - start_time))::INTEGER AS dur,
           session_rating
         FROM workouts
-        WHERE user_id = $1 AND status = 'completed'
+        WHERE user_id = $1 AND (status = 'completed' OR (status IS NULL AND end_time IS NOT NULL))
         UNION ALL
         SELECT duration_seconds AS dur, session_rating FROM cardio_sessions
         WHERE user_id = $1 AND status = 'finished'
