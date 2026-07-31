@@ -4,7 +4,7 @@
 // Goals section links to GoalsPage for the full multi-select+detail flow.
 
 import './UserPreferencesPage.css';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import ProfileCircle from './ProfileCircle';
 import './UserPreferencesPage.css';
@@ -188,14 +188,14 @@ export default function UserPreferencesPage({ onBack }) {
     });
   }
 
-  function updateGoalDetail(goalId, field, value) {
+  const updateGoalDetail = useCallback((goalId, field, value) => {
     setForm(prev => ({
       ...prev,
       goals: prev.goals.map(g =>
         g.type === goalId ? { ...g, details: { ...g.details, [field]: value } } : g
       ),
     }));
-  }
+  }, []);
 
   function getGoalDetails(goalId) {
     return form.goals.find(g => g.type === goalId)?.details || {};
@@ -475,7 +475,7 @@ export default function UserPreferencesPage({ onBack }) {
 }
 
 // ── Goal detail sub-forms (same as ProfileMenu, extracted here) ───────────
-function GoalDetails({ goalId, details, onChange, unitsWeight }) {
+const GoalDetails = memo(function GoalDetails({ goalId, details, onChange, unitsWeight }) {
   const wUnit = unitsWeight || 'lbs';
   const dimUnit = wUnit === 'lbs' ? 'in' : 'cm';
   // Local draft state so inputs don't lose focus on each keystroke.
@@ -574,6 +574,8 @@ function GoalDetails({ goalId, details, onChange, unitsWeight }) {
     default: return null;
   }
 }
+
+}); // end memo(GoalDetails)
 
 function WeightLossCalc({ details, unit }) {
   const current = parseFloat(details.current_weight);

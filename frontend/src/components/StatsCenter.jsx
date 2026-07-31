@@ -877,6 +877,9 @@ function RecordsTab() {
   const [selectedExId, setSelectedExId] = useState(null);
   const [exData, setExData] = useState(null);
   const [exLoading, setExLoading] = useState(false);
+  // Chart state for exercise drill-down — must be at top level (rules of hooks)
+  const [recChartMetric, setRecChartMetric] = useState('max_weight');
+  const [recChartType, setRecChartType] = useState('line');
 
   useEffect(() => {
     if (!selectedExId) return;
@@ -905,8 +908,6 @@ function RecordsTab() {
       avg_rpe: parseFloat(s.avg_rpe),
       sets: s.sets,
     }));
-    const [recChartMetric, setRecChartMetric] = useState('max_weight');
-    const [recChartType, setRecChartType] = useState('line');
     const CHART_OPTIONS = [
       { value: 'line', label: 'Line', icon: '╱' },
       { value: 'bar', label: 'Bar', icon: '▮▮' },

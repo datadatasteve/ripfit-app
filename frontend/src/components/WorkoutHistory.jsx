@@ -13,7 +13,21 @@ function formatDuration(s) {
 }
 function formatDate(d) {
   if (!d) return '—';
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  // Treat bare dates and midnight-UTC timestamps as local dates to avoid UTC offset shifting the day
+  let dateStr;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+    dateStr = d;
+  } else if (/T00:00:00/.test(d)) {
+    dateStr = d.slice(0, 10);
+  } else {
+    const local = new Date(d);
+    const y = local.getFullYear();
+    const mo = String(local.getMonth() + 1).padStart(2, '0');
+    const day = String(local.getDate()).padStart(2, '0');
+    dateStr = `${y}-${mo}-${day}`;
+  }
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 export default function WorkoutHistory() {
@@ -270,4 +284,3 @@ export default function WorkoutHistory() {
     </div>
   );
 }
-
