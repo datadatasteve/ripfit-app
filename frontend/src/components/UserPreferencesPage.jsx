@@ -391,9 +391,10 @@ export default function UserPreferencesPage({ onBack }) {
                       {active && (
                         <div className="prefs-goal-details">
                           <GoalDetails
+                            key={goal.id}
                             goalId={goal.id}
                             details={details}
-                            onChange={(field, val) => updateGoalDetail(goal.id, field, val)}
+                            onChange={updateGoalDetail}
                             unitsWeight={form.units_weight}
                           />
                         </div>
@@ -480,9 +481,9 @@ const GoalDetails = memo(function GoalDetails({ goalId, details, onChange, units
   const dimUnit = wUnit === 'lbs' ? 'in' : 'cm';
   // Local draft state so inputs don't lose focus on each keystroke.
   // Syncs to parent only on blur.
-  const [draft, setDraft] = useState({ ...details });
-  // Keep draft in sync when details change externally (e.g. goal toggled off/on)
-  useEffect(() => { setDraft({ ...details }); }, [goalId]);
+  // Initialize draft once from details. Parent uses key={goalId} to reset
+  // when the goal type changes, so we don't need a sync useEffect.
+  const [draft, setDraft] = useState(() => ({ ...details }));
 
   const Field = ({ label, field, type = 'text', placeholder, step }) => (
     <div className="prefs-goal-field">
@@ -493,7 +494,7 @@ const GoalDetails = memo(function GoalDetails({ goalId, details, onChange, units
         placeholder={placeholder || ''}
         value={draft[field] || ''}
         onChange={e => setDraft(d => ({ ...d, [field]: e.target.value }))}
-        onBlur={e => onChange(field, e.target.value)}
+        onBlur={e => onChange(goalId, field, e.target.value)}
       />
     </div>
   );
