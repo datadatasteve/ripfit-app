@@ -475,101 +475,133 @@ export default function UserPreferencesPage({ onBack }) {
   );
 }
 
-// ── Goal detail sub-forms (same as ProfileMenu, extracted here) ───────────
-const GoalDetails = memo(function GoalDetails({ goalId, details, onChange, unitsWeight }) {
-  const wUnit = unitsWeight || 'lbs';
-  const dimUnit = wUnit === 'lbs' ? 'in' : 'cm';
-  // Local draft state so inputs don't lose focus on each keystroke.
-  // Syncs to parent only on blur.
-  // Initialize draft once from details. Parent uses key={goalId} to reset
-  // when the goal type changes, so we don't need a sync useEffect.
-  const [draft, setDraft] = useState(() => ({ ...details }));
 
-  const Field = ({ label, field, type = 'text', placeholder, step }) => (
+// ── GoalField: standalone component, never defined inside another component ──
+// This is critical — defining components inside render functions causes React
+// to treat them as new component types on every render, unmounting/remounting
+// inputs and losing focus. GoalField lives at module scope permanently.
+function GoalField({ label, field, type, placeholder, step, value, onFieldChange, onFieldBlur }) {
+  return (
     <div className="prefs-goal-field">
       <label>{label}</label>
       <input
-        type={type}
+        type={type || 'text'}
         step={step}
         placeholder={placeholder || ''}
-        value={draft[field] || ''}
-        onChange={e => setDraft(d => ({ ...d, [field]: e.target.value }))}
-        onBlur={e => onChange(goalId, field, e.target.value)}
+        value={value}
+        onChange={e => onFieldChange(field, e.target.value)}
+        onBlur={e => onFieldBlur(field, e.target.value)}
       />
     </div>
+  );
+}
+
+// GoalDetails is memoized so it only re-renders when its own props change,
+// not when the parent form state updates other fields.
+const GoalDetails = memo(function GoalDetails({ goalId, details, onChange, unitsWeight }) {
+  const wUnit = unitsWeight || 'lbs';
+  const dimUnit = wUnit === 'lbs' ? 'in' : 'cm';
+
+  // Local draft — initialized once, updated as user types.
+  // Syncs to parent only on blur to avoid re-render on every keystroke.
+  const [draft, setDraft] = useState(() => ({ ...details }));
+
+  const handleChange = useCallback((field, value) => {
+    setDraft(d => ({ ...d, [field]: value }));
+  }, []);
+
+  const handleBlur = useCallback((field, value) => {
+    onChange(goalId, field, value);
+  }, [goalId, onChange]);
+
+  // Helper to render a GoalField with all shared props pre-filled.
+  // Written as a regular function (not JSX component) so it never gets
+  // a new identity and never triggers unmount/remount.
+  const f = (label, field, type, placeholder, step) => (
+    <GoalField
+      key={field}
+      label={label}
+      field={field}
+      type={type || 'text'}
+      placeholder={placeholder || ''}
+      step={step}
+      value={draft[field] || ''}
+      onFieldChange={handleChange}
+      onFieldBlur={handleBlur}
+    />
   );
 
   switch (goalId) {
     case 'weight_loss': return (
       <div className="prefs-goal-field-set">
         <p className="prefs-goal-hint">Used to calculate your target weekly deficit.</p>
-        <Field label={`Current weight (${wUnit})`} field="current_weight" type="number" />
-        <Field label={`Target weight (${wUnit})`} field="target_weight" type="number" />
-        <Field label="Target date" field="target_date" type="date" />
-        <WeightLossCalc details={details} unit={wUnit} />
+        {f(`Current weight (${wUnit})`, 'current_weight', 'number')}
+        {f(`Target weight (${wUnit})`, 'target_weight', 'number')}
+        {f('Target date', 'target_date', 'date')}
+        <WeightLossCalc details={draft} unit={wUnit} />
       </div>
     );
     case 'muscle_gain': return (
       <div className="prefs-goal-field-set">
         <p className="prefs-goal-hint">Track weight, measurements, and key lift targets.</p>
-        <Field label={`Current weight (${wUnit})`} field="current_weight" type="number" />
-        <Field label={`Target weight (${wUnit})`} field="target_weight" type="number" />
-        <Field label="Target date" field="target_date" type="date" />
-        <Field label={`Waist (${dimUnit})`} field="waist" type="number" />
-        <Field label={`Chest (${dimUnit})`} field="chest" type="number" />
-        <Field label={`Arm (${dimUnit})`} field="arm" type="number" />
-        <Field label={`Squat current 1RM (${wUnit})`} field="squat_current" type="number" />
-        <Field label={`Squat target 1RM (${wUnit})`} field="squat_target" type="number" />
-        <Field label={`Bench current 1RM (${wUnit})`} field="bench_current" type="number" />
-        <Field label={`Bench target 1RM (${wUnit})`} field="bench_target" type="number" />
-        <Field label={`Deadlift current 1RM (${wUnit})`} field="deadlift_current" type="number" />
-        <Field label={`Deadlift target 1RM (${wUnit})`} field="deadlift_target" type="number" />
+        {f(`Current weight (${wUnit})`, 'current_weight', 'number')}
+        {f(`Target weight (${wUnit})`, 'target_weight', 'number')}
+        {f('Target date', 'target_date', 'date')}
+        {f(`Waist (${dimUnit})`, 'waist', 'number')}
+        {f(`Chest (${dimUnit})`, 'chest', 'number')}
+        {f(`Arm (${dimUnit})`, 'arm', 'number')}
+        {f(`Squat current 1RM (${wUnit})`, 'squat_current', 'number')}
+        {f(`Squat target 1RM (${wUnit})`, 'squat_target', 'number')}
+        {f(`Bench current 1RM (${wUnit})`, 'bench_current', 'number')}
+        {f(`Bench target 1RM (${wUnit})`, 'bench_target', 'number')}
+        {f(`Deadlift current 1RM (${wUnit})`, 'deadlift_current', 'number')}
+        {f(`Deadlift target 1RM (${wUnit})`, 'deadlift_target', 'number')}
       </div>
     );
     case 'body_fat': return (
       <div className="prefs-goal-field-set">
-        <Field label="Current body fat %" field="current_bf" type="number" step="0.1" />
-        <Field label="Target body fat %" field="target_bf" type="number" step="0.1" />
-        <Field label="Target date" field="target_date" type="date" />
-        <Field label="Measurement source" field="source" placeholder="DEXA, calipers, scale…" />
+        {f('Current body fat %', 'current_bf', 'number', '', '0.1')}
+        {f('Target body fat %', 'target_bf', 'number', '', '0.1')}
+        {f('Target date', 'target_date', 'date')}
+        {f('Measurement source', 'source', 'text', 'DEXA, calipers, scale…')}
       </div>
     );
     case 'speed': return (
       <div className="prefs-goal-field-set">
-        <Field label="Event / distance" field="event" placeholder="100m, 5K, mile…" />
-        <Field label="Current best time" field="current_time" placeholder="e.g. 12.4s" />
-        <Field label="Target time" field="target_time" placeholder="e.g. 11.9s" />
-        <Field label="Target date" field="target_date" type="date" />
-        <Field label="Notes" field="notes" placeholder="mid-race slump, acceleration…" />
+        {f('Event / distance', 'event', 'text', '100m, 5K, mile…')}
+        {f('Current best time', 'current_time', 'text', 'e.g. 12.4s')}
+        {f('Target time', 'target_time', 'text', 'e.g. 11.9s')}
+        {f('Target date', 'target_date', 'date')}
+        {f('Notes', 'notes', 'text', 'mid-race slump, acceleration…')}
       </div>
     );
     case 'endurance': return (
       <div className="prefs-goal-field-set">
-        <Field label="Event / distance" field="event" placeholder="half marathon, century ride…" />
-        <Field label="Current capability" field="current" placeholder="can run 8mi comfortably" />
-        <Field label="Target finish time" field="target_time" placeholder="sub-2hr" />
-        <Field label="Race / event date" field="target_date" type="date" />
+        {f('Event / distance', 'event', 'text', 'half marathon, century ride…')}
+        {f('Current capability', 'current', 'text', 'can run 8mi comfortably')}
+        {f('Target finish time', 'target_time', 'text', 'sub-2hr')}
+        {f('Race / event date', 'target_date', 'date')}
       </div>
     );
     case 'rehab': return (
       <div className="prefs-goal-field-set">
         <p className="prefs-goal-hint">Your trainer can add more specific programming once connected.</p>
-        <Field label="Injury / area" field="injury" placeholder="left knee, rotator cuff…" />
-        <Field label="Target outcome" field="target" placeholder="return to sport, pain-free squat…" />
-        <Field label="Notes" field="notes" />
+        {f('Injury / area', 'injury', 'text', 'left knee, rotator cuff…')}
+        {f('Target outcome', 'target', 'text', 'return to sport, pain-free squat…')}
+        {f('Notes', 'notes')}
       </div>
     );
     case 'consistency': return (
       <div className="prefs-goal-field-set">
-        <Field label="Sessions per week" field="sessions_per_week" type="number" />
-        <Field label="Or: minutes per day" field="minutes_per_day" type="number" />
+        {f('Sessions per week', 'sessions_per_week', 'number')}
+        {f('Or: minutes per day', 'minutes_per_day', 'number')}
       </div>
     );
     case 'flexibility': return (
       <div className="prefs-goal-field-set">
-        <Field label="Focus area" field="focus" placeholder="hip flexors, hamstrings…" />
-        <Field label="Current limitation" field="current" placeholder="can't touch toes" />
-        <Field label="Target" field="target" placeholder="full splits, overhead squat…" />
+        {f('Focus area', 'focus', 'text', 'hip flexors, hamstrings…')}
+        {f('Current limitation', 'current', 'text', "can't touch toes")}
+        {f('Target', 'target', 'text', 'full splits, overhead squat…')}
       </div>
     );
     default: return null;
