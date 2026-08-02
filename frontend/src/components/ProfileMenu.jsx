@@ -22,7 +22,7 @@ const GOAL_TYPES = [
   { id: 'flexibility',       label: 'Flexibility / Mobility' },
 ];
 
-export default function ProfileMenu({ onLogout, onOpenPrefs }) {
+export default function ProfileMenu({ onLogout, onOpenPrefs, onOpenAdmin }) {
   const { themeMode, setThemeMode } = useTheme();
   const [open, setOpen]         = useState(false);
   const [panel, setPanel]       = useState(null); // null | 'settings' | 'prefs'
@@ -275,6 +275,11 @@ export default function ProfileMenu({ onLogout, onOpenPrefs }) {
           {/* ── Main menu ── */}
           {!panel && (
             <ul className="profile-dropdown-menu">
+              {onOpenAdmin && (
+                <li onClick={() => { setOpen(false); onOpenAdmin(); }} style={{ color: 'var(--color-primary)', fontWeight: 600 }}>
+                  Admin Panel
+                </li>
+              )}
               <li onClick={() => { setOpen(false); onOpenPrefs && onOpenPrefs(); }}>Settings &amp; Preferences</li>
               <li className="profile-dropdown-logout" onClick={onLogout}>Log Out</li>
             </ul>

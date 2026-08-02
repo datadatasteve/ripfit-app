@@ -1,0 +1,277 @@
+/* frontend/src/components/AdminPanel.css */
+
+.admin-panel {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 0 60px;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.admin-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+.admin-title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  margin: 0;
+}
+.admin-back-btn {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  padding: 0;
+  flex-shrink: 0;
+}
+
+/* ── Tab bar ─────────────────────────────────────────────────────────────── */
+.admin-tab-bar {
+  display: flex;
+  gap: 2px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border-color);
+  overflow-x: auto;
+  scrollbar-width: none;
+  background: var(--bg-primary);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.admin-tab-bar::-webkit-scrollbar { display: none; }
+
+.admin-tab-btn {
+  padding: 12px 18px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+  margin-bottom: -1px;
+}
+.admin-tab-btn:hover { color: var(--text-primary); }
+.admin-tab-btn.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* ── Content ─────────────────────────────────────────────────────────────── */
+.admin-content {
+  padding: 20px;
+}
+
+/* ── Section title ───────────────────────────────────────────────────────── */
+.admin-section-title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  margin: 0 0 16px;
+}
+
+/* ── Tables ──────────────────────────────────────────────────────────────── */
+.admin-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+.admin-table th {
+  text-align: left;
+  padding: 10px 14px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
+}
+.admin-table td {
+  padding: 10px 14px;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+}
+.admin-table tr:last-child td { border-bottom: none; }
+.admin-clickable-row { cursor: pointer; }
+.admin-clickable-row:hover td { background: var(--bg-secondary); }
+
+/* ── User drill-down ─────────────────────────────────────────────────────── */
+.admin-user-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.admin-user-name {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  margin: 0 0 4px;
+}
+.admin-user-email {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  margin: 0;
+}
+.admin-user-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* ── Action buttons ──────────────────────────────────────────────────────── */
+.admin-action-btn {
+  padding: 7px 14px;
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  transition: opacity var(--transition-fast);
+}
+.admin-action-btn:hover { opacity: 0.85; }
+.admin-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.admin-action-btn.danger {
+  background: var(--color-danger);
+}
+
+/* ── Filter buttons ──────────────────────────────────────────────────────── */
+.admin-filter-btn {
+  padding: 5px 12px;
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+  transition: background var(--transition-fast), color var(--transition-fast);
+  text-transform: capitalize;
+}
+.admin-filter-btn:hover { background: var(--bg-secondary); color: var(--text-primary); }
+.admin-filter-btn.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: white;
+}
+
+/* ── Sub-tabs (inside user drill-down) ───────────────────────────────────── */
+.admin-sub-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+.admin-sub-tab {
+  padding: 8px 14px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  position: relative;
+  margin-bottom: -1px;
+  transition: color var(--transition-fast);
+}
+.admin-sub-tab:hover { color: var(--text-primary); }
+.admin-sub-tab.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* ── Badges ──────────────────────────────────────────────────────────────── */
+.admin-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  background: var(--color-warning);
+  color: white;
+  border-radius: var(--radius-full);
+  font-size: 0.7em;
+  font-weight: 700;
+  vertical-align: middle;
+}
+.admin-badge-red { background: var(--color-danger); }
+
+/* ── Overview stat grid ──────────────────────────────────────────────────── */
+.admin-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.admin-stat-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.admin-stat-value {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+}
+.admin-stat-label {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ── Modal (bug report detail) ───────────────────────────────────────────── */
+.admin-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal);
+  padding: 20px;
+}
+.admin-modal {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  max-width: 520px;
+  width: 100%;
+  box-shadow: var(--shadow-xl);
+}
+.admin-modal h3 {
+  margin: 0 0 8px;
+  color: var(--text-primary);
+}
+
+/* ── Loading / empty ─────────────────────────────────────────────────────── */
+.admin-loading {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  padding: 24px 0;
+  text-align: center;
+}

@@ -62,6 +62,7 @@ const routineRoutes = require('./routes/routineRoutes');
 const cardioRoutes = require('./routes/cardioRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 const statsRoutes = require('./routes/statsRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
 app.use(`/api/${API_VERSION}/nutrition`, nutritionRoutes);
 app.use(`/api/${API_VERSION}/auth`, authRoutes);
@@ -71,6 +72,7 @@ app.use(`/api/${API_VERSION}/cardio`, cardioRoutes);
 app.use('/api/v1/users', profileRoutes);
 app.use('/api/v1/stats', statsRoutes);
 app.use('/api/v1', statsRoutes); // admin reset password (protected by ADMIN_SECRET)
+app.use('/api/v1/admin', adminRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -114,6 +116,23 @@ app.use((err, req, res, next) => {
   console.error('Error:', err);
   const statusCode = err.statusCode || 500;
   const message = err.message || 'Internal Server Error';
+
+  // Log server errors to DB for admin visibility
+  if (statusCode >= 500) {
+    const { pool } = require('./config/database');
+    pool.query(
+      `INSERT INTO error_logs (user_id, error_message, error_stack, current_view, url, severity)
+       VALUES ($1, $2, $3, $4, $5, 'server_error')`,
+      [
+        req.user?.userId || null,
+        message.slice(0, 2000),
+        err.stack ? err.stack.slice(0, 5000) : null,
+        null,
+        req.path || null,
+      ]
+    ).catch(logErr => console.error('Failed to log error to DB:', logErr));
+  }
+
   res.status(statusCode).json({
     error: message,
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
@@ -161,3 +180,4 @@ process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
 module.exports = app;
+

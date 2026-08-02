@@ -5,6 +5,7 @@
 
 import './UserPreferencesPage.css';
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
+import BugReportModal from './BugReportModal';
 import { useTheme } from '../contexts/ThemeContext';
 import ProfileCircle from './ProfileCircle';
 import './UserPreferencesPage.css';
@@ -43,6 +44,7 @@ export default function UserPreferencesPage({ onBack }) {
   const [pwMsg, setPwMsg] = useState('');
   const [pwMsgType, setPwMsgType] = useState('ok');
   const [picMsg, setPicMsg] = useState('');
+  const [showBugReport, setShowBugReport] = useState(false);
 
   useEffect(() => { fetchProfile(); }, []);
 
@@ -467,6 +469,23 @@ export default function UserPreferencesPage({ onBack }) {
                 <label>Account</label>
                 <p className="prefs-value">@{user?.username}</p>
               </div>
+
+              <div className="prefs-field-group" style={{ marginTop: 24 }}>
+                <label>Support</label>
+                <button className="prefs-btn-secondary" onClick={() => setShowBugReport(true)} style={{ alignSelf: 'flex-start' }}>
+                  Report a Bug
+                </button>
+                <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', marginTop: 6 }}>
+                  Describe any issues you encounter and we'll look into it.
+                </p>
+              </div>
+
+              {showBugReport && (
+                <BugReportModal
+                  onClose={() => setShowBugReport(false)}
+                  currentView="settings"
+                />
+              )}
             </div>
           )}
         </div>

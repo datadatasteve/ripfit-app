@@ -4,6 +4,8 @@ import ActiveWorkout from './components/ActiveWorkout'
 import ExerciseBrowser from './components/ExerciseBrowser'
 import StatsCenter from './components/StatsCenter'
 import UserPreferencesPage from './components/UserPreferencesPage'
+import AdminPanel from './components/AdminPanel'
+import ErrorBoundary from './components/ErrorBoundary'
 import Login from './components/Login'
 import './styles/App.css'
 
@@ -48,6 +50,7 @@ function App() {
   const [workoutSummary, setWorkoutSummary] = useState(null);
   const [showNavClock, setShowNavClock] = useState(true);
   const [verifiedToast, setVerifiedToast] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Handle ?verified=true redirect from email verification link
   useEffect(() => {
@@ -59,6 +62,18 @@ function App() {
     }
   }, []);
 
+  // Fetch profile on load to get admin status
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const tok = localStorage.getItem('ripfit_token');
+    fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1'}/users/me`, {
+      headers: { Authorization: `Bearer ${tok}` },
+    })
+      .then(r => r.json())
+      .then(d => { if (d.is_admin) setIsAdmin(true); })
+      .catch(() => {});
+  }, [isLoggedIn]);
+
   const handleLogin = (user) => {
     setIsLoggedIn(true);
     setCurrentView('workout');
@@ -67,6 +82,7 @@ function App() {
   const handleLogout = () => {
     localStorage.removeItem('ripfit_token');
     setIsLoggedIn(false);
+    setIsAdmin(false);
     setActiveWorkout(null);
     setWorkoutSummary(null);
   };
@@ -106,6 +122,7 @@ function App() {
                 <ProfileMenu
                   onLogout={handleLogout}
                   onOpenPrefs={() => setCurrentView('preferences')}
+                  onOpenAdmin={isAdmin ? () => setCurrentView('admin') : null}
                 />
               )}
             </div>
@@ -114,6 +131,7 @@ function App() {
       </header>
 
       <main className="main">
+        <ErrorBoundary>
         {!isLoggedIn ? (
           <Login onLogin={handleLogin} />
         ) : (
@@ -133,6 +151,8 @@ function App() {
               <StatsCenter />
             ) : currentView === 'preferences' ? (
               <UserPreferencesPage onBack={() => setCurrentView('workout')} />
+            ) : currentView === 'admin' ? (
+              <AdminPanel onBack={() => setCurrentView('workout')} />
             ) : currentView === 'nutrition' ? (
               <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-secondary, #aaa)' }}>
                 <h2>Nutrition</h2>
@@ -150,6 +170,7 @@ function App() {
             )}
           </>
         )}
+        </ErrorBoundary>
       </main>
 
       {verifiedToast && (
