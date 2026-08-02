@@ -521,3 +521,145 @@
   }
   .nutri-macro-bars { gap: 8px; }
 }
+
+/* ── Unit select ─────────────────────────────────────────────────────────── */
+.nutri-unit-select {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  padding: 5px 8px;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+/* ── Meal-level macro bars ───────────────────────────────────────────────── */
+.nutri-meal-macro-bars {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.meal-macro-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.meal-macro-label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  width: 14px;
+  flex-shrink: 0;
+}
+.meal-macro-track {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.meal-macro-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.meal-macro-value {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  width: 60px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ── Water tracker ───────────────────────────────────────────────────────── */
+.nutri-water-card {
+  margin: 0 16px 8px;
+  padding: 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+}
+.nutri-water-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.nutri-water-title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+.nutri-water-goal-btn {
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  padding: 3px 8px;
+  cursor: pointer;
+}
+.nutri-water-goal-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.nutri-water-goal-input {
+  width: 72px;
+  padding: 5px 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+}
+.nutri-water-progress {
+  margin-bottom: 10px;
+}
+.nutri-water-track {
+  height: 10px;
+  background: var(--bg-tertiary);
+  border-radius: 5px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.nutri-water-fill {
+  height: 100%;
+  background: #3b82f6;
+  border-radius: 5px;
+  transition: width 0.3s ease;
+}
+.nutri-water-stats {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.nutri-water-presets {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.nutri-water-preset {
+  padding: 5px 10px;
+  background: none;
+  border: 1px solid #3b82f6;
+  border-radius: var(--radius-sm);
+  color: #3b82f6;
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.nutri-water-preset:hover {
+  background: #3b82f6;
+  color: white;
+}
+.nutri-water-preset.danger {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+.nutri-water-preset.danger:hover {
+  background: var(--color-danger);
+  color: white;
+}

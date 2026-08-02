@@ -77,6 +77,105 @@ function MacroBar({ label, current, target, color }) {
   );
 }
 
+// ── Meal-level compact macro bar ─────────────────────────────────────────
+function MealMacroBar({ label, current, target, color }) {
+  const pct = Math.min(100, target > 0 ? (current / target) * 100 : 0);
+  const over = current > target && target > 0;
+  return (
+    <div className="meal-macro-bar">
+      <span className="meal-macro-label" style={{ color }}>{label}</span>
+      <div className="meal-macro-track">
+        <div className="meal-macro-fill" style={{
+          width: `${pct}%`,
+          background: over ? 'var(--color-danger)' : color
+        }} />
+      </div>
+      <span className="meal-macro-value" style={{ color: over ? 'var(--color-danger)' : 'var(--text-secondary)' }}>
+        {current}/{target}g
+      </span>
+    </div>
+  );
+}
+
+// ── Water tracker ─────────────────────────────────────────────────────────
+const WATER_PRESETS = [4, 8, 12, 16, 24, 32, 48]; // oz
+
+function WaterTracker({ date }) {
+  const [consumed, setConsumed] = useState(0); // in oz
+  const [goal, setGoal] = useState(64); // oz default (8 cups)
+  const [editingGoal, setEditingGoal] = useState(false);
+  const [goalInput, setGoalInput] = useState('64');
+  const storageKey = `ripfit_water_${date}`;
+  const goalKey = 'ripfit_water_goal';
+
+  useEffect(() => {
+    const saved = localStorage.getItem(storageKey);
+    const savedGoal = localStorage.getItem(goalKey);
+    if (saved) setConsumed(parseFloat(saved) || 0);
+    if (savedGoal) { setGoal(parseFloat(savedGoal) || 64); setGoalInput(savedGoal); }
+  }, [date]);
+
+  function addWater(oz) {
+    const newVal = Math.max(0, consumed + oz);
+    setConsumed(newVal);
+    localStorage.setItem(storageKey, String(newVal));
+  }
+
+  function saveGoal() {
+    const val = parseFloat(goalInput) || 64;
+    setGoal(val);
+    localStorage.setItem(goalKey, String(val));
+    setEditingGoal(false);
+  }
+
+  const pct = Math.min(100, goal > 0 ? (consumed / goal) * 100 : 0);
+  const remaining = Math.max(0, goal - consumed);
+
+  return (
+    <div className="nutri-water-card">
+      <div className="nutri-water-header">
+        <span className="nutri-water-title">💧 Water</span>
+        <button className="nutri-water-goal-btn" onClick={() => setEditingGoal(e => !e)}>
+          Goal: {goal} oz
+        </button>
+      </div>
+
+      {editingGoal && (
+        <div className="nutri-water-goal-edit">
+          <input
+            type="number"
+            value={goalInput}
+            onChange={e => setGoalInput(e.target.value)}
+            className="nutri-water-goal-input"
+            min={1}
+          />
+          <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>oz</span>
+          <button className="nutri-add-btn" style={{ padding: '6px 12px', fontSize: 'var(--font-size-xs)' }} onClick={saveGoal}>Save</button>
+        </div>
+      )}
+
+      <div className="nutri-water-progress">
+        <div className="nutri-water-track">
+          <div className="nutri-water-fill" style={{ width: `${pct}%` }} />
+        </div>
+        <div className="nutri-water-stats">
+          <span style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--text-primary)' }}>{consumed} oz</span>
+          <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-xs)' }}>{remaining} oz remaining</span>
+        </div>
+      </div>
+
+      <div className="nutri-water-presets">
+        {WATER_PRESETS.map(oz => (
+          <button key={oz} className="nutri-water-preset" onClick={() => addWater(oz)}>+{oz}</button>
+        ))}
+        {consumed > 0 && (
+          <button className="nutri-water-preset danger" onClick={() => addWater(-consumed)} title="Reset">↺</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Food search modal ─────────────────────────────────────────────────────
 function FoodSearchModal({ mealType, mealDate, onClose, onAdded }) {
   const [query, setQuery] = useState('');
@@ -84,6 +183,7 @@ function FoodSearchModal({ mealType, mealDate, onClose, onAdded }) {
   const [searching, setSearching] = useState(false);
   const [selected, setSelected] = useState(null);
   const [serving, setServing] = useState('100');
+  const [servingUnit, setServingUnit] = useState('g');
   const [adding, setAdding] = useState(false);
   const [tab, setTab] = useState('search'); // 'search' | 'custom'
   const searchRef = useRef(null);
@@ -118,8 +218,10 @@ function FoodSearchModal({ mealType, mealDate, onClose, onAdded }) {
   }, [query]);
 
   // Preview macros for selected food at current serving
+  const UNIT_TO_G = { g: 1, ml: 1, oz: 28.3495 };
   const previewMacros = selected ? (() => {
-    const mult = parseFloat(serving || 0) / 100;
+    const servingG = parseFloat(serving || 0) * (UNIT_TO_G[servingUnit] || 1);
+    const mult = servingG / 100;
     return {
       cal: round1(selected.calories_per_100g * mult),
       pro: round1(selected.protein_per_100g * mult),
@@ -161,7 +263,7 @@ function FoodSearchModal({ mealType, mealDate, onClose, onAdded }) {
         body: JSON.stringify({
           meal_date: mealDate,
           meal_type: mealType,
-          foods: [{ food_id, serving_size: parseFloat(serving), serving_unit: 'g' }],
+          foods: [{ food_id, serving_size: parseFloat(serving), serving_unit: servingUnit }],
         }),
       });
       if (!res.ok) throw new Error();
@@ -267,7 +369,15 @@ function FoodSearchModal({ mealType, mealDate, onClose, onAdded }) {
                     onChange={e => setServing(e.target.value)}
                     className="nutri-serving-input"
                   />
-                  <span>g</span>
+                  <select
+                    value={servingUnit}
+                    onChange={e => setServingUnit(e.target.value)}
+                    className="nutri-unit-select"
+                  >
+                    <option value="g">g</option>
+                    <option value="ml">ml</option>
+                    <option value="oz">oz</option>
+                  </select>
                 </div>
 
                 {previewMacros && (
@@ -470,6 +580,9 @@ export default function NutritionPage() {
         </div>
       </div>
 
+      {/* Water tracker */}
+      <WaterTracker date={date} />
+
       {/* Meal sections */}
       {loading ? (
         <p className="nutri-loading">Loading…</p>
@@ -503,6 +616,13 @@ export default function NutritionPage() {
 
                 {expanded && (
                   <div className="nutri-meal-body">
+                    {typeTotals.cal > 0 && (
+                      <div className="nutri-meal-macro-bars">
+                        <MealMacroBar current={round1(typeTotals.pro)} target={Math.round(goals.protein / 4)} color="#3b82f6" label="P" />
+                        <MealMacroBar current={round1(typeTotals.carb)} target={Math.round(goals.carbs / 4)} color="#f59e0b" label="C" />
+                        <MealMacroBar current={round1(typeTotals.fat)} target={Math.round(goals.fat / 4)} color="#ef4444" label="F" />
+                      </div>
+                    )}
                     {typeMeals.length === 0 ? (
                       <p className="nutri-meal-empty">Nothing logged yet.</p>
                     ) : (
@@ -512,13 +632,13 @@ export default function NutritionPage() {
                             <div key={f.meal_food_id} className="nutri-food-row">
                               <div className="nutri-food-info">
                                 <span className="nutri-food-name">{f.food_name}</span>
-                                <span className="nutri-food-serving">{f.serving_size}g</span>
+                                <span className="nutri-food-serving">{f.serving_size}{f.serving_unit || 'g'}</span>
                               </div>
                               <div className="nutri-food-macros">
                                 <span className="nutri-food-cal">{Math.round(f.calories)} cal</span>
-                                <span className="nutri-food-macro">P {round1(f.protein)}g</span>
-                                <span className="nutri-food-macro">C {round1(f.carbs)}g</span>
-                                <span className="nutri-food-macro">F {round1(f.fat)}g</span>
+                                <span className="nutri-food-macro" style={{ color: '#3b82f6' }}>P {round1(f.protein)}g</span>
+                                <span className="nutri-food-macro" style={{ color: '#f59e0b' }}>C {round1(f.carbs)}g</span>
+                                <span className="nutri-food-macro" style={{ color: '#ef4444' }}>F {round1(f.fat)}g</span>
                               </div>
                               <button
                                 className="nutri-remove-btn"
@@ -527,11 +647,6 @@ export default function NutritionPage() {
                               >✕</button>
                             </div>
                           ))}
-                          {typeMeals.length > 1 && (
-                            <button className="nutri-delete-meal-btn" onClick={() => removeMeal(meal.id)}>
-                              Delete meal entry
-                            </button>
-                          )}
                         </div>
                       ))
                     )}

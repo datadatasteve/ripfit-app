@@ -200,7 +200,10 @@ const logMeal = async (req, res) => {
       const food = foodData.rows[0];
 
       // Calculate nutrition based on serving size (food data is per 100g)
-      const multiplier = serving_size / 100;
+      // Convert serving to grams before calculating (food data is always per 100g)
+      const UNIT_TO_GRAMS = { g: 1, ml: 1, oz: 28.3495, lb: 453.592, kg: 1000 };
+      const servingInGrams = serving_size * (UNIT_TO_GRAMS[serving_unit] || 1);
+      const multiplier = servingInGrams / 100;
       const calories = food.calories_per_100g * multiplier;
       const protein = food.protein_per_100g * multiplier;
       const carbs = food.carbs_per_100g * multiplier;
@@ -336,13 +339,23 @@ const searchUSDA = async (req, res) => {
       : type === 'foundation' ? ['Foundation', 'SR Legacy']
       : null; // null = all types
 
-    const results = await usdaApi.searchFoods(q, {
-      dataType,
-      pageSize: parseInt(limit),
-    });
+    // For general searches, fetch Foundation/raw foods first, then branded
+    // so unprocessed foods appear at top of results
+    let foods = [];
+    if (!dataType || type === 'all') {
+      const [foundationRes, brandedRes] = await Promise.all([
+        usdaApi.searchFoods(q, { dataType: ['Foundation', 'SR Legacy'], pageSize: 10 }),
+        usdaApi.searchFoods(q, { dataType: ['Branded'], pageSize: parseInt(limit) - 10 }),
+      ]);
+      foods = [...(foundationRes.foods || []), ...(brandedRes.foods || [])];
+    } else {
+      const results = await usdaApi.searchFoods(q, { dataType, pageSize: parseInt(limit) });
+      foods = results.foods || [];
+    }
+    const results = { foods };
 
     // Normalize to a consistent shape the frontend can use
-    const foods = (results.foods || []).map(f => {
+    const foodList = (foods || []).map(f => {
       const nutrients = {};
       if (f.foodNutrients) {
         const map = { 1008: 'calories', 1003: 'protein', 1004: 'fat', 1005: 'carbs', 1079: 'fiber', 2000: 'sugar' };
@@ -366,7 +379,7 @@ const searchUSDA = async (req, res) => {
       };
     });
 
-    res.json({ query: q, count: foods.length, foods });
+    res.json({ query: q, count: foodList.length, foods: foodList });
   } catch (err) {
     console.error('USDA search error:', err.message);
     res.status(500).json({ error: 'Food search failed' });
@@ -488,7 +501,9 @@ const updateMealFood = async (req, res) => {
     if (current.rows.length === 0) return res.status(404).json({ error: 'Item not found' });
 
     const food = current.rows[0];
-    const mult = serving_size / 100;
+    const UNIT_TO_GRAMS = { g: 1, ml: 1, oz: 28.3495, lb: 453.592, kg: 1000 };
+    const servingInGrams = serving_size * (UNIT_TO_GRAMS[req.body.serving_unit || 'g'] || 1);
+    const mult = servingInGrams / 100;
 
     const result = await pool.query(
       `UPDATE meal_foods
