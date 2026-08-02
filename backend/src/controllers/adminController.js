@@ -36,10 +36,10 @@ async function listUsers(req, res) {
         u.goals,
         COUNT(DISTINCT w.id) AS workout_count,
         COUNT(DISTINCT cs.id) AS cardio_count,
-        MAX(GREATEST(
-          COALESCE(w.start_time, '1970-01-01'),
-          COALESCE(cs.start_time, '1970-01-01')
-        )) AS last_active,
+        GREATEST(
+          MAX(w.start_time),
+          MAX(cs.start_time)
+        ) AS last_active,
         COUNT(DISTINCT br.id) AS bug_reports,
         COUNT(DISTINCT el.id) AS error_count
       FROM users u
