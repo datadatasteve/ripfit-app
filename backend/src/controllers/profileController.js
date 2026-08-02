@@ -13,7 +13,7 @@ async function getProfile(req, res) {
          id, username, email, display_name, profile_picture,
          height_cm, weight_kg, date_of_birth, gender,
          units_weight, units_distance, theme_preference, goals,
-         initials, email_verified, created_at
+         initials, email_verified, is_admin, workout_rating_prefs, created_at
        FROM users WHERE id = $1`,
       [req.user.userId]
     );
@@ -297,4 +297,3 @@ module.exports = {
   getProfile, updateProfile, updateProfilePicture, removeProfilePicture,
   updatePassword, verifyEmail, resendVerification, adminVerifyUser
 };
-
