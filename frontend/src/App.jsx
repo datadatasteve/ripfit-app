@@ -6,6 +6,7 @@ import StatsCenter from './components/StatsCenter'
 import UserPreferencesPage from './components/UserPreferencesPage'
 import AdminPanel from './components/AdminPanel'
 import ErrorBoundary from './components/ErrorBoundary'
+import NutritionPage from './components/NutritionPage'
 import Login from './components/Login'
 import './styles/App.css'
 
@@ -154,10 +155,7 @@ function App() {
             ) : currentView === 'admin' ? (
               <AdminPanel onBack={() => setCurrentView('workout')} />
             ) : currentView === 'nutrition' ? (
-              <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-secondary, #aaa)' }}>
-                <h2>Nutrition</h2>
-                <p>Coming soon.</p>
-              </div>
+              <NutritionPage />
             ) : (
               <section className="hero">
                 <div className="container">
@@ -189,3 +187,4 @@ function App() {
 }
 
 export default App
+

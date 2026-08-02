@@ -243,27 +243,27 @@ const logMeal = async (req, res) => {
  */
 const getMealsByDate = async (req, res) => {
   const { date } = req.params;
-  const { user_id } = req.query;
-
-  if (!user_id) {
-    return res.status(400).json({ error: 'user_id query parameter required' });
-  }
+  const user_id = req.user.userId;
 
   try {
     const result = await pool.query(
       `SELECT 
         m.id, m.meal_type, m.meal_name, m.created_at,
-        json_agg(json_build_object(
-          'food_id', mf.food_id,
-          'food_name', f.name,
-          'serving_size', mf.serving_size,
-          'serving_unit', mf.serving_unit,
-          'calories', mf.calories,
-          'protein', mf.protein,
-          'carbs', mf.carbs,
-          'fat', mf.fat,
-          'fiber', mf.fiber
-        )) as foods
+        COALESCE(json_agg(
+          json_build_object(
+            'meal_food_id', mf.id,
+            'food_id', mf.food_id,
+            'food_name', f.name,
+            'brand', f.brand,
+            'serving_size', mf.serving_size,
+            'serving_unit', mf.serving_unit,
+            'calories', mf.calories,
+            'protein', mf.protein,
+            'carbs', mf.carbs,
+            'fat', mf.fat,
+            'fiber', mf.fiber
+          ) ORDER BY mf.id
+        ) FILTER (WHERE mf.id IS NOT NULL), '[]') AS foods
        FROM meals m
        LEFT JOIN meal_foods mf ON m.id = mf.meal_id
        LEFT JOIN foods f ON mf.food_id = f.id
@@ -273,10 +273,7 @@ const getMealsByDate = async (req, res) => {
       [user_id, date]
     );
 
-    res.json({
-      date,
-      meals: result.rows
-    });
+    res.json({ date, meals: result.rows });
   } catch (error) {
     console.error('Get meals error:', error);
     res.status(500).json({ error: 'Failed to get meals' });
@@ -293,11 +290,7 @@ const getMealsByDate = async (req, res) => {
  */
 const getDailyNutrition = async (req, res) => {
   const { date } = req.params;
-  const { user_id } = req.query;
-
-  if (!user_id) {
-    return res.status(400).json({ error: 'user_id query parameter required' });
-  }
+  const user_id = req.user.userId;
 
   try {
     const result = await pool.query(
@@ -324,6 +317,245 @@ const getDailyNutrition = async (req, res) => {
   }
 };
 
+
+// ============================================================================
+// USDA LIVE SEARCH
+// ============================================================================
+
+/**
+ * Search USDA FoodData Central live
+ * GET /api/v1/nutrition/foods/usda-search?q=chicken&type=all
+ * type: 'all' | 'branded' | 'foundation'
+ */
+const searchUSDA = async (req, res) => {
+  const { q, type = 'all', limit = 25 } = req.query;
+  if (!q) return res.status(400).json({ error: 'q required' });
+
+  try {
+    const dataType = type === 'branded' ? ['Branded']
+      : type === 'foundation' ? ['Foundation', 'SR Legacy']
+      : null; // null = all types
+
+    const results = await usdaApi.searchFoods(q, {
+      dataType,
+      pageSize: parseInt(limit),
+    });
+
+    // Normalize to a consistent shape the frontend can use
+    const foods = (results.foods || []).map(f => {
+      const nutrients = {};
+      if (f.foodNutrients) {
+        const map = { 1008: 'calories', 1003: 'protein', 1004: 'fat', 1005: 'carbs', 1079: 'fiber', 2000: 'sugar' };
+        f.foodNutrients.forEach(n => {
+          const key = map[n.nutrientId || n.nutrientNumber];
+          if (key) nutrients[key] = n.value || 0;
+        });
+      }
+      return {
+        fdc_id: f.fdcId,
+        name: f.description,
+        brand: f.brandOwner || f.brandName || null,
+        data_type: f.dataType,
+        serving_size: f.servingSize || 100,
+        serving_unit: f.servingSizeUnit || 'g',
+        calories_per_100g: nutrients.calories || 0,
+        protein_per_100g: nutrients.protein || 0,
+        carbs_per_100g: nutrients.carbs || 0,
+        fat_per_100g: nutrients.fat || 0,
+        fiber_per_100g: nutrients.fiber || 0,
+      };
+    });
+
+    res.json({ query: q, count: foods.length, foods });
+  } catch (err) {
+    console.error('USDA search error:', err.message);
+    res.status(500).json({ error: 'Food search failed' });
+  }
+};
+
+// ============================================================================
+// CUSTOM FOOD CREATION
+// ============================================================================
+
+/**
+ * Create a custom food entry
+ * POST /api/v1/nutrition/foods/custom
+ */
+const createCustomFood = async (req, res) => {
+  const user_id = req.user.userId;
+  const {
+    name, brand, serving_size = 100, serving_unit = 'g',
+    calories_per_100g, protein_per_100g, carbs_per_100g,
+    fat_per_100g, fiber_per_100g = 0, sugar_per_100g = 0
+  } = req.body;
+
+  if (!name || calories_per_100g == null) {
+    return res.status(400).json({ error: 'name and calories_per_100g required' });
+  }
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO foods
+         (name, brand, serving_size, serving_unit, calories_per_100g, protein_per_100g,
+          carbs_per_100g, fat_per_100g, fiber_per_100g, sugar_per_100g,
+          source, created_by_user_id, is_verified)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'custom',$11,false)
+       RETURNING *`,
+      [name, brand || null, serving_size, serving_unit,
+       calories_per_100g, protein_per_100g || 0, carbs_per_100g || 0,
+       fat_per_100g || 0, fiber_per_100g, sugar_per_100g, user_id]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error('createCustomFood error:', err);
+    res.status(500).json({ error: 'Failed to create food' });
+  }
+};
+
+// ============================================================================
+// MEAL / FOOD ITEM MANAGEMENT
+// ============================================================================
+
+/**
+ * Delete an entire meal
+ * DELETE /api/v1/nutrition/meals/:mealId
+ */
+const deleteMeal = async (req, res) => {
+  const user_id = req.user.userId;
+  const { mealId } = req.params;
+  try {
+    const result = await pool.query(
+      'DELETE FROM meals WHERE id = $1 AND user_id = $2 RETURNING id',
+      [mealId, user_id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Meal not found' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('deleteMeal error:', err);
+    res.status(500).json({ error: 'Failed to delete meal' });
+  }
+};
+
+/**
+ * Remove a food item from a meal
+ * DELETE /api/v1/nutrition/meal-foods/:mealFoodId
+ */
+const deleteMealFood = async (req, res) => {
+  const user_id = req.user.userId;
+  const { mealFoodId } = req.params;
+  try {
+    // Verify ownership via join
+    const result = await pool.query(
+      `DELETE FROM meal_foods mf
+       USING meals m
+       WHERE mf.id = $1 AND mf.meal_id = m.id AND m.user_id = $2
+       RETURNING mf.id`,
+      [mealFoodId, user_id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Item not found' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('deleteMealFood error:', err);
+    res.status(500).json({ error: 'Failed to remove food' });
+  }
+};
+
+/**
+ * Update serving size of a food item in a meal
+ * PUT /api/v1/nutrition/meal-foods/:mealFoodId
+ */
+const updateMealFood = async (req, res) => {
+  const user_id = req.user.userId;
+  const { mealFoodId } = req.params;
+  const { serving_size } = req.body;
+
+  if (!serving_size || serving_size <= 0) {
+    return res.status(400).json({ error: 'serving_size required' });
+  }
+
+  try {
+    // Get current food data to recalculate macros
+    const current = await pool.query(
+      `SELECT mf.food_id, f.calories_per_100g, f.protein_per_100g,
+              f.carbs_per_100g, f.fat_per_100g, f.fiber_per_100g
+       FROM meal_foods mf
+       JOIN meals m ON mf.meal_id = m.id
+       JOIN foods f ON mf.food_id = f.id
+       WHERE mf.id = $1 AND m.user_id = $2`,
+      [mealFoodId, user_id]
+    );
+
+    if (current.rows.length === 0) return res.status(404).json({ error: 'Item not found' });
+
+    const food = current.rows[0];
+    const mult = serving_size / 100;
+
+    const result = await pool.query(
+      `UPDATE meal_foods
+       SET serving_size = $1,
+           calories = $2, protein = $3, carbs = $4, fat = $5, fiber = $6
+       WHERE id = $7
+       RETURNING *`,
+      [
+        serving_size,
+        food.calories_per_100g * mult,
+        food.protein_per_100g * mult,
+        food.carbs_per_100g * mult,
+        food.fat_per_100g * mult,
+        (food.fiber_per_100g || 0) * mult,
+        mealFoodId
+      ]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('updateMealFood error:', err);
+    res.status(500).json({ error: 'Failed to update serving' });
+  }
+};
+
+/**
+ * Get or derive daily macro targets from user goals
+ * GET /api/v1/nutrition/goals
+ */
+const getNutritionGoals = async (req, res) => {
+  const user_id = req.user.userId;
+  try {
+    const result = await pool.query(
+      'SELECT goals, weight_kg, workout_rating_prefs FROM users WHERE id = $1',
+      [user_id]
+    );
+    const { goals = [], weight_kg } = result.rows[0] || {};
+
+    // Default targets — sensible starting points
+    let targets = { calories: 2000, protein: 150, carbs: 200, fat: 65, fiber: 25 };
+
+    // If user has weight loss goal with target, adjust
+    const wl = goals.find(g => g.type === 'weight_loss');
+    if (wl?.details?.current_weight && weight_kg) {
+      const weightLbs = parseFloat(wl.details.current_weight);
+      // ~0.8g protein per lb body weight, moderate deficit
+      targets.protein = Math.round(weightLbs * 0.8);
+      targets.calories = Math.round(weightLbs * 13); // light deficit multiplier
+      targets.carbs = Math.round((targets.calories * 0.4) / 4);
+      targets.fat = Math.round((targets.calories * 0.3) / 9);
+    }
+
+    const mg = goals.find(g => g.type === 'muscle_gain');
+    if (mg?.details?.current_weight) {
+      const weightLbs = parseFloat(mg.details.current_weight);
+      targets.protein = Math.round(weightLbs * 1.0); // 1g/lb for muscle gain
+      targets.calories = Math.round(weightLbs * 16); // slight surplus
+      targets.carbs = Math.round((targets.calories * 0.45) / 4);
+      targets.fat = Math.round((targets.calories * 0.25) / 9);
+    }
+
+    res.json({ targets });
+  } catch (err) {
+    console.error('getNutritionGoals error:', err);
+    res.status(500).json({ error: 'Failed to get nutrition goals' });
+  }
+};
+
 // ============================================================================
 // EXPORTS
 // ============================================================================
@@ -332,7 +564,13 @@ module.exports = {
   searchFoods,
   getFoodById,
   scanBarcode,
+  searchUSDA,
+  createCustomFood,
   logMeal,
   getMealsByDate,
-  getDailyNutrition
+  getDailyNutrition,
+  deleteMeal,
+  deleteMealFood,
+  updateMealFood,
+  getNutritionGoals,
 };

@@ -1,0 +1,557 @@
+// frontend/src/components/NutritionPage.jsx
+import { useState, useEffect, useCallback, useRef } from 'react';
+import './NutritionPage.css';
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+function token() { return localStorage.getItem('ripfit_token'); }
+
+const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snacks'];
+const MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snacks: 'Snacks' };
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function toLocalDateStr(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function fmtDate(str) {
+  const [y, m, d] = str.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric'
+  });
+}
+
+function round1(n) { return Math.round((n || 0) * 10) / 10; }
+
+// ── Macro progress ring (SVG) ─────────────────────────────────────────────
+function MacroRing({ label, current, target, color, unit = 'g' }) {
+  const pct = Math.min(1, target > 0 ? current / target : 0);
+  const r = 28;
+  const circ = 2 * Math.PI * r;
+  const dash = pct * circ;
+  const over = current > target && target > 0;
+
+  return (
+    <div className="macro-ring-item">
+      <svg width="72" height="72" viewBox="0 0 72 72">
+        {/* Track */}
+        <circle cx="36" cy="36" r={r} fill="none" stroke="var(--bg-tertiary)" strokeWidth="6" />
+        {/* Fill */}
+        <circle
+          cx="36" cy="36" r={r}
+          fill="none"
+          stroke={over ? 'var(--color-danger)' : color}
+          strokeWidth="6"
+          strokeDasharray={`${dash} ${circ}`}
+          strokeLinecap="round"
+          transform="rotate(-90 36 36)"
+        />
+        {/* Center text */}
+        <text x="36" y="33" textAnchor="middle" fontSize="10" fontWeight="700" fill="var(--text-primary)">{Math.round(current)}</text>
+        <text x="36" y="44" textAnchor="middle" fontSize="8" fill="var(--text-secondary)">/{target}</text>
+      </svg>
+      <span className="macro-ring-label">{label}</span>
+      <span className="macro-ring-unit">{unit}</span>
+    </div>
+  );
+}
+
+// ── Macro bar (linear) ────────────────────────────────────────────────────
+function MacroBar({ label, current, target, color }) {
+  const pct = Math.min(100, target > 0 ? (current / target) * 100 : 0);
+  const over = current > target && target > 0;
+  return (
+    <div className="macro-bar-item">
+      <div className="macro-bar-header">
+        <span className="macro-bar-label">{label}</span>
+        <span className="macro-bar-values" style={{ color: over ? 'var(--color-danger)' : 'var(--text-secondary)' }}>
+          {Math.round(current)} / {target}g
+        </span>
+      </div>
+      <div className="macro-bar-track">
+        <div className="macro-bar-fill" style={{ width: `${pct}%`, background: over ? 'var(--color-danger)' : color }} />
+      </div>
+    </div>
+  );
+}
+
+// ── Food search modal ─────────────────────────────────────────────────────
+function FoodSearchModal({ mealType, mealDate, onClose, onAdded }) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [selected, setSelected] = useState(null);
+  const [serving, setServing] = useState('100');
+  const [adding, setAdding] = useState(false);
+  const [tab, setTab] = useState('search'); // 'search' | 'custom'
+  const searchRef = useRef(null);
+  const debounceRef = useRef(null);
+
+  // Custom food form state
+  const [custom, setCustom] = useState({
+    name: '', brand: '', serving_size: '100', serving_unit: 'g',
+    calories_per_100g: '', protein_per_100g: '', carbs_per_100g: '',
+    fat_per_100g: '', fiber_per_100g: ''
+  });
+  const [customSaving, setCustomSaving] = useState(false);
+  const [customMsg, setCustomMsg] = useState('');
+
+  useEffect(() => { searchRef.current?.focus(); }, []);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!query.trim() || query.length < 2) { setResults([]); return; }
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res = await fetch(
+          `${API_BASE}/nutrition/foods/usda-search?q=${encodeURIComponent(query)}&limit=20`,
+          { headers: { Authorization: `Bearer ${token()}` } }
+        );
+        const data = await res.json();
+        setResults(data.foods || []);
+      } catch { setResults([]); }
+      finally { setSearching(false); }
+    }, 400);
+  }, [query]);
+
+  // Preview macros for selected food at current serving
+  const previewMacros = selected ? (() => {
+    const mult = parseFloat(serving || 0) / 100;
+    return {
+      cal: round1(selected.calories_per_100g * mult),
+      pro: round1(selected.protein_per_100g * mult),
+      carb: round1(selected.carbs_per_100g * mult),
+      fat: round1(selected.fat_per_100g * mult),
+    };
+  })() : null;
+
+  async function addFood() {
+    if (!selected || !serving || parseFloat(serving) <= 0) return;
+    setAdding(true);
+    try {
+      // If USDA result (has fdc_id, no db id), save to foods table first
+      let food_id = selected.id;
+      if (!food_id && selected.fdc_id) {
+        const saveRes = await fetch(`${API_BASE}/nutrition/foods/custom`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+          body: JSON.stringify({
+            name: selected.name,
+            brand: selected.brand,
+            serving_size: selected.serving_size || 100,
+            serving_unit: selected.serving_unit || 'g',
+            calories_per_100g: selected.calories_per_100g,
+            protein_per_100g: selected.protein_per_100g,
+            carbs_per_100g: selected.carbs_per_100g,
+            fat_per_100g: selected.fat_per_100g,
+            fiber_per_100g: selected.fiber_per_100g || 0,
+          }),
+        });
+        const savedFood = await saveRes.json();
+        food_id = savedFood.id;
+      }
+
+      // Log meal with this food
+      const res = await fetch(`${API_BASE}/nutrition/meals`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+        body: JSON.stringify({
+          meal_date: mealDate,
+          meal_type: mealType,
+          foods: [{ food_id, serving_size: parseFloat(serving), serving_unit: 'g' }],
+        }),
+      });
+      if (!res.ok) throw new Error();
+      onAdded();
+      onClose();
+    } catch (e) {
+      console.error('Add food error:', e);
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function saveCustomFood() {
+    if (!custom.name || !custom.calories_per_100g) {
+      setCustomMsg('Name and calories are required.');
+      return;
+    }
+    setCustomSaving(true);
+    try {
+      const res = await fetch(`${API_BASE}/nutrition/foods/custom`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+        body: JSON.stringify({
+          ...custom,
+          calories_per_100g: parseFloat(custom.calories_per_100g),
+          protein_per_100g: parseFloat(custom.protein_per_100g) || 0,
+          carbs_per_100g: parseFloat(custom.carbs_per_100g) || 0,
+          fat_per_100g: parseFloat(custom.fat_per_100g) || 0,
+          fiber_per_100g: parseFloat(custom.fiber_per_100g) || 0,
+          serving_size: parseFloat(custom.serving_size) || 100,
+        }),
+      });
+      const food = await res.json();
+      // Now add it to the meal
+      await fetch(`${API_BASE}/nutrition/meals`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+        body: JSON.stringify({
+          meal_date: mealDate,
+          meal_type: mealType,
+          foods: [{ food_id: food.id, serving_size: parseFloat(custom.serving_size) || 100, serving_unit: custom.serving_unit || 'g' }],
+        }),
+      });
+      onAdded();
+      onClose();
+    } catch {
+      setCustomMsg('Failed to save. Try again.');
+    } finally {
+      setCustomSaving(false);
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="nutri-search-modal" onClick={e => e.stopPropagation()}>
+        <div className="nutri-modal-header">
+          <h3>Add to {MEAL_LABELS[mealType]}</h3>
+          <button className="nutri-modal-close" onClick={onClose}>✕</button>
+        </div>
+
+        <div className="nutri-modal-tabs">
+          <button className={`nutri-modal-tab ${tab === 'search' ? 'active' : ''}`} onClick={() => setTab('search')}>Search Foods</button>
+          <button className={`nutri-modal-tab ${tab === 'custom' ? 'active' : ''}`} onClick={() => setTab('custom')}>Custom Food</button>
+        </div>
+
+        {tab === 'search' && (
+          <>
+            <input
+              ref={searchRef}
+              className="nutri-search-input"
+              placeholder="Search foods (e.g. chicken breast, banana)…"
+              value={query}
+              onChange={e => { setQuery(e.target.value); setSelected(null); }}
+            />
+
+            {searching && <p className="nutri-search-status">Searching…</p>}
+
+            {!selected && results.length > 0 && (
+              <div className="nutri-results-list">
+                {results.map((f, i) => (
+                  <div key={i} className="nutri-result-item" onClick={() => { setSelected(f); setServing(String(f.serving_size || 100)); }}>
+                    <div className="nutri-result-name">{f.name}</div>
+                    <div className="nutri-result-meta">
+                      {f.brand && <span>{f.brand} · </span>}
+                      <span>{Math.round(f.calories_per_100g)} cal/100g</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {selected && (
+              <div className="nutri-selected-food">
+                <div className="nutri-selected-name">{selected.name}</div>
+                {selected.brand && <div className="nutri-selected-brand">{selected.brand}</div>}
+
+                <div className="nutri-serving-row">
+                  <label>Serving size</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={serving}
+                    onChange={e => setServing(e.target.value)}
+                    className="nutri-serving-input"
+                  />
+                  <span>g</span>
+                </div>
+
+                {previewMacros && (
+                  <div className="nutri-preview-macros">
+                    <div className="nutri-preview-cal">{previewMacros.cal} <span>cal</span></div>
+                    <div className="nutri-preview-item"><span>P</span> {previewMacros.pro}g</div>
+                    <div className="nutri-preview-item"><span>C</span> {previewMacros.carb}g</div>
+                    <div className="nutri-preview-item"><span>F</span> {previewMacros.fat}g</div>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                  <button className="nutri-add-btn" onClick={addFood} disabled={adding}>
+                    {adding ? 'Adding…' : 'Add to Meal'}
+                  </button>
+                  <button className="nutri-cancel-btn" onClick={() => setSelected(null)}>Back</button>
+                </div>
+              </div>
+            )}
+
+            {!searching && query.length >= 2 && results.length === 0 && !selected && (
+              <p className="nutri-search-status">No results. Try a different term or create a custom food.</p>
+            )}
+          </>
+        )}
+
+        {tab === 'custom' && (
+          <div className="nutri-custom-form">
+            <div className="nutri-custom-field">
+              <label>Food Name *</label>
+              <input type="text" value={custom.name} onChange={e => setCustom(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Homemade Protein Bar" />
+            </div>
+            <div className="nutri-custom-field">
+              <label>Brand (optional)</label>
+              <input type="text" value={custom.brand} onChange={e => setCustom(f => ({ ...f, brand: e.target.value }))} />
+            </div>
+            <div className="nutri-custom-row">
+              <div className="nutri-custom-field">
+                <label>Serving size</label>
+                <input type="number" value={custom.serving_size} onChange={e => setCustom(f => ({ ...f, serving_size: e.target.value }))} />
+              </div>
+              <div className="nutri-custom-field">
+                <label>Unit</label>
+                <select value={custom.serving_unit} onChange={e => setCustom(f => ({ ...f, serving_unit: e.target.value }))}>
+                  <option value="g">g</option>
+                  <option value="ml">ml</option>
+                  <option value="oz">oz</option>
+                </select>
+              </div>
+            </div>
+            <p className="nutri-custom-hint">Enter values per 100g (or per 100ml for liquids)</p>
+            <div className="nutri-custom-row">
+              <div className="nutri-custom-field"><label>Calories *</label><input type="number" value={custom.calories_per_100g} onChange={e => setCustom(f => ({ ...f, calories_per_100g: e.target.value }))} /></div>
+              <div className="nutri-custom-field"><label>Protein (g)</label><input type="number" value={custom.protein_per_100g} onChange={e => setCustom(f => ({ ...f, protein_per_100g: e.target.value }))} /></div>
+            </div>
+            <div className="nutri-custom-row">
+              <div className="nutri-custom-field"><label>Carbs (g)</label><input type="number" value={custom.carbs_per_100g} onChange={e => setCustom(f => ({ ...f, carbs_per_100g: e.target.value }))} /></div>
+              <div className="nutri-custom-field"><label>Fat (g)</label><input type="number" value={custom.fat_per_100g} onChange={e => setCustom(f => ({ ...f, fat_per_100g: e.target.value }))} /></div>
+            </div>
+            <div className="nutri-custom-field"><label>Fiber (g)</label><input type="number" value={custom.fiber_per_100g} onChange={e => setCustom(f => ({ ...f, fiber_per_100g: e.target.value }))} /></div>
+            {customMsg && <p style={{ color: 'var(--color-danger)', fontSize: '0.85em' }}>{customMsg}</p>}
+            <button className="nutri-add-btn" onClick={saveCustomFood} disabled={customSaving} style={{ marginTop: 12, width: '100%' }}>
+              {customSaving ? 'Saving…' : 'Save & Add to Meal'}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MAIN NUTRITION PAGE
+// ═══════════════════════════════════════════════════════════════════════════
+export default function NutritionPage() {
+  const [date, setDate] = useState(toLocalDateStr());
+  const [meals, setMeals] = useState([]);
+  const [totals, setTotals] = useState({ total_calories: 0, total_protein: 0, total_carbs: 0, total_fat: 0, total_fiber: 0 });
+  const [goals, setGoals] = useState({ calories: 2000, protein: 150, carbs: 200, fat: 65, fiber: 25 });
+  const [loading, setLoading] = useState(true);
+  const [addingToMeal, setAddingToMeal] = useState(null); // meal_type string
+  const [expandedMeals, setExpandedMeals] = useState(new Set(MEAL_TYPES));
+
+  useEffect(() => {
+    fetch(`${API_BASE}/nutrition/goals`, {
+      headers: { Authorization: `Bearer ${token()}` },
+    })
+      .then(r => r.json())
+      .then(d => { if (d.targets) setGoals(d.targets); })
+      .catch(() => {});
+  }, []);
+
+  const fetchDay = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [mealsRes, totalsRes] = await Promise.all([
+        fetch(`${API_BASE}/nutrition/meals/${date}`, { headers: { Authorization: `Bearer ${token()}` } }),
+        fetch(`${API_BASE}/nutrition/daily/${date}`, { headers: { Authorization: `Bearer ${token()}` } }),
+      ]);
+      const mealsData = await mealsRes.json();
+      const totalsData = await totalsRes.json();
+      setMeals(mealsData.meals || []);
+      setTotals(totalsData);
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
+  }, [date]);
+
+  useEffect(() => { fetchDay(); }, [fetchDay]);
+
+  function changeDate(days) {
+    const d = new Date(date + 'T00:00:00');
+    d.setDate(d.getDate() + days);
+    setDate(toLocalDateStr(d));
+  }
+
+  async function removeMealFood(mealFoodId) {
+    await fetch(`${API_BASE}/nutrition/meal-foods/${mealFoodId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token()}` },
+    });
+    fetchDay();
+  }
+
+  async function removeMeal(mealId) {
+    await fetch(`${API_BASE}/nutrition/meals/${mealId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token()}` },
+    });
+    fetchDay();
+  }
+
+  function toggleMeal(type) {
+    setExpandedMeals(prev => {
+      const next = new Set(prev);
+      next.has(type) ? next.delete(type) : next.add(type);
+      return next;
+    });
+  }
+
+  // Calculate live totals from meal data (more accurate than DB summary)
+  const liveTotals = meals.reduce((acc, meal) => {
+    (meal.foods || []).forEach(f => {
+      acc.cal += f.calories || 0;
+      acc.pro += f.protein || 0;
+      acc.carb += f.carbs || 0;
+      acc.fat += f.fat || 0;
+      acc.fib += f.fiber || 0;
+    });
+    return acc;
+  }, { cal: 0, pro: 0, carb: 0, fat: 0, fib: 0 });
+
+  const mealsByType = MEAL_TYPES.reduce((acc, type) => {
+    acc[type] = meals.filter(m => m.meal_type === type);
+    return acc;
+  }, {});
+
+  const calRemaining = goals.calories - liveTotals.cal;
+  const isToday = date === toLocalDateStr();
+
+  return (
+    <div className="nutri-page">
+      {/* Date navigation */}
+      <div className="nutri-date-nav">
+        <button className="nutri-date-btn" onClick={() => changeDate(-1)}>‹</button>
+        <div className="nutri-date-center">
+          <span className="nutri-date-label">{isToday ? 'Today' : fmtDate(date)}</span>
+          {!isToday && (
+            <button className="nutri-today-btn" onClick={() => setDate(toLocalDateStr())}>Today</button>
+          )}
+        </div>
+        <button className="nutri-date-btn" onClick={() => changeDate(1)} disabled={isToday}>›</button>
+      </div>
+
+      {/* Macro summary */}
+      <div className="nutri-summary-card">
+        <div className="nutri-calorie-row">
+          <div className="nutri-calorie-main">
+            <span className="nutri-calorie-value">{Math.round(liveTotals.cal)}</span>
+            <span className="nutri-calorie-label">cal eaten</span>
+          </div>
+          <div className="nutri-calorie-divider" />
+          <div className="nutri-calorie-stat">
+            <span className="nutri-calorie-value">{goals.calories}</span>
+            <span className="nutri-calorie-label">goal</span>
+          </div>
+          <div className="nutri-calorie-divider" />
+          <div className="nutri-calorie-stat">
+            <span className="nutri-calorie-value" style={{ color: calRemaining < 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>
+              {Math.abs(Math.round(calRemaining))}
+            </span>
+            <span className="nutri-calorie-label">{calRemaining < 0 ? 'over' : 'remaining'}</span>
+          </div>
+        </div>
+
+        <div className="nutri-macro-bars">
+          <MacroBar label="Protein" current={round1(liveTotals.pro)} target={goals.protein} color="#3b82f6" />
+          <MacroBar label="Carbs" current={round1(liveTotals.carb)} target={goals.carbs} color="#f59e0b" />
+          <MacroBar label="Fat" current={round1(liveTotals.fat)} target={goals.fat} color="#ef4444" />
+          <MacroBar label="Fiber" current={round1(liveTotals.fib)} target={goals.fiber} color="#22c55e" />
+        </div>
+      </div>
+
+      {/* Meal sections */}
+      {loading ? (
+        <p className="nutri-loading">Loading…</p>
+      ) : (
+        <div className="nutri-meals">
+          {MEAL_TYPES.map(type => {
+            const typeMeals = mealsByType[type];
+            const expanded = expandedMeals.has(type);
+            const typeTotals = typeMeals.reduce((acc, meal) => {
+              (meal.foods || []).forEach(f => { acc.cal += f.calories || 0; acc.pro += f.protein || 0; acc.carb += f.carbs || 0; acc.fat += f.fat || 0; });
+              return acc;
+            }, { cal: 0, pro: 0, carb: 0, fat: 0 });
+
+            return (
+              <div key={type} className="nutri-meal-section">
+                <div className="nutri-meal-header" onClick={() => toggleMeal(type)}>
+                  <div className="nutri-meal-header-left">
+                    <span className="nutri-meal-chevron">{expanded ? '▾' : '▸'}</span>
+                    <span className="nutri-meal-title">{MEAL_LABELS[type]}</span>
+                  </div>
+                  <div className="nutri-meal-header-right">
+                    {typeTotals.cal > 0 && (
+                      <span className="nutri-meal-total-cal">{Math.round(typeTotals.cal)} cal</span>
+                    )}
+                    <button
+                      className="nutri-add-food-btn"
+                      onClick={e => { e.stopPropagation(); setAddingToMeal(type); }}
+                    >+ Add</button>
+                  </div>
+                </div>
+
+                {expanded && (
+                  <div className="nutri-meal-body">
+                    {typeMeals.length === 0 ? (
+                      <p className="nutri-meal-empty">Nothing logged yet.</p>
+                    ) : (
+                      typeMeals.map(meal => (
+                        <div key={meal.id} className="nutri-meal-group">
+                          {(meal.foods || []).map(f => (
+                            <div key={f.meal_food_id} className="nutri-food-row">
+                              <div className="nutri-food-info">
+                                <span className="nutri-food-name">{f.food_name}</span>
+                                <span className="nutri-food-serving">{f.serving_size}g</span>
+                              </div>
+                              <div className="nutri-food-macros">
+                                <span className="nutri-food-cal">{Math.round(f.calories)} cal</span>
+                                <span className="nutri-food-macro">P {round1(f.protein)}g</span>
+                                <span className="nutri-food-macro">C {round1(f.carbs)}g</span>
+                                <span className="nutri-food-macro">F {round1(f.fat)}g</span>
+                              </div>
+                              <button
+                                className="nutri-remove-btn"
+                                onClick={() => removeMealFood(f.meal_food_id)}
+                                title="Remove"
+                              >✕</button>
+                            </div>
+                          ))}
+                          {typeMeals.length > 1 && (
+                            <button className="nutri-delete-meal-btn" onClick={() => removeMeal(meal.id)}>
+                              Delete meal entry
+                            </button>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Food search modal */}
+      {addingToMeal && (
+        <FoodSearchModal
+          mealType={addingToMeal}
+          mealDate={date}
+          onClose={() => setAddingToMeal(null)}
+          onAdded={fetchDay}
+        />
+      )}
+    </div>
+  );
+}
