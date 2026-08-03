@@ -43,7 +43,8 @@ async function searchFoods(query, options = {}) {
     };
 
     if (dataType) {
-      params.dataType = dataType;
+      // USDA API expects comma-separated string, not an array
+      params.dataType = Array.isArray(dataType) ? dataType.join(',') : dataType;
     }
 
     const response = await axios.get(`${USDA_API_BASE}/foods/search`, { params });
@@ -195,3 +196,4 @@ module.exports = {
   getFoodById,
   parseNutrients
 };
+

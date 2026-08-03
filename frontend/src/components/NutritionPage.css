@@ -600,6 +600,17 @@
   padding: 3px 8px;
   cursor: pointer;
 }
+.nutri-water-undo-btn {
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+.nutri-water-undo-btn:hover { background: var(--bg-secondary); }
 .nutri-water-goal-edit {
   display: flex;
   align-items: center;
@@ -616,7 +627,7 @@
   font-size: var(--font-size-sm);
 }
 .nutri-water-progress {
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 .nutri-water-track {
   height: 10px;
@@ -629,37 +640,94 @@
   height: 100%;
   background: #3b82f6;
   border-radius: 5px;
-  transition: width 0.3s ease;
+  transition: width 0.4s ease;
 }
 .nutri-water-stats {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
-.nutri-water-presets {
+
+/* ── Vessel + preset selector ────────────────────────────────────────────── */
+.nutri-water-action-row {
   display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  position: relative;
 }
-.nutri-water-preset {
-  padding: 5px 10px;
+.nutri-water-vessel-btn {
   background: none;
-  border: 1px solid #3b82f6;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 16px;
+  border-radius: var(--radius-lg);
+  transition: background var(--transition-fast);
+}
+.nutri-water-vessel-btn:hover { background: var(--bg-secondary); }
+.nutri-water-vessel-hint {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+.nutri-water-preset-wrapper {
+  position: absolute;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.nutri-water-preset-toggle {
+  background: none;
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  color: #3b82f6;
+  color: var(--text-secondary);
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  font-size: 0.7em;
+  transition: transform var(--transition-fast), background var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.nutri-water-preset-toggle.open {
+  transform: rotate(180deg);
+  background: var(--bg-secondary);
+}
+.nutri-water-preset-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 6px;
+  box-shadow: var(--shadow-lg);
+  position: absolute;
+  right: 36px;
+  bottom: 0;
+  z-index: 20;
+}
+.nutri-water-preset-option {
+  padding: 6px 14px;
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
   font-size: var(--font-size-xs);
   cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast);
+  white-space: nowrap;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+  text-align: left;
 }
-.nutri-water-preset:hover {
-  background: #3b82f6;
-  color: white;
+.nutri-water-preset-option:hover { background: var(--bg-secondary); }
+.nutri-water-preset-option.active {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  font-weight: var(--font-weight-semibold);
 }
-.nutri-water-preset.danger {
-  border-color: var(--color-danger);
-  color: var(--color-danger);
-}
-.nutri-water-preset.danger:hover {
-  background: var(--color-danger);
-  color: white;
-}
+

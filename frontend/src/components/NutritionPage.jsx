@@ -97,28 +97,114 @@ function MealMacroBar({ label, current, target, color }) {
   );
 }
 
+// ── Water SVG components ──────────────────────────────────────────────────
+function GlassSVG({ oz, fillPct }) {
+  const fill = Math.min(1, fillPct);
+  const glassH = 52;
+  const waterH = glassH * fill;
+  const waterY = 8 + glassH - waterH;
+  return (
+    <svg width="48" height="72" viewBox="0 0 48 72" xmlns="http://www.w3.org/2000/svg">
+      {/* Glass body */}
+      <path d="M10 8 L8 60 Q8 64 12 64 L36 64 Q40 64 40 60 L38 8 Z"
+        fill="none" stroke="var(--border-color)" strokeWidth="1.5" />
+      {/* Water fill */}
+      {fill > 0 && (
+        <clipPath id="glass-clip">
+          <path d="M10 8 L8 60 Q8 64 12 64 L36 64 Q40 64 40 60 L38 8 Z" />
+        </clipPath>
+      )}
+      {fill > 0 && (
+        <rect x="8" y={waterY} width="32" height={waterH + 4}
+          fill="#3b82f6" opacity="0.35" clipPath="url(#glass-clip)" />
+      )}
+      {/* Oz label */}
+      <text x="24" y="40" textAnchor="middle" fontSize="11" fontWeight="700"
+        fill="var(--text-primary)">{oz}</text>
+      <text x="24" y="52" textAnchor="middle" fontSize="8"
+        fill="var(--text-secondary)">oz</text>
+    </svg>
+  );
+}
+
+function BottleSVG({ oz, fillPct }) {
+  const fill = Math.min(1, fillPct);
+  const bodyH = 44;
+  const waterH = bodyH * fill;
+  const waterY = 20 + bodyH - waterH;
+  return (
+    <svg width="48" height="72" viewBox="0 0 48 72" xmlns="http://www.w3.org/2000/svg">
+      {/* Bottle cap */}
+      <rect x="18" y="4" width="12" height="8" rx="2"
+        fill="none" stroke="var(--border-color)" strokeWidth="1.5" />
+      {/* Bottle neck */}
+      <path d="M16 12 L14 20 L34 20 L32 12 Z"
+        fill="none" stroke="var(--border-color)" strokeWidth="1.5" />
+      {/* Bottle body */}
+      <rect x="10" y="20" width="28" height={bodyH} rx="4"
+        fill="none" stroke="var(--border-color)" strokeWidth="1.5" />
+      {/* Water fill */}
+      {fill > 0 && (
+        <>
+          <clipPath id="bottle-clip">
+            <rect x="10" y="20" width="28" height={bodyH} rx="4" />
+          </clipPath>
+          <rect x="10" y={waterY} width="28" height={waterH + 4}
+            fill="#3b82f6" opacity="0.35" clipPath="url(#bottle-clip)" />
+        </>
+      )}
+      {/* Oz label */}
+      <text x="24" y="46" textAnchor="middle" fontSize="11" fontWeight="700"
+        fill="var(--text-primary)">{oz}</text>
+      <text x="24" y="57" textAnchor="middle" fontSize="8"
+        fill="var(--text-secondary)">oz</text>
+    </svg>
+  );
+}
+
 // ── Water tracker ─────────────────────────────────────────────────────────
-const WATER_PRESETS = [4, 8, 12, 16, 24, 32, 48]; // oz
+const WATER_PRESETS_ALL = [4, 8, 12, 16, 24, 32, 48]; // oz
 
 function WaterTracker({ date }) {
-  const [consumed, setConsumed] = useState(0); // in oz
-  const [goal, setGoal] = useState(64); // oz default (8 cups)
+  const [consumed, setConsumed] = useState(0);
+  const [history, setHistory] = useState([]); // undo stack
+  const [goal, setGoal] = useState(64);
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalInput, setGoalInput] = useState('64');
+  const [selectedPreset, setSelectedPreset] = useState(8);
+  const [presetsOpen, setPresetsOpen] = useState(false);
   const storageKey = `ripfit_water_${date}`;
   const goalKey = 'ripfit_water_goal';
+  const presetKey = 'ripfit_water_preset';
 
   useEffect(() => {
     const saved = localStorage.getItem(storageKey);
     const savedGoal = localStorage.getItem(goalKey);
+    const savedPreset = localStorage.getItem(presetKey);
     if (saved) setConsumed(parseFloat(saved) || 0);
     if (savedGoal) { setGoal(parseFloat(savedGoal) || 64); setGoalInput(savedGoal); }
+    if (savedPreset) setSelectedPreset(parseFloat(savedPreset) || 8);
   }, [date]);
 
   function addWater(oz) {
-    const newVal = Math.max(0, consumed + oz);
+    setHistory(h => [...h, consumed]);
+    const newVal = consumed + oz;
     setConsumed(newVal);
     localStorage.setItem(storageKey, String(newVal));
+  }
+
+  function undo() {
+    if (history.length === 0) return;
+    const prev = history[history.length - 1];
+    setHistory(h => h.slice(0, -1));
+    setConsumed(prev);
+    localStorage.setItem(storageKey, String(prev));
+  }
+
+  function selectPreset(oz) {
+    setSelectedPreset(oz);
+    setPresetsOpen(false);
+    localStorage.setItem(presetKey, String(oz));
   }
 
   function saveGoal() {
@@ -128,49 +214,81 @@ function WaterTracker({ date }) {
     setEditingGoal(false);
   }
 
-  const pct = Math.min(100, goal > 0 ? (consumed / goal) * 100 : 0);
+  const pct = Math.min(1, goal > 0 ? consumed / goal : 0);
   const remaining = Math.max(0, goal - consumed);
+  const isBottle = selectedPreset >= 16;
 
   return (
     <div className="nutri-water-card">
       <div className="nutri-water-header">
-        <span className="nutri-water-title">💧 Water</span>
-        <button className="nutri-water-goal-btn" onClick={() => setEditingGoal(e => !e)}>
-          Goal: {goal} oz
-        </button>
+        <span className="nutri-water-title">Water Intake</span>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {history.length > 0 && (
+            <button className="nutri-water-undo-btn" onClick={undo} title="Undo last entry">
+              ↩ Undo
+            </button>
+          )}
+          <button className="nutri-water-goal-btn" onClick={() => setEditingGoal(e => !e)}>
+            Goal: {goal} oz
+          </button>
+        </div>
       </div>
 
       {editingGoal && (
         <div className="nutri-water-goal-edit">
-          <input
-            type="number"
-            value={goalInput}
-            onChange={e => setGoalInput(e.target.value)}
-            className="nutri-water-goal-input"
-            min={1}
-          />
+          <input type="number" value={goalInput} onChange={e => setGoalInput(e.target.value)}
+            className="nutri-water-goal-input" min={1} />
           <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>oz</span>
           <button className="nutri-add-btn" style={{ padding: '6px 12px', fontSize: 'var(--font-size-xs)' }} onClick={saveGoal}>Save</button>
         </div>
       )}
 
+      {/* Progress bar */}
       <div className="nutri-water-progress">
         <div className="nutri-water-track">
-          <div className="nutri-water-fill" style={{ width: `${pct}%` }} />
+          <div className="nutri-water-fill" style={{ width: `${pct * 100}%` }} />
         </div>
         <div className="nutri-water-stats">
           <span style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--text-primary)' }}>{consumed} oz</span>
-          <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-xs)' }}>{remaining} oz remaining</span>
+          <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-xs)' }}>
+            {remaining > 0 ? `${remaining} oz remaining` : '🎉 Goal reached!'}
+          </span>
         </div>
       </div>
 
-      <div className="nutri-water-presets">
-        {WATER_PRESETS.map(oz => (
-          <button key={oz} className="nutri-water-preset" onClick={() => addWater(oz)}>+{oz}</button>
-        ))}
-        {consumed > 0 && (
-          <button className="nutri-water-preset danger" onClick={() => addWater(-consumed)} title="Reset">↺</button>
-        )}
+      {/* SVG + add button + preset selector */}
+      <div className="nutri-water-action-row">
+        {/* Clickable vessel SVG — adds water */}
+        <button className="nutri-water-vessel-btn" onClick={() => addWater(selectedPreset)} title={`Add ${selectedPreset} oz`}>
+          {isBottle
+            ? <BottleSVG oz={selectedPreset} fillPct={pct} />
+            : <GlassSVG oz={selectedPreset} fillPct={pct} />}
+          <span className="nutri-water-vessel-hint">tap to add</span>
+        </button>
+
+        {/* Preset selector — slides out */}
+        <div className="nutri-water-preset-wrapper">
+          <button
+            className={`nutri-water-preset-toggle ${presetsOpen ? 'open' : ''}`}
+            onClick={() => setPresetsOpen(o => !o)}
+            title="Choose amount"
+          >
+            ◀
+          </button>
+          {presetsOpen && (
+            <div className="nutri-water-preset-panel">
+              {WATER_PRESETS_ALL.map(oz => (
+                <button
+                  key={oz}
+                  className={`nutri-water-preset-option ${selectedPreset === oz ? 'active' : ''}`}
+                  onClick={() => selectPreset(oz)}
+                >
+                  {oz} oz
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
