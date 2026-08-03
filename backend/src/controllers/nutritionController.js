@@ -640,12 +640,21 @@ const debugUSDA = async (req, res) => {
       if (key) mapped[key] = n.value;
     });
 
+    // Dump all nutrient IDs to find energy
+    const allIds = allNutrients.map(n => ({
+      id: n.nutrientId,
+      num: n.nutrientNumber,
+      name: n.nutrientName,
+      val: n.value,
+    })).sort((a, b) => (a.id || 0) - (b.id || 0));
+
     res.json({
       description: food.description,
       dataType: food.dataType,
       total_nutrient_count: totalCount,
       key_nutrients_found: keyNutrients,
       mapping_result: mapped,
+      all_ids_sorted: allIds,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
