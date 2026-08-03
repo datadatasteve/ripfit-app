@@ -591,6 +591,91 @@ function FoodSearchModal({ mealType, mealDate, onClose, onAdded }) {
   );
 }
 
+// ── MealSection — extracted so useState is at component top level ──────────
+function MealSection({ type, typeMeals, goals, date, onAdd, onRemoveFood }) {
+  const [expanded, setExpanded] = useState(true);
+  const [macroExpanded, setMacroExpanded] = useState(false);
+
+  const typeTotals = typeMeals.reduce((acc, meal) => {
+    (meal.foods || []).forEach(f => {
+      acc.cal  += f.calories || 0;
+      acc.pro  += f.protein  || 0;
+      acc.carb += f.carbs    || 0;
+      acc.fat  += f.fat      || 0;
+    });
+    return acc;
+  }, { cal: 0, pro: 0, carb: 0, fat: 0 });
+
+  return (
+    <div className="nutri-meal-section">
+      <div className="nutri-meal-header" onClick={() => setExpanded(e => !e)}>
+        <div className="nutri-meal-header-left">
+          <span className="nutri-meal-chevron">{expanded ? '▾' : '▸'}</span>
+          <span className="nutri-meal-title">{MEAL_LABELS[type]}</span>
+        </div>
+        <div className="nutri-meal-header-right">
+          {typeTotals.cal > 0 && (
+            <span className="nutri-meal-total-cal">{Math.round(typeTotals.cal)} cal</span>
+          )}
+          <button
+            className="nutri-add-food-btn"
+            onClick={e => { e.stopPropagation(); onAdd(type); }}
+          >+ Add</button>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="nutri-meal-body">
+          {typeTotals.cal > 0 && (
+            <>
+              <div className="nutri-meal-ratio-row">
+                <MacroRatioBar protein={typeTotals.pro} carbs={typeTotals.carb} fat={typeTotals.fat} />
+                <button className="nutri-macro-toggle" onClick={() => setMacroExpanded(e => !e)}>
+                  {macroExpanded ? '▴' : '▾'} macros
+                </button>
+              </div>
+              {macroExpanded && (
+                <div className="nutri-meal-macro-bars">
+                  <MealMacroBar current={round1(typeTotals.pro)} target={Math.round(goals.protein / 4)} color="#3b82f6" label="P" />
+                  <MealMacroBar current={round1(typeTotals.carb)} target={Math.round(goals.carbs / 4)} color="#f59e0b" label="C" />
+                  <MealMacroBar current={round1(typeTotals.fat)} target={Math.round(goals.fat / 4)} color="#ef4444" label="F" />
+                </div>
+              )}
+            </>
+          )}
+          {typeMeals.length === 0 ? (
+            <p className="nutri-meal-empty">Nothing logged yet.</p>
+          ) : (
+            typeMeals.map(meal => (
+              <div key={meal.id} className="nutri-meal-group">
+                {(meal.foods || []).map(f => (
+                  <div key={f.meal_food_id} className="nutri-food-row">
+                    <div className="nutri-food-info">
+                      <span className="nutri-food-name">{f.food_name}</span>
+                      <span className="nutri-food-serving">{f.serving_size}{f.serving_unit || 'g'}</span>
+                    </div>
+                    <div className="nutri-food-macros">
+                      <span className="nutri-food-cal">{Math.round(f.calories)} cal</span>
+                      <span className="nutri-food-macro" style={{ color: '#3b82f6' }}>P {round1(f.protein)}g</span>
+                      <span className="nutri-food-macro" style={{ color: '#f59e0b' }}>C {round1(f.carbs)}g</span>
+                      <span className="nutri-food-macro" style={{ color: '#ef4444' }}>F {round1(f.fat)}g</span>
+                    </div>
+                    <button
+                      className="nutri-remove-btn"
+                      onClick={() => onRemoveFood(f.meal_food_id)}
+                      title="Remove"
+                    >✕</button>
+                  </div>
+                ))}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN NUTRITION PAGE
 // ═══════════════════════════════════════════════════════════════════════════
@@ -601,7 +686,6 @@ export default function NutritionPage() {
   const [goals, setGoals] = useState({ calories: 2000, protein: 150, carbs: 200, fat: 65, fiber: 25 });
   const [loading, setLoading] = useState(true);
   const [addingToMeal, setAddingToMeal] = useState(null); // meal_type string
-  const [expandedMeals, setExpandedMeals] = useState(new Set(MEAL_TYPES));
 
   useEffect(() => {
     fetch(`${API_BASE}/nutrition/goals`, {
@@ -651,13 +735,6 @@ export default function NutritionPage() {
     fetchDay();
   }
 
-  function toggleMeal(type) {
-    setExpandedMeals(prev => {
-      const next = new Set(prev);
-      next.has(type) ? next.delete(type) : next.add(type);
-      return next;
-    });
-  }
 
   // Calculate live totals from meal data (more accurate than DB summary)
   const liveTotals = meals.reduce((acc, meal) => {
@@ -771,88 +848,17 @@ export default function NutritionPage() {
         <p className="nutri-loading">Loading…</p>
       ) : (
         <div className="nutri-meals">
-          {MEAL_TYPES.map(type => {
-            const typeMeals = mealsByType[type];
-            const expanded = expandedMeals.has(type);
-            const typeTotals = typeMeals.reduce((acc, meal) => {
-              (meal.foods || []).forEach(f => { acc.cal += f.calories || 0; acc.pro += f.protein || 0; acc.carb += f.carbs || 0; acc.fat += f.fat || 0; });
-              return acc;
-            }, { cal: 0, pro: 0, carb: 0, fat: 0 });
-
-            return (
-              <div key={type} className="nutri-meal-section">
-                <div className="nutri-meal-header" onClick={() => toggleMeal(type)}>
-                  <div className="nutri-meal-header-left">
-                    <span className="nutri-meal-chevron">{expanded ? '▾' : '▸'}</span>
-                    <span className="nutri-meal-title">{MEAL_LABELS[type]}</span>
-                  </div>
-                  <div className="nutri-meal-header-right">
-                    {typeTotals.cal > 0 && (
-                      <span className="nutri-meal-total-cal">{Math.round(typeTotals.cal)} cal</span>
-                    )}
-                    <button
-                      className="nutri-add-food-btn"
-                      onClick={e => { e.stopPropagation(); setAddingToMeal(type); }}
-                    >+ Add</button>
-                  </div>
-                </div>
-
-                {expanded && (() => {
-                  const [macroExpanded, setMacroExpanded] = useState(false);
-                  return (
-                  <div className="nutri-meal-body">
-                    {typeTotals.cal > 0 && (
-                      <>
-                        {/* Macro ratio bar — always visible */}
-                        <div className="nutri-meal-ratio-row">
-                          <MacroRatioBar protein={typeTotals.pro} carbs={typeTotals.carb} fat={typeTotals.fat} />
-                          <button className="nutri-macro-toggle" onClick={() => setMacroExpanded(e => !e)}>
-                            {macroExpanded ? '▴' : '▾'} macros
-                          </button>
-                        </div>
-                        {/* Collapsible detailed macro bars */}
-                        {macroExpanded && (
-                          <div className="nutri-meal-macro-bars">
-                            <MealMacroBar current={round1(typeTotals.pro)} target={Math.round(goals.protein / 4)} color="#3b82f6" label="P" />
-                            <MealMacroBar current={round1(typeTotals.carb)} target={Math.round(goals.carbs / 4)} color="#f59e0b" label="C" />
-                            <MealMacroBar current={round1(typeTotals.fat)} target={Math.round(goals.fat / 4)} color="#ef4444" label="F" />
-                          </div>
-                        )}
-                      </>
-                    )}
-                    {typeMeals.length === 0 ? (
-                      <p className="nutri-meal-empty">Nothing logged yet.</p>
-                    ) : (
-                      typeMeals.map(meal => (
-                        <div key={meal.id} className="nutri-meal-group">
-                          {(meal.foods || []).map(f => (
-                            <div key={f.meal_food_id} className="nutri-food-row">
-                              <div className="nutri-food-info">
-                                <span className="nutri-food-name">{f.food_name}</span>
-                                <span className="nutri-food-serving">{f.serving_size}{f.serving_unit || 'g'}</span>
-                              </div>
-                              <div className="nutri-food-macros">
-                                <span className="nutri-food-cal">{Math.round(f.calories)} cal</span>
-                                <span className="nutri-food-macro" style={{ color: '#3b82f6' }}>P {round1(f.protein)}g</span>
-                                <span className="nutri-food-macro" style={{ color: '#f59e0b' }}>C {round1(f.carbs)}g</span>
-                                <span className="nutri-food-macro" style={{ color: '#ef4444' }}>F {round1(f.fat)}g</span>
-                              </div>
-                              <button
-                                className="nutri-remove-btn"
-                                onClick={() => removeMealFood(f.meal_food_id)}
-                                title="Remove"
-                              >✕</button>
-                            </div>
-                          ))}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                  );
-                })()}
-              </div>
-            );
-          })}
+          {MEAL_TYPES.map(type => (
+            <MealSection
+              key={type}
+              type={type}
+              typeMeals={mealsByType[type]}
+              goals={goals}
+              date={date}
+              onAdd={setAddingToMeal}
+              onRemoveFood={removeMealFood}
+            />
+          ))}
         </div>
       )}
 
