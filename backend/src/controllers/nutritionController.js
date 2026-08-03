@@ -355,6 +355,8 @@ const searchUSDA = async (req, res) => {
     const results = { foods };
 
     // Normalize to a consistent shape the frontend can use
+    // DEBUG: log first food's nutrients to see field structure
+    if (foods && foods[0]) console.log('[USDA DEBUG] first food nutrients:', JSON.stringify(foods[0].foodNutrients?.slice(0,4)));
     const foodList = (foods || []).map(f => {
       const nutrients = {};
       if (f.foodNutrients) {
