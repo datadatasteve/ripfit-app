@@ -77,6 +77,29 @@ function MacroBar({ label, current, target, color }) {
   );
 }
 
+// ── Macro ratio stacked bar (shows proportion of P/C/F in a meal) ─────────
+function MacroRatioBar({ protein, carbs, fat }) {
+  const total = (protein * 4) + (carbs * 4) + (fat * 9); // calories from each
+  if (total === 0) return null;
+  const pPct = (protein * 4 / total) * 100;
+  const cPct = (carbs * 4 / total) * 100;
+  const fPct = (fat * 9 / total) * 100;
+  return (
+    <div className="macro-ratio-bar-wrapper">
+      <div className="macro-ratio-bar">
+        <div style={{ width: `${pPct}%`, background: '#3b82f6', borderRadius: '3px 0 0 3px' }} title={`Protein ${Math.round(pPct)}%`} />
+        <div style={{ width: `${cPct}%`, background: '#f59e0b' }} title={`Carbs ${Math.round(cPct)}%`} />
+        <div style={{ width: `${fPct}%`, background: '#ef4444', borderRadius: '0 3px 3px 0' }} title={`Fat ${Math.round(fPct)}%`} />
+      </div>
+      <div className="macro-ratio-legend">
+        <span style={{ color: '#3b82f6' }}>P {Math.round(pPct)}%</span>
+        <span style={{ color: '#f59e0b' }}>C {Math.round(cPct)}%</span>
+        <span style={{ color: '#ef4444' }}>F {Math.round(fPct)}%</span>
+      </div>
+    </div>
+  );
+}
+
 // ── Meal-level compact macro bar ─────────────────────────────────────────
 function MealMacroBar({ label, current, target, color }) {
   const pct = Math.min(100, target > 0 ? (current / target) * 100 : 0);
@@ -100,28 +123,30 @@ function MealMacroBar({ label, current, target, color }) {
 // ── Water SVG components ──────────────────────────────────────────────────
 function GlassSVG({ oz, fillPct }) {
   const fill = Math.min(1, fillPct);
-  const glassH = 52;
+  // Glass: wide at top (x=8..40), narrow at bottom (x=14..34), height 52
+  const topY = 8, botY = 62;
+  const glassH = botY - topY;
   const waterH = glassH * fill;
-  const waterY = 8 + glassH - waterH;
+  const waterY = botY - waterH;
+  const clipId = `glass-clip-${oz}`;
   return (
     <svg width="48" height="72" viewBox="0 0 48 72" xmlns="http://www.w3.org/2000/svg">
-      {/* Glass body */}
-      <path d="M10 8 L8 60 Q8 64 12 64 L36 64 Q40 64 40 60 L38 8 Z"
+      <defs>
+        <clipPath id={clipId}>
+          <polygon points={`8,${topY} 40,${topY} 34,${botY} 14,${botY}`} />
+        </clipPath>
+      </defs>
+      {/* Glass outline */}
+      <polygon points={`8,${topY} 40,${topY} 34,${botY} 14,${botY}`}
         fill="none" stroke="var(--border-color)" strokeWidth="1.5" />
       {/* Water fill */}
       {fill > 0 && (
-        <clipPath id="glass-clip">
-          <path d="M10 8 L8 60 Q8 64 12 64 L36 64 Q40 64 40 60 L38 8 Z" />
-        </clipPath>
+        <rect x="0" y={waterY} width="48" height={waterH + 2}
+          fill="#3b82f6" opacity="0.35" clipPath={`url(#${clipId})`} />
       )}
-      {fill > 0 && (
-        <rect x="8" y={waterY} width="32" height={waterH + 4}
-          fill="#3b82f6" opacity="0.35" clipPath="url(#glass-clip)" />
-      )}
-      {/* Oz label */}
-      <text x="24" y="40" textAnchor="middle" fontSize="11" fontWeight="700"
+      <text x="24" y="38" textAnchor="middle" fontSize="11" fontWeight="700"
         fill="var(--text-primary)">{oz}</text>
-      <text x="24" y="52" textAnchor="middle" fontSize="8"
+      <text x="24" y="50" textAnchor="middle" fontSize="8"
         fill="var(--text-secondary)">oz</text>
     </svg>
   );
@@ -233,7 +258,6 @@ function WaterTracker({ date }) {
           </button>
         </div>
       </div>
-
       {editingGoal && (
         <div className="nutri-water-goal-edit">
           <input type="number" value={goalInput} onChange={e => setGoalInput(e.target.value)}
@@ -652,7 +676,25 @@ export default function NutritionPage() {
     return acc;
   }, {});
 
+  const [editingGoals, setEditingGoals] = useState(false);
+  const [goalInput, setGoalInput] = useState({ calories: '', protein: '', carbs: '', fat: '', fiber: '' });
   const calRemaining = goals.calories - liveTotals.cal;
+
+  function openGoalEdit() {
+    setGoalInput({ calories: String(goals.calories), protein: String(goals.protein), carbs: String(goals.carbs), fat: String(goals.fat), fiber: String(goals.fiber) });
+    setEditingGoals(true);
+  }
+  function saveGoals() {
+    setGoals({
+      calories: parseInt(goalInput.calories) || goals.calories,
+      protein:  parseInt(goalInput.protein)  || goals.protein,
+      carbs:    parseInt(goalInput.carbs)    || goals.carbs,
+      fat:      parseInt(goalInput.fat)      || goals.fat,
+      fiber:    parseInt(goalInput.fiber)    || goals.fiber,
+    });
+    setEditingGoals(false);
+    // TODO: persist to user profile via PUT /users/me when nutrition_goals column exists
+  }
   const isToday = date === toLocalDateStr();
 
   return (
@@ -671,6 +713,29 @@ export default function NutritionPage() {
 
       {/* Macro summary */}
       <div className="nutri-summary-card">
+        <div className="nutri-summary-header">
+          <span className="nutri-summary-title">Daily Totals</span>
+          <button className="nutri-edit-goals-btn" onClick={openGoalEdit}>Edit Goals</button>
+        </div>
+
+        {editingGoals && (
+          <div className="nutri-goal-edit-grid">
+            {[['calories','Calories','kcal'],['protein','Protein','g'],['carbs','Carbs','g'],['fat','Fat','g'],['fiber','Fiber','g']].map(([key, label, unit]) => (
+              <div key={key} className="nutri-goal-edit-field">
+                <label>{label}</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <input type="number" value={goalInput[key]} onChange={e => setGoalInput(g => ({ ...g, [key]: e.target.value }))} className="nutri-goal-input" />
+                  <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)' }}>{unit}</span>
+                </div>
+              </div>
+            ))}
+            <div style={{ gridColumn: '1/-1', display: 'flex', gap: 8 }}>
+              <button className="nutri-add-btn" style={{ padding: '8px 20px' }} onClick={saveGoals}>Save</button>
+              <button className="nutri-cancel-btn" onClick={() => setEditingGoals(false)}>Cancel</button>
+            </div>
+          </div>
+        )}
+
         <div className="nutri-calorie-row">
           <div className="nutri-calorie-main">
             <span className="nutri-calorie-value">{Math.round(liveTotals.cal)}</span>
@@ -732,14 +797,28 @@ export default function NutritionPage() {
                   </div>
                 </div>
 
-                {expanded && (
+                {expanded && (() => {
+                  const [macroExpanded, setMacroExpanded] = useState(false);
+                  return (
                   <div className="nutri-meal-body">
                     {typeTotals.cal > 0 && (
-                      <div className="nutri-meal-macro-bars">
-                        <MealMacroBar current={round1(typeTotals.pro)} target={Math.round(goals.protein / 4)} color="#3b82f6" label="P" />
-                        <MealMacroBar current={round1(typeTotals.carb)} target={Math.round(goals.carbs / 4)} color="#f59e0b" label="C" />
-                        <MealMacroBar current={round1(typeTotals.fat)} target={Math.round(goals.fat / 4)} color="#ef4444" label="F" />
-                      </div>
+                      <>
+                        {/* Macro ratio bar — always visible */}
+                        <div className="nutri-meal-ratio-row">
+                          <MacroRatioBar protein={typeTotals.pro} carbs={typeTotals.carb} fat={typeTotals.fat} />
+                          <button className="nutri-macro-toggle" onClick={() => setMacroExpanded(e => !e)}>
+                            {macroExpanded ? '▴' : '▾'} macros
+                          </button>
+                        </div>
+                        {/* Collapsible detailed macro bars */}
+                        {macroExpanded && (
+                          <div className="nutri-meal-macro-bars">
+                            <MealMacroBar current={round1(typeTotals.pro)} target={Math.round(goals.protein / 4)} color="#3b82f6" label="P" />
+                            <MealMacroBar current={round1(typeTotals.carb)} target={Math.round(goals.carbs / 4)} color="#f59e0b" label="C" />
+                            <MealMacroBar current={round1(typeTotals.fat)} target={Math.round(goals.fat / 4)} color="#ef4444" label="F" />
+                          </div>
+                        )}
+                      </>
                     )}
                     {typeMeals.length === 0 ? (
                       <p className="nutri-meal-empty">Nothing logged yet.</p>
@@ -769,7 +848,8 @@ export default function NutritionPage() {
                       ))
                     )}
                   </div>
-                )}
+                  );
+                })()}
               </div>
             );
           })}

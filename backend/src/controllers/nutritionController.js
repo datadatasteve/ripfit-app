@@ -358,10 +358,20 @@ const searchUSDA = async (req, res) => {
     const foodList = (foods || []).map(f => {
       const nutrients = {};
       if (f.foodNutrients) {
-        const map = { 1008: 'calories', 1003: 'protein', 1004: 'fat', 1005: 'carbs', 1079: 'fiber', 2000: 'sugar' };
+        // USDA search uses nutrientNumber (string e.g. "208") not nutrientId (int)
+        // Map covers both formats
+        const map = {
+          '208': 'calories', '1008': 'calories',
+          '203': 'protein',  '1003': 'protein',
+          '204': 'fat',      '1004': 'fat',
+          '205': 'carbs',    '1005': 'carbs',
+          '291': 'fiber',    '1079': 'fiber',
+          '269': 'sugar',    '2000': 'sugar',
+        };
         f.foodNutrients.forEach(n => {
-          const key = map[n.nutrientId || n.nutrientNumber];
-          if (key) nutrients[key] = n.value || 0;
+          const id = String(n.nutrientId || n.nutrientNumber || '');
+          const key = map[id];
+          if (key && n.value != null) nutrients[key] = n.value;
         });
       }
       return {

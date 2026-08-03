@@ -731,3 +731,110 @@
   font-weight: var(--font-weight-semibold);
 }
 
+/* ── Goal editing ────────────────────────────────────────────────────────── */
+.nutri-summary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.nutri-summary-title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.nutri-edit-goals-btn {
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--color-primary);
+  font-size: var(--font-size-xs);
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+.nutri-edit-goals-btn:hover { background: var(--bg-secondary); }
+.nutri-goal-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+}
+.nutri-goal-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.nutri-goal-edit-field label {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.nutri-goal-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+}
+.nutri-goal-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+/* ── Macro ratio bar ─────────────────────────────────────────────────────── */
+.macro-ratio-bar-wrapper {
+  flex: 1;
+}
+.macro-ratio-bar {
+  height: 8px;
+  display: flex;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--bg-tertiary);
+  gap: 1px;
+}
+.macro-ratio-legend {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+}
+.nutri-meal-ratio-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-color);
+}
+.nutri-macro-toggle {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  white-space: nowrap;
+  padding: 0;
+  flex-shrink: 0;
+}
+.nutri-macro-toggle:hover { color: var(--text-secondary); }
+
+/* ── Goal edit panel position (water) ───────────────────────────────────── */
+.nutri-water-goal-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  justify-content: flex-end;
+}
