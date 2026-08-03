@@ -369,9 +369,23 @@ const searchUSDA = async (req, res) => {
           '269': 'sugar',    '2000': 'sugar',
         };
         f.foodNutrients.forEach(n => {
-          const id = String(n.nutrientId || n.nutrientNumber || '');
+          // USDA uses different field names across data types:
+          // Foundation: nutrientId (int), SR Legacy: nutrientId, Branded: nutrientNumber (string)
+          // Some endpoints also use n.number or n.nutrient.number
+          const rawId = n.nutrientId ?? n.nutrientNumber ?? n.number ?? n.nutrient?.number ?? '';
+          const id = String(rawId);
           const key = map[id];
           if (key && n.value != null) nutrients[key] = n.value;
+          // Also try matching by nutrientName as fallback
+          if (!key && n.nutrientName) {
+            const nameMap = {
+              'Energy': 'calories', 'Protein': 'protein',
+              'Total lipid (fat)': 'fat', 'Carbohydrate, by difference': 'carbs',
+              'Fiber, total dietary': 'fiber', 'Sugars, total': 'sugar',
+            };
+            const nameKey = nameMap[n.nutrientName];
+            if (nameKey && n.value != null) nutrients[nameKey] = n.value;
+          }
         });
       }
       return {
