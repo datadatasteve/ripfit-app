@@ -598,6 +598,29 @@ const getNutritionGoals = async (req, res) => {
 };
 
 // ============================================================================
+// DEBUG ENDPOINT (remove after fixing nutrient mapping)
+// GET /api/v1/nutrition/debug/usda?q=chicken
+// ============================================================================
+const debugUSDA = async (req, res) => {
+  const { q = 'chicken breast' } = req.query;
+  try {
+    const result = await usdaApi.searchFoods(q, {
+      dataType: ['Foundation'],
+      pageSize: 1,
+    });
+    const food = result.foods?.[0];
+    if (!food) return res.json({ error: 'no results', raw: result });
+    res.json({
+      description: food.description,
+      dataType: food.dataType,
+      first_8_nutrients: food.foodNutrients?.slice(0, 8),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -614,4 +637,5 @@ module.exports = {
   deleteMealFood,
   updateMealFood,
   getNutritionGoals,
+  debugUSDA,
 };
