@@ -339,18 +339,24 @@ const searchUSDA = async (req, res) => {
       : type === 'foundation' ? ['Foundation', 'SR Legacy']
       : null; // null = all types
 
-    // For general searches, fetch Foundation/raw foods first, then branded
-    // so unprocessed foods appear at top of results
+    // Search strategy:
+    // SR Legacy has complete macro data for basic/raw foods (better than Foundation)
+    // Branded covers packaged foods
+    // Foundation often has incomplete macro data — skip it
     let foods = [];
     if (!dataType || type === 'all') {
-      const [foundationRes, brandedRes] = await Promise.all([
-        usdaApi.searchFoods(q, { dataType: ['Foundation', 'SR Legacy'], pageSize: 10 }),
+      const [srRes, brandedRes] = await Promise.all([
+        usdaApi.searchFoods(q, { dataType: ['SR Legacy'], pageSize: 10 }),
         usdaApi.searchFoods(q, { dataType: ['Branded'], pageSize: parseInt(limit) - 10 }),
       ]);
-      foods = [...(foundationRes.foods || []), ...(brandedRes.foods || [])];
+      foods = [...(srRes.foods || []), ...(brandedRes.foods || [])];
+    } else if (type === 'foundation') {
+      // If explicitly requesting foundation, use SR Legacy as it has better data
+      const res = await usdaApi.searchFoods(q, { dataType: ['SR Legacy'], pageSize: parseInt(limit) });
+      foods = res.foods || [];
     } else {
-      const results = await usdaApi.searchFoods(q, { dataType, pageSize: parseInt(limit) });
-      foods = results.foods || [];
+      const res = await usdaApi.searchFoods(q, { dataType, pageSize: parseInt(limit) });
+      foods = res.foods || [];
     }
     const results = { foods };
 
@@ -605,7 +611,7 @@ const debugUSDA = async (req, res) => {
   const { q = 'chicken breast' } = req.query;
   try {
     const result = await usdaApi.searchFoods(q, {
-      dataType: ['Foundation'],
+      dataType: ['SR Legacy'],
       pageSize: 1,
     });
     const food = result.foods?.[0];
@@ -640,21 +646,12 @@ const debugUSDA = async (req, res) => {
       if (key) mapped[key] = n.value;
     });
 
-    // Dump all nutrient IDs to find energy
-    const allIds = allNutrients.map(n => ({
-      id: n.nutrientId,
-      num: n.nutrientNumber,
-      name: n.nutrientName,
-      val: n.value,
-    })).sort((a, b) => (a.id || 0) - (b.id || 0));
-
     res.json({
       description: food.description,
       dataType: food.dataType,
       total_nutrient_count: totalCount,
       key_nutrients_found: keyNutrients,
       mapping_result: mapped,
-      all_ids_sorted: allIds,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
