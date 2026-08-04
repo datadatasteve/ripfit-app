@@ -59,31 +59,21 @@ function MacroRing({ label, current, target, color, unit = 'g' }) {
 }
 
 // ── Macro bar (linear, color-coded by progress) ───────────────────────────
-function getMacroColor(pct) {
-  // 0-49%: red, 50-74%: orange, 75-99%: yellow, 100%: green, >110%: red again
-  if (pct <= 0) return '#ef4444';
-  if (pct < 50) return '#ef4444';
-  if (pct < 75) return '#f97316';
-  if (pct < 100) return '#eab308';
-  if (pct <= 110) return '#22c55e';
-  // Over 110% — gradient back toward orange/red
-  if (pct <= 130) return '#f97316';
-  return '#ef4444';
-}
-
 function MacroBar({ label, current, target, color }) {
   const pct = target > 0 ? (current / target) * 100 : 0;
   const clampedPct = Math.min(100, pct);
-  const barColor = target > 0 ? getMacroColor(pct) : color;
-  const over = pct > 110;
+  // Use identity color while under/at goal, shift to warning colors only when over
+  const barColor = pct <= 100 ? color : pct <= 120 ? '#f97316' : '#ef4444';
+  const atGoal = pct >= 95 && pct <= 120;
+  const over = pct > 120;
   return (
     <div className="macro-bar-item">
       <div className="macro-bar-header">
         <span className="macro-bar-label">{label}</span>
         <span className="macro-bar-values" style={{ color: pct > 100 ? barColor : 'var(--text-secondary)' }}>
           {Math.round(current)} / {target}g
-          {pct >= 100 && pct <= 110 && <span style={{ marginLeft: 6, fontSize: '0.75em' }}>✓</span>}
-          {over && <span style={{ marginLeft: 6, fontSize: '0.75em' }}>↑ over</span>}
+          {atGoal && <span style={{ marginLeft: 6, fontSize: '0.8em', color: '#22c55e' }}>✓</span>}
+          {over && <span style={{ marginLeft: 6, fontSize: '0.75em', color: barColor }}>↑</span>}
         </span>
       </div>
       <div className="macro-bar-track">
@@ -703,11 +693,20 @@ export default function NutritionPage() {
   const [date, setDate] = useState(toLocalDateStr());
   const [meals, setMeals] = useState([]);
   const [totals, setTotals] = useState({ total_calories: 0, total_protein: 0, total_carbs: 0, total_fat: 0, total_fiber: 0 });
-  const [goals, setGoals] = useState({ calories: 2000, protein: 150, carbs: 200, fat: 65, fiber: 25 });
+  const [goals, setGoals] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ripfit_nutrition_goals');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return { calories: 2000, protein: 150, carbs: 200, fat: 65, fiber: 25 };
+  });
   const [loading, setLoading] = useState(true);
   const [addingToMeal, setAddingToMeal] = useState(null); // meal_type string
 
   useEffect(() => {
+    // Only fetch from API if user hasn't set custom goals locally
+    const saved = localStorage.getItem('ripfit_nutrition_goals');
+    if (saved) return;
     fetch(`${API_BASE}/nutrition/goals`, {
       headers: { Authorization: `Bearer ${token()}` },
     })
@@ -782,15 +781,16 @@ export default function NutritionPage() {
     setEditingGoals(true);
   }
   function saveGoals() {
-    setGoals({
+    const newGoals = {
       calories: parseInt(goalInput.calories) || goals.calories,
       protein:  parseInt(goalInput.protein)  || goals.protein,
       carbs:    parseInt(goalInput.carbs)    || goals.carbs,
       fat:      parseInt(goalInput.fat)      || goals.fat,
       fiber:    parseInt(goalInput.fiber)    || goals.fiber,
-    });
+    };
+    setGoals(newGoals);
+    localStorage.setItem('ripfit_nutrition_goals', JSON.stringify(newGoals));
     setEditingGoals(false);
-    // TODO: persist to user profile via PUT /users/me when nutrition_goals column exists
   }
   const isToday = date === toLocalDateStr();
 
