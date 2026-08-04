@@ -32,7 +32,5 @@ router.get('/daily/:date', authenticate, nutritionController.getDailyNutrition);
 // Nutrition goals (derived from user profile)
 router.get('/goals', authenticate, nutritionController.getNutritionGoals);
 
-// Debug — remove after fixing nutrient mapping
-router.get('/debug/usda', authenticate, nutritionController.debugUSDA);
 
 module.exports = router;

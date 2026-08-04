@@ -361,8 +361,6 @@ const searchUSDA = async (req, res) => {
     const results = { foods };
 
     // Normalize to a consistent shape the frontend can use
-    // DEBUG: log first food's nutrients to see field structure
-    if (foods && foods[0]) console.log('[USDA DEBUG] first food nutrients:', JSON.stringify(foods[0].foodNutrients?.slice(0,4)));
     const foodList = (foods || []).map(f => {
       const nutrients = {};
       if (f.foodNutrients) {
@@ -604,61 +602,6 @@ const getNutritionGoals = async (req, res) => {
 };
 
 // ============================================================================
-// DEBUG ENDPOINT (remove after fixing nutrient mapping)
-// GET /api/v1/nutrition/debug/usda?q=chicken
-// ============================================================================
-const debugUSDA = async (req, res) => {
-  const { q = 'chicken breast' } = req.query;
-  try {
-    const result = await usdaApi.searchFoods(q, {
-      dataType: ['SR Legacy'],
-      pageSize: 1,
-    });
-    const food = result.foods?.[0];
-    if (!food) return res.json({ error: 'no results' });
-
-    const allNutrients = food.foodNutrients || [];
-    const totalCount = allNutrients.length;
-
-    // Find key nutrients by ID or name
-    const targetIds = new Set(['208', '203', '204', '205', '291', '269',
-                                '1008', '1003', '1004', '1005', '1079', '2000']);
-    const targetNames = new Set(['Energy', 'Protein', 'Total lipid (fat)',
-                                  'Carbohydrate, by difference', 'Fiber, total dietary']);
-
-    const keyNutrients = allNutrients.filter(n => {
-      const id = String(n.nutrientId || n.nutrientNumber || '');
-      return targetIds.has(id) || targetNames.has(n.nutrientName);
-    });
-
-    // Show what our mapping produces
-    const map = {
-      '208': 'calories', '1008': 'calories',
-      '203': 'protein',  '1003': 'protein',
-      '204': 'fat',      '1004': 'fat',
-      '205': 'carbs',    '1005': 'carbs',
-      '291': 'fiber',    '1079': 'fiber',
-    };
-    const mapped = {};
-    allNutrients.forEach(n => {
-      const id = String(n.nutrientId || n.nutrientNumber || '');
-      const key = map[id];
-      if (key) mapped[key] = n.value;
-    });
-
-    res.json({
-      description: food.description,
-      dataType: food.dataType,
-      total_nutrient_count: totalCount,
-      key_nutrients_found: keyNutrients,
-      mapping_result: mapped,
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -675,5 +618,4 @@ module.exports = {
   deleteMealFood,
   updateMealFood,
   getNutritionGoals,
-  debugUSDA,
 };
