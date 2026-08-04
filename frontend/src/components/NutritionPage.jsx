@@ -58,20 +58,40 @@ function MacroRing({ label, current, target, color, unit = 'g' }) {
   );
 }
 
-// ── Macro bar (linear) ────────────────────────────────────────────────────
+// ── Macro bar (linear, color-coded by progress) ───────────────────────────
+function getMacroColor(pct) {
+  // 0-49%: red, 50-74%: orange, 75-99%: yellow, 100%: green, >110%: red again
+  if (pct <= 0) return '#ef4444';
+  if (pct < 50) return '#ef4444';
+  if (pct < 75) return '#f97316';
+  if (pct < 100) return '#eab308';
+  if (pct <= 110) return '#22c55e';
+  // Over 110% — gradient back toward orange/red
+  if (pct <= 130) return '#f97316';
+  return '#ef4444';
+}
+
 function MacroBar({ label, current, target, color }) {
-  const pct = Math.min(100, target > 0 ? (current / target) * 100 : 0);
-  const over = current > target && target > 0;
+  const pct = target > 0 ? (current / target) * 100 : 0;
+  const clampedPct = Math.min(100, pct);
+  const barColor = target > 0 ? getMacroColor(pct) : color;
+  const over = pct > 110;
   return (
     <div className="macro-bar-item">
       <div className="macro-bar-header">
         <span className="macro-bar-label">{label}</span>
-        <span className="macro-bar-values" style={{ color: over ? 'var(--color-danger)' : 'var(--text-secondary)' }}>
+        <span className="macro-bar-values" style={{ color: pct > 100 ? barColor : 'var(--text-secondary)' }}>
           {Math.round(current)} / {target}g
+          {pct >= 100 && pct <= 110 && <span style={{ marginLeft: 6, fontSize: '0.75em' }}>✓</span>}
+          {over && <span style={{ marginLeft: 6, fontSize: '0.75em' }}>↑ over</span>}
         </span>
       </div>
       <div className="macro-bar-track">
-        <div className="macro-bar-fill" style={{ width: `${pct}%`, background: over ? 'var(--color-danger)' : color }} />
+        <div className="macro-bar-fill" style={{
+          width: `${clampedPct}%`,
+          background: barColor,
+          transition: 'width 0.3s ease, background 0.3s ease',
+        }} />
       </div>
     </div>
   );
@@ -834,9 +854,9 @@ export default function NutritionPage() {
 
         <div className="nutri-macro-bars">
           <MacroBar label="Protein" current={round1(liveTotals.pro)} target={goals.protein} color="#3b82f6" />
-          <MacroBar label="Carbs" current={round1(liveTotals.carb)} target={goals.carbs} color="#f59e0b" />
-          <MacroBar label="Fat" current={round1(liveTotals.fat)} target={goals.fat} color="#ef4444" />
-          <MacroBar label="Fiber" current={round1(liveTotals.fib)} target={goals.fiber} color="#22c55e" />
+          <MacroBar label="Carbs"   current={round1(liveTotals.carb)} target={goals.carbs}   color="#f59e0b" />
+          <MacroBar label="Fat"     current={round1(liveTotals.fat)}  target={goals.fat}     color="#ef4444" />
+          <MacroBar label="Fiber"   current={round1(liveTotals.fib)}  target={goals.fiber}   color="#22c55e" />
         </div>
       </div>
 
