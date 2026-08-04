@@ -364,33 +364,38 @@ const searchUSDA = async (req, res) => {
     const foodList = (foods || []).map(f => {
       const nutrients = {};
       if (f.foodNutrients) {
-        // USDA search uses nutrientNumber (string e.g. "208") not nutrientId (int)
-        // Map covers both formats
         const map = {
-          '208': 'calories', '1008': 'calories',
+          '208': 'calories', '1008': 'calories',  // Energy kcal
           '203': 'protein',  '1003': 'protein',
           '204': 'fat',      '1004': 'fat',
           '205': 'carbs',    '1005': 'carbs',
           '291': 'fiber',    '1079': 'fiber',
           '269': 'sugar',    '2000': 'sugar',
+          // Explicitly exclude kJ entries (268/1062) by not mapping them
         };
         f.foodNutrients.forEach(n => {
-          // USDA uses different field names across data types:
-          // Foundation: nutrientId (int), SR Legacy: nutrientId, Branded: nutrientNumber (string)
-          // Some endpoints also use n.number or n.nutrient.number
           const rawId = n.nutrientId ?? n.nutrientNumber ?? n.number ?? n.nutrient?.number ?? '';
           const id = String(rawId);
+          // Skip kJ energy — we only want kcal
+          if (id === '268' || id === '1062') return;
           const key = map[id];
-          if (key && n.value != null) nutrients[key] = n.value;
-          // Also try matching by nutrientName as fallback
-          if (!key && n.nutrientName) {
+          if (key && n.value != null) {
+            // Only set if not already set — kcal entry (1008) should win over
+            // any duplicate that might appear
+            if (nutrients[key] == null) nutrients[key] = n.value;
+          }
+          // Name-based fallback — but exclude kJ Energy
+          if (!key && n.nutrientName && n.unitName !== 'kJ') {
             const nameMap = {
               'Energy': 'calories', 'Protein': 'protein',
               'Total lipid (fat)': 'fat', 'Carbohydrate, by difference': 'carbs',
-              'Fiber, total dietary': 'fiber', 'Sugars, total': 'sugar',
+              'Fiber, total dietary': 'fiber', 'Sugars, Total': 'sugar',
+              'Sugars, total': 'sugar',
             };
             const nameKey = nameMap[n.nutrientName];
-            if (nameKey && n.value != null) nutrients[nameKey] = n.value;
+            if (nameKey && n.value != null && nutrients[nameKey] == null) {
+              nutrients[nameKey] = n.value;
+            }
           }
         });
       }
