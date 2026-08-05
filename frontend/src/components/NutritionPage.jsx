@@ -703,8 +703,17 @@ export default function NutritionPage() {
   const [loading, setLoading] = useState(true);
   const [addingToMeal, setAddingToMeal] = useState(null); // meal_type string
 
-  // Goals come from localStorage (set via Edit Goals) or hardcoded defaults.
-  // API-derived goals removed — they were overwriting user-set values.
+  useEffect(() => {
+    // Only fetch from API if user hasn't set custom goals locally
+    const saved = localStorage.getItem('ripfit_nutrition_goals');
+    if (saved) return;
+    fetch(`${API_BASE}/nutrition/goals`, {
+      headers: { Authorization: `Bearer ${token()}` },
+    })
+      .then(r => r.json())
+      .then(d => { if (d.targets) setGoals(d.targets); })
+      .catch(() => {});
+  }, []);
 
   const fetchDay = useCallback(async () => {
     setLoading(true);
