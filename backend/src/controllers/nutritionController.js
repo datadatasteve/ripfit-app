@@ -414,7 +414,14 @@ const searchUSDA = async (req, res) => {
       };
     });
 
-    res.json({ query: q, count: foodList.length, foods: foodList });
+    // Filter corrupt entries: 0 calories with 0 protein and 0 fat = bad data
+    const cleanList = foodList.filter(f =>
+      f.calories_per_100g > 0 ||
+      f.protein_per_100g > 0 ||
+      f.fat_per_100g > 0
+    );
+
+    res.json({ query: q, count: cleanList.length, foods: cleanList });
   } catch (err) {
     console.error('USDA search error:', err.message);
     res.status(500).json({ error: 'Food search failed' });
