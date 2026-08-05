@@ -59,39 +59,28 @@ function MacroRing({ label, current, target, color, unit = 'g' }) {
 }
 
 // ── Macro bar (linear, color-coded by progress) ───────────────────────────
-function getDynamicColor(pct) {
-  if (pct > 100) return '#ef4444';
-  if (pct >= 91) return '#16a34a';
-  if (pct <= 0)  return '#f97316';
-  if (pct <= 50) {
-    const t = pct / 50;
-    return `rgb(${Math.round(249+(234-249)*t)},${Math.round(115+(179-115)*t)},${Math.round(22+(8-22)*t)})`;
-  }
-  const t = (pct - 50) / 40;
-  return `rgb(${Math.round(234+(134-234)*t)},${Math.round(179+(239-179)*t)},${Math.round(8+(172-8)*t)})`;
-}
-
-function MacroBar({ label, current, target, color, dynamic: isDynamic }) {
+function MacroBar({ label, current, target, color }) {
   const pct = target > 0 ? (current / target) * 100 : 0;
   const clampedPct = Math.min(100, pct);
-  const barColor = isDynamic ? getDynamicColor(pct) : (pct <= 100 ? color : '#ef4444');
-  const atGoal = pct >= 91 && pct <= 100;
-  const over = pct > 100;
+  // Use identity color while under/at goal, shift to warning colors only when over
+  const barColor = pct <= 100 ? color : pct <= 120 ? '#f97316' : '#ef4444';
+  const atGoal = pct >= 95 && pct <= 120;
+  const over = pct > 120;
   return (
     <div className="macro-bar-item">
       <div className="macro-bar-header">
         <span className="macro-bar-label">{label}</span>
-        <span className="macro-bar-values" style={{ color: over ? '#ef4444' : atGoal ? '#16a34a' : 'var(--text-secondary)' }}>
+        <span className="macro-bar-values" style={{ color: pct > 100 ? barColor : 'var(--text-secondary)' }}>
           {Math.round(current)} / {target}g
-          {atGoal && <span style={{ marginLeft: 6, fontSize: '0.8em' }}>✓</span>}
-          {over && <span style={{ marginLeft: 6, fontSize: '0.75em' }}>↑</span>}
+          {atGoal && <span style={{ marginLeft: 6, fontSize: '0.8em', color: '#22c55e' }}>✓</span>}
+          {over && <span style={{ marginLeft: 6, fontSize: '0.75em', color: barColor }}>↑</span>}
         </span>
       </div>
       <div className="macro-bar-track">
         <div className="macro-bar-fill" style={{
           width: `${clampedPct}%`,
           background: barColor,
-          transition: 'width 0.4s ease, background 0.4s ease',
+          transition: 'width 0.3s ease, background 0.3s ease',
         }} />
       </div>
     </div>
@@ -108,9 +97,9 @@ function MacroRatioBar({ protein, carbs, fat }) {
   return (
     <div className="macro-ratio-bar-wrapper">
       <div className="macro-ratio-bar">
-        <div style={{ width: `${pPct}%`, background: '#3b82f6', borderRadius: '3px 0 0 3px' }} title={`Protein ${Math.round(pPct)}%`} />
-        <div style={{ width: `${cPct}%`, background: '#f59e0b' }} title={`Carbs ${Math.round(cPct)}%`} />
-        <div style={{ width: `${fPct}%`, background: '#ef4444', borderRadius: '0 3px 3px 0' }} title={`Fat ${Math.round(fPct)}%`} />
+        <div style={{ width: `${pPct}%`, background: '#7c3aed', borderRadius: '3px 0 0 3px' }} title={`Protein ${Math.round(pPct)}%`} />
+        <div style={{ width: `${cPct}%`, background: '#d97706' }} title={`Carbs ${Math.round(cPct)}%`} />
+        <div style={{ width: `${fPct}%`, background: '#0d9488', borderRadius: '0 3px 3px 0' }} title={`Fat ${Math.round(fPct)}%`} />
       </div>
       <div className="macro-ratio-legend">
         <span style={{ color: '#7c3aed' }}>P {Math.round(pPct)}%</span>
@@ -620,16 +609,9 @@ function MealSection({ type, typeMeals, goals, mealSplit, date, onAdd, onRemoveF
   const [editServing, setEditServing] = useState('');
   const [editUnit, setEditUnit] = useState('g');
 
-  function startEdit(f) {
-    setEditingFoodId(f.meal_food_id);
-    setEditServing(String(f.serving_size));
-    setEditUnit(f.serving_unit || 'g');
-  }
+  function startEdit(f) { setEditingFoodId(f.meal_food_id); setEditServing(String(f.serving_size)); setEditUnit(f.serving_unit || 'g'); }
   function cancelEdit() { setEditingFoodId(null); }
-  async function saveEdit(mealFoodId) {
-    await onEditFood(mealFoodId, editServing, editUnit);
-    setEditingFoodId(null);
-  }
+  async function saveEdit(id) { await onEditFood(id, editServing, editUnit); setEditingFoodId(null); }
   const [expanded, setExpanded] = useState(true);
   const [macroExpanded, setMacroExpanded] = useState(false);
 
@@ -688,27 +670,19 @@ function MealSection({ type, typeMeals, goals, mealSplit, date, onAdd, onRemoveF
                 {(meal.foods || []).map(f => (
                   <div key={f.meal_food_id} className="nutri-food-row">
                     {editingFoodId === f.meal_food_id ? (
-                      // Inline edit mode
                       <div className="nutri-food-edit-row">
-                        <span className="nutri-food-name" style={{ flex: 1 }}>{f.food_name}</span>
-                        <input
-                          type="number" min="1"
-                          value={editServing}
-                          onChange={e => setEditServing(e.target.value)}
-                          className="nutri-serving-input"
-                          style={{ width: 64 }}
-                          autoFocus
-                        />
+                        <span className="nutri-food-name" style={{ flex: 1, minWidth: 80 }}>{f.food_name}</span>
+                        <input type="number" min="1" value={editServing} onChange={e => setEditServing(e.target.value)}
+                          className="nutri-serving-input" style={{ width: 64 }} autoFocus />
                         <select value={editUnit} onChange={e => setEditUnit(e.target.value)} className="nutri-unit-select">
                           <option value="g">g</option>
                           <option value="ml">ml</option>
                           <option value="oz">oz</option>
                         </select>
-                        <button className="nutri-add-btn" style={{ padding: '4px 10px', fontSize: '0.8em' }} onClick={() => saveEdit(f.meal_food_id)}>Save</button>
+                        <button className="nutri-add-btn" style={{ padding: '4px 10px', fontSize: '0.8em' }} onClick={() => saveEdit(f.meal_food_id)}>✓</button>
                         <button className="nutri-cancel-btn" style={{ padding: '4px 8px', fontSize: '0.8em' }} onClick={cancelEdit}>✕</button>
                       </div>
                     ) : (
-                      // Normal display mode
                       <>
                         <div className="nutri-food-info" onClick={() => startEdit(f)} style={{ cursor: 'pointer' }} title="Click to edit serving">
                           <span className="nutri-food-name">{f.food_name}</span>
@@ -849,10 +823,7 @@ export default function NutritionPage() {
       snacks:    parseInt(splitInput.snacks)    || 0,
     };
     const total = Object.values(parsed).reduce((a, b) => a + b, 0);
-    if (total !== 100) {
-      alert(`Meal split must total 100%. Current: ${total}%`);
-      return;
-    }
+    if (total !== 100) { alert(`Meal split must total 100%. Current: ${total}%`); return; }
     setGoals(newGoals);
     setMealSplit(parsed);
     localStorage.setItem('ripfit_nutrition_goals', JSON.stringify(newGoals));
