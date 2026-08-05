@@ -59,28 +59,50 @@ function MacroRing({ label, current, target, color, unit = 'g' }) {
 }
 
 // ── Macro bar (linear, color-coded by progress) ───────────────────────────
-function MacroBar({ label, current, target, color }) {
+// Dynamic color: orange→yellow→green gradient as % increases, red when over
+function getDynamicColor(pct) {
+  if (pct > 100) return '#ef4444';  // red when exceeded
+  if (pct >= 91) return '#16a34a';  // vivid green 91-100%
+  if (pct <= 0)  return '#f97316';  // orange at empty
+
+  if (pct <= 50) {
+    // Orange (#f97316) → Yellow (#eab308)
+    const t = pct / 50;
+    const r = Math.round(249 + (234 - 249) * t);
+    const g = Math.round(115 + (179 - 115) * t);
+    const b = Math.round(22  + (8   - 22)  * t);
+    return `rgb(${r},${g},${b})`;
+  }
+  // Yellow (#eab308) → Light green (#86efac)
+  const t = (pct - 50) / 40;
+  const r = Math.round(234 + (134 - 234) * t);
+  const g = Math.round(179 + (239 - 179) * t);
+  const b = Math.round(8   + (172 - 8)   * t);
+  return `rgb(${r},${g},${b})`;
+}
+
+function MacroBar({ label, current, target, color, dynamic: isDynamic }) {
   const pct = target > 0 ? (current / target) * 100 : 0;
   const clampedPct = Math.min(100, pct);
-  // Use identity color while under/at goal, shift to warning colors only when over
-  const barColor = pct <= 100 ? color : pct <= 120 ? '#f97316' : '#ef4444';
-  const atGoal = pct >= 95 && pct <= 120;
-  const over = pct > 120;
+  const barColor = isDynamic ? getDynamicColor(pct) : (pct <= 100 ? color : '#ef4444');
+  const atGoal = pct >= 91 && pct <= 100;
+  const over = pct > 100;
+
   return (
     <div className="macro-bar-item">
       <div className="macro-bar-header">
         <span className="macro-bar-label">{label}</span>
-        <span className="macro-bar-values" style={{ color: pct > 100 ? barColor : 'var(--text-secondary)' }}>
+        <span className="macro-bar-values" style={{ color: over ? '#ef4444' : atGoal ? '#16a34a' : 'var(--text-secondary)' }}>
           {Math.round(current)} / {target}g
-          {atGoal && <span style={{ marginLeft: 6, fontSize: '0.8em', color: '#22c55e' }}>✓</span>}
-          {over && <span style={{ marginLeft: 6, fontSize: '0.75em', color: barColor }}>↑</span>}
+          {atGoal && <span style={{ marginLeft: 6, fontSize: '0.8em' }}>✓</span>}
+          {over && <span style={{ marginLeft: 6, fontSize: '0.75em' }}>↑</span>}
         </span>
       </div>
       <div className="macro-bar-track">
         <div className="macro-bar-fill" style={{
           width: `${clampedPct}%`,
           background: barColor,
-          transition: 'width 0.3s ease, background 0.3s ease',
+          transition: 'width 0.4s ease, background 0.4s ease',
         }} />
       </div>
     </div>
@@ -602,7 +624,9 @@ function FoodSearchModal({ mealType, mealDate, onClose, onAdded }) {
 }
 
 // ── MealSection — extracted so useState is at component top level ──────────
-function MealSection({ type, typeMeals, goals, date, onAdd, onRemoveFood }) {
+function MealSection({ type, typeMeals, goals, mealSplit, date, onAdd, onRemoveFood }) {
+  const splitPct = (mealSplit?.[type] || 0) / 100;
+  const mealTarget = macro => Math.round(goals[macro] * splitPct);
   const [expanded, setExpanded] = useState(true);
   const [macroExpanded, setMacroExpanded] = useState(false);
 
@@ -646,9 +670,9 @@ function MealSection({ type, typeMeals, goals, date, onAdd, onRemoveFood }) {
               </div>
               {macroExpanded && (
                 <div className="nutri-meal-macro-bars">
-                  <MealMacroBar current={round1(typeTotals.pro)} target={Math.round(goals.protein / 4)} color="#3b82f6" label="P" />
-                  <MealMacroBar current={round1(typeTotals.carb)} target={Math.round(goals.carbs / 4)} color="#f59e0b" label="C" />
-                  <MealMacroBar current={round1(typeTotals.fat)} target={Math.round(goals.fat / 4)} color="#ef4444" label="F" />
+                  <MealMacroBar current={round1(typeTotals.pro)} target={mealTarget('protein')} color="#7c3aed" label="P" />
+                  <MealMacroBar current={round1(typeTotals.carb)} target={mealTarget('carbs')} color="#d97706" label="C" />
+                  <MealMacroBar current={round1(typeTotals.fat)} target={mealTarget('fat')} color="#0d9488" label="F" />
                 </div>
               )}
             </>
@@ -666,9 +690,9 @@ function MealSection({ type, typeMeals, goals, date, onAdd, onRemoveFood }) {
                     </div>
                     <div className="nutri-food-macros">
                       <span className="nutri-food-cal">{Math.round(f.calories)} cal</span>
-                      <span className="nutri-food-macro" style={{ color: '#3b82f6' }}>P {round1(f.protein)}g</span>
-                      <span className="nutri-food-macro" style={{ color: '#f59e0b' }}>C {round1(f.carbs)}g</span>
-                      <span className="nutri-food-macro" style={{ color: '#ef4444' }}>F {round1(f.fat)}g</span>
+                      <span className="nutri-food-macro" style={{ color: '#7c3aed' }}>P {round1(f.protein)}g</span>
+                      <span className="nutri-food-macro" style={{ color: '#d97706' }}>C {round1(f.carbs)}g</span>
+                      <span className="nutri-food-macro" style={{ color: '#0d9488' }}>F {round1(f.fat)}g</span>
                     </div>
                     <button
                       className="nutri-remove-btn"
@@ -700,20 +724,34 @@ export default function NutritionPage() {
     } catch {}
     return { calories: 2000, protein: 150, carbs: 200, fat: 65, fiber: 25 };
   });
-  const [loading, setLoading] = useState(true);
-  const [addingToMeal, setAddingToMeal] = useState(null); // meal_type string
 
-  useEffect(() => {
-    // Only fetch from API if user hasn't set custom goals locally
-    const saved = localStorage.getItem('ripfit_nutrition_goals');
-    if (saved) return;
-    fetch(`${API_BASE}/nutrition/goals`, {
-      headers: { Authorization: `Bearer ${token()}` },
-    })
-      .then(r => r.json())
-      .then(d => { if (d.targets) setGoals(d.targets); })
-      .catch(() => {});
-  }, []);
+  const [mealSplit, setMealSplit] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ripfit_meal_split');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return { breakfast: 33, lunch: 33, dinner: 34, snacks: 0 };
+  });
+  const [splitInput, setSplitInput] = useState({ breakfast: '33', lunch: '33', dinner: '34', snacks: '0' });
+
+  function saveMealSplit() {
+    const parsed = {
+      breakfast: parseInt(splitInput.breakfast) || 0,
+      lunch:     parseInt(splitInput.lunch)     || 0,
+      dinner:    parseInt(splitInput.dinner)    || 0,
+      snacks:    parseInt(splitInput.snacks)    || 0,
+    };
+    const total = Object.values(parsed).reduce((a, b) => a + b, 0);
+    if (total !== 100) {
+      alert(`Meal split must total 100%. Current total: ${total}%`);
+      return;
+    }
+    setMealSplit(parsed);
+    localStorage.setItem('ripfit_meal_split', JSON.stringify(parsed));
+  }
+
+  const [loading, setLoading] = useState(true);
+  const [addingToMeal, setAddingToMeal] = useState(null);
 
   const fetchDay = useCallback(async () => {
     setLoading(true);
@@ -778,6 +816,7 @@ export default function NutritionPage() {
 
   function openGoalEdit() {
     setGoalInput({ calories: String(goals.calories), protein: String(goals.protein), carbs: String(goals.carbs), fat: String(goals.fat), fiber: String(goals.fiber) });
+    setSplitInput({ breakfast: String(mealSplit.breakfast), lunch: String(mealSplit.lunch), dinner: String(mealSplit.dinner), snacks: String(mealSplit.snacks) });
     setEditingGoals(true);
   }
   function saveGoals() {
@@ -788,8 +827,21 @@ export default function NutritionPage() {
       fat:      parseInt(goalInput.fat)      || goals.fat,
       fiber:    parseInt(goalInput.fiber)    || goals.fiber,
     };
+    const parsed = {
+      breakfast: parseInt(splitInput.breakfast) || 0,
+      lunch:     parseInt(splitInput.lunch)     || 0,
+      dinner:    parseInt(splitInput.dinner)    || 0,
+      snacks:    parseInt(splitInput.snacks)    || 0,
+    };
+    const total = Object.values(parsed).reduce((a, b) => a + b, 0);
+    if (total !== 100) {
+      alert(`Meal split must total 100%. Current: ${total}%`);
+      return;
+    }
     setGoals(newGoals);
+    setMealSplit(parsed);
     localStorage.setItem('ripfit_nutrition_goals', JSON.stringify(newGoals));
+    localStorage.setItem('ripfit_meal_split', JSON.stringify(parsed));
     setEditingGoals(false);
   }
   const isToday = date === toLocalDateStr();
@@ -826,6 +878,27 @@ export default function NutritionPage() {
                 </div>
               </div>
             ))}
+            <div style={{ gridColumn: '1/-1', borderTop: '1px solid var(--border-color)', paddingTop: 12, marginTop: 4 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Meal Split</span>
+                <span style={{ fontSize: 'var(--font-size-xs)', color: ['breakfast','lunch','dinner','snacks'].reduce((s,m) => s + (parseInt(splitInput[m])||0), 0) === 100 ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                  {['breakfast','lunch','dinner','snacks'].reduce((s,m) => s + (parseInt(splitInput[m])||0), 0)}% / 100%
+                </span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                {[['breakfast','Breakfast'],['lunch','Lunch'],['dinner','Dinner'],['snacks','Snacks']].map(([key, label]) => (
+                  <div key={key} className="nutri-goal-edit-field">
+                    <label>{label}</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <input type="number" min="0" max="100" value={splitInput[key]}
+                        onChange={e => setSplitInput(s => ({ ...s, [key]: e.target.value }))}
+                        className="nutri-goal-input" />
+                      <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)' }}>%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
             <div style={{ gridColumn: '1/-1', display: 'flex', gap: 8 }}>
               <button className="nutri-add-btn" style={{ padding: '8px 20px' }} onClick={saveGoals}>Save</button>
               <button className="nutri-cancel-btn" onClick={() => setEditingGoals(false)}>Cancel</button>
@@ -853,10 +926,10 @@ export default function NutritionPage() {
         </div>
 
         <div className="nutri-macro-bars">
-          <MacroBar label="Protein" current={round1(liveTotals.pro)} target={goals.protein} color="#3b82f6" />
-          <MacroBar label="Carbs"   current={round1(liveTotals.carb)} target={goals.carbs}   color="#f59e0b" />
-          <MacroBar label="Fat"     current={round1(liveTotals.fat)}  target={goals.fat}     color="#ef4444" />
-          <MacroBar label="Fiber"   current={round1(liveTotals.fib)}  target={goals.fiber}   color="#22c55e" />
+          <MacroBar label="Protein" current={round1(liveTotals.pro)} target={goals.protein} color="#7c3aed" dynamic />
+          <MacroBar label="Carbs"   current={round1(liveTotals.carb)} target={goals.carbs}   color="#d97706" dynamic />
+          <MacroBar label="Fat"     current={round1(liveTotals.fat)}  target={goals.fat}     color="#0d9488" dynamic />
+          <MacroBar label="Fiber"   current={round1(liveTotals.fib)}  target={goals.fiber}   color="#16a34a" dynamic />
         </div>
       </div>
 
@@ -874,6 +947,7 @@ export default function NutritionPage() {
               type={type}
               typeMeals={mealsByType[type]}
               goals={goals}
+              mealSplit={mealSplit}
               date={date}
               onAdd={setAddingToMeal}
               onRemoveFood={removeMealFood}
