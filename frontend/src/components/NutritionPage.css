@@ -838,3 +838,12 @@
   margin-bottom: 10px;
   justify-content: flex-end;
 }
+
+/* ── Inline food edit row ────────────────────────────────────────────────── */
+.nutri-food-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  flex-wrap: wrap;
+}

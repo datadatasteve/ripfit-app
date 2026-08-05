@@ -59,26 +59,16 @@ function MacroRing({ label, current, target, color, unit = 'g' }) {
 }
 
 // ── Macro bar (linear, color-coded by progress) ───────────────────────────
-// Dynamic color: orange→yellow→green gradient as % increases, red when over
 function getDynamicColor(pct) {
-  if (pct > 100) return '#ef4444';  // red when exceeded
-  if (pct >= 91) return '#16a34a';  // vivid green 91-100%
-  if (pct <= 0)  return '#f97316';  // orange at empty
-
+  if (pct > 100) return '#ef4444';
+  if (pct >= 91) return '#16a34a';
+  if (pct <= 0)  return '#f97316';
   if (pct <= 50) {
-    // Orange (#f97316) → Yellow (#eab308)
     const t = pct / 50;
-    const r = Math.round(249 + (234 - 249) * t);
-    const g = Math.round(115 + (179 - 115) * t);
-    const b = Math.round(22  + (8   - 22)  * t);
-    return `rgb(${r},${g},${b})`;
+    return `rgb(${Math.round(249+(234-249)*t)},${Math.round(115+(179-115)*t)},${Math.round(22+(8-22)*t)})`;
   }
-  // Yellow (#eab308) → Light green (#86efac)
   const t = (pct - 50) / 40;
-  const r = Math.round(234 + (134 - 234) * t);
-  const g = Math.round(179 + (239 - 179) * t);
-  const b = Math.round(8   + (172 - 8)   * t);
-  return `rgb(${r},${g},${b})`;
+  return `rgb(${Math.round(234+(134-234)*t)},${Math.round(179+(239-179)*t)},${Math.round(8+(172-8)*t)})`;
 }
 
 function MacroBar({ label, current, target, color, dynamic: isDynamic }) {
@@ -87,7 +77,6 @@ function MacroBar({ label, current, target, color, dynamic: isDynamic }) {
   const barColor = isDynamic ? getDynamicColor(pct) : (pct <= 100 ? color : '#ef4444');
   const atGoal = pct >= 91 && pct <= 100;
   const over = pct > 100;
-
   return (
     <div className="macro-bar-item">
       <div className="macro-bar-header">
@@ -124,9 +113,9 @@ function MacroRatioBar({ protein, carbs, fat }) {
         <div style={{ width: `${fPct}%`, background: '#ef4444', borderRadius: '0 3px 3px 0' }} title={`Fat ${Math.round(fPct)}%`} />
       </div>
       <div className="macro-ratio-legend">
-        <span style={{ color: '#3b82f6' }}>P {Math.round(pPct)}%</span>
-        <span style={{ color: '#f59e0b' }}>C {Math.round(cPct)}%</span>
-        <span style={{ color: '#ef4444' }}>F {Math.round(fPct)}%</span>
+        <span style={{ color: '#7c3aed' }}>P {Math.round(pPct)}%</span>
+        <span style={{ color: '#d97706' }}>C {Math.round(cPct)}%</span>
+        <span style={{ color: '#0d9488' }}>F {Math.round(fPct)}%</span>
       </div>
     </div>
   );
@@ -624,9 +613,23 @@ function FoodSearchModal({ mealType, mealDate, onClose, onAdded }) {
 }
 
 // ── MealSection — extracted so useState is at component top level ──────────
-function MealSection({ type, typeMeals, goals, mealSplit, date, onAdd, onRemoveFood }) {
+function MealSection({ type, typeMeals, goals, mealSplit, date, onAdd, onRemoveFood, onEditFood }) {
   const splitPct = (mealSplit?.[type] || 0) / 100;
-  const mealTarget = macro => Math.round(goals[macro] * splitPct);
+  const mealTarget = macro => Math.max(1, Math.round(goals[macro] * splitPct));
+  const [editingFoodId, setEditingFoodId] = useState(null);
+  const [editServing, setEditServing] = useState('');
+  const [editUnit, setEditUnit] = useState('g');
+
+  function startEdit(f) {
+    setEditingFoodId(f.meal_food_id);
+    setEditServing(String(f.serving_size));
+    setEditUnit(f.serving_unit || 'g');
+  }
+  function cancelEdit() { setEditingFoodId(null); }
+  async function saveEdit(mealFoodId) {
+    await onEditFood(mealFoodId, editServing, editUnit);
+    setEditingFoodId(null);
+  }
   const [expanded, setExpanded] = useState(true);
   const [macroExpanded, setMacroExpanded] = useState(false);
 
@@ -684,21 +687,42 @@ function MealSection({ type, typeMeals, goals, mealSplit, date, onAdd, onRemoveF
               <div key={meal.id} className="nutri-meal-group">
                 {(meal.foods || []).map(f => (
                   <div key={f.meal_food_id} className="nutri-food-row">
-                    <div className="nutri-food-info">
-                      <span className="nutri-food-name">{f.food_name}</span>
-                      <span className="nutri-food-serving">{f.serving_size}{f.serving_unit || 'g'}</span>
-                    </div>
-                    <div className="nutri-food-macros">
-                      <span className="nutri-food-cal">{Math.round(f.calories)} cal</span>
-                      <span className="nutri-food-macro" style={{ color: '#7c3aed' }}>P {round1(f.protein)}g</span>
-                      <span className="nutri-food-macro" style={{ color: '#d97706' }}>C {round1(f.carbs)}g</span>
-                      <span className="nutri-food-macro" style={{ color: '#0d9488' }}>F {round1(f.fat)}g</span>
-                    </div>
-                    <button
-                      className="nutri-remove-btn"
-                      onClick={() => onRemoveFood(f.meal_food_id)}
-                      title="Remove"
-                    >✕</button>
+                    {editingFoodId === f.meal_food_id ? (
+                      // Inline edit mode
+                      <div className="nutri-food-edit-row">
+                        <span className="nutri-food-name" style={{ flex: 1 }}>{f.food_name}</span>
+                        <input
+                          type="number" min="1"
+                          value={editServing}
+                          onChange={e => setEditServing(e.target.value)}
+                          className="nutri-serving-input"
+                          style={{ width: 64 }}
+                          autoFocus
+                        />
+                        <select value={editUnit} onChange={e => setEditUnit(e.target.value)} className="nutri-unit-select">
+                          <option value="g">g</option>
+                          <option value="ml">ml</option>
+                          <option value="oz">oz</option>
+                        </select>
+                        <button className="nutri-add-btn" style={{ padding: '4px 10px', fontSize: '0.8em' }} onClick={() => saveEdit(f.meal_food_id)}>Save</button>
+                        <button className="nutri-cancel-btn" style={{ padding: '4px 8px', fontSize: '0.8em' }} onClick={cancelEdit}>✕</button>
+                      </div>
+                    ) : (
+                      // Normal display mode
+                      <>
+                        <div className="nutri-food-info" onClick={() => startEdit(f)} style={{ cursor: 'pointer' }} title="Click to edit serving">
+                          <span className="nutri-food-name">{f.food_name}</span>
+                          <span className="nutri-food-serving">{f.serving_size}{f.serving_unit || 'g'} ✎</span>
+                        </div>
+                        <div className="nutri-food-macros">
+                          <span className="nutri-food-cal">{Math.round(f.calories)} cal</span>
+                          <span className="nutri-food-macro" style={{ color: '#7c3aed' }}>P {round1(f.protein)}g</span>
+                          <span className="nutri-food-macro" style={{ color: '#d97706' }}>C {round1(f.carbs)}g</span>
+                          <span className="nutri-food-macro" style={{ color: '#0d9488' }}>F {round1(f.fat)}g</span>
+                        </div>
+                        <button className="nutri-remove-btn" onClick={() => onRemoveFood(f.meal_food_id)} title="Remove">✕</button>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
@@ -724,7 +748,6 @@ export default function NutritionPage() {
     } catch {}
     return { calories: 2000, protein: 150, carbs: 200, fat: 65, fiber: 25 };
   });
-
   const [mealSplit, setMealSplit] = useState(() => {
     try {
       const saved = localStorage.getItem('ripfit_meal_split');
@@ -733,23 +756,6 @@ export default function NutritionPage() {
     return { breakfast: 33, lunch: 33, dinner: 34, snacks: 0 };
   });
   const [splitInput, setSplitInput] = useState({ breakfast: '33', lunch: '33', dinner: '34', snacks: '0' });
-
-  function saveMealSplit() {
-    const parsed = {
-      breakfast: parseInt(splitInput.breakfast) || 0,
-      lunch:     parseInt(splitInput.lunch)     || 0,
-      dinner:    parseInt(splitInput.dinner)    || 0,
-      snacks:    parseInt(splitInput.snacks)    || 0,
-    };
-    const total = Object.values(parsed).reduce((a, b) => a + b, 0);
-    if (total !== 100) {
-      alert(`Meal split must total 100%. Current total: ${total}%`);
-      return;
-    }
-    setMealSplit(parsed);
-    localStorage.setItem('ripfit_meal_split', JSON.stringify(parsed));
-  }
-
   const [loading, setLoading] = useState(true);
   const [addingToMeal, setAddingToMeal] = useState(null);
 
@@ -780,6 +786,15 @@ export default function NutritionPage() {
     await fetch(`${API_BASE}/nutrition/meal-foods/${mealFoodId}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token()}` },
+    });
+    fetchDay();
+  }
+
+  async function editMealFood(mealFoodId, newServing, newUnit) {
+    await fetch(`${API_BASE}/nutrition/meal-foods/${mealFoodId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+      body: JSON.stringify({ serving_size: parseFloat(newServing), serving_unit: newUnit }),
     });
     fetchDay();
   }
@@ -879,9 +894,9 @@ export default function NutritionPage() {
               </div>
             ))}
             <div style={{ gridColumn: '1/-1', borderTop: '1px solid var(--border-color)', paddingTop: 12, marginTop: 4 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                 <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Meal Split</span>
-                <span style={{ fontSize: 'var(--font-size-xs)', color: ['breakfast','lunch','dinner','snacks'].reduce((s,m) => s + (parseInt(splitInput[m])||0), 0) === 100 ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                <span style={{ fontSize: 'var(--font-size-xs)', color: ['breakfast','lunch','dinner','snacks'].reduce((s,m) => s + (parseInt(splitInput[m])||0), 0) === 100 ? '#16a34a' : '#ef4444' }}>
                   {['breakfast','lunch','dinner','snacks'].reduce((s,m) => s + (parseInt(splitInput[m])||0), 0)}% / 100%
                 </span>
               </div>
@@ -929,7 +944,7 @@ export default function NutritionPage() {
           <MacroBar label="Protein" current={round1(liveTotals.pro)} target={goals.protein} color="#7c3aed" dynamic />
           <MacroBar label="Carbs"   current={round1(liveTotals.carb)} target={goals.carbs}   color="#d97706" dynamic />
           <MacroBar label="Fat"     current={round1(liveTotals.fat)}  target={goals.fat}     color="#0d9488" dynamic />
-          <MacroBar label="Fiber"   current={round1(liveTotals.fib)}  target={goals.fiber}   color="#16a34a" dynamic />
+          <MacroBar label="Fiber"   current={round1(liveTotals.fib)}  target={goals.fiber}   color="#22c55e" dynamic />
         </div>
       </div>
 
@@ -951,6 +966,7 @@ export default function NutritionPage() {
               date={date}
               onAdd={setAddingToMeal}
               onRemoveFood={removeMealFood}
+              onEditFood={editMealFood}
             />
           ))}
         </div>
