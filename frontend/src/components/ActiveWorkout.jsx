@@ -103,6 +103,53 @@ function SessionRatingWidget({ workoutId }) {
   );
 }
 
+// ── Free Lift Title Modal ─────────────────────────────────────────────────
+// Prompts for a custom title when starting a Free Lift. Title is optional —
+// skipping defaults to "Free Lift — <date>". Can be updated during/after workout.
+function FreeLiftTitleModal({ onStart, onClose }) {
+  const today = new Date();
+  const dateStr = today.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const defaultTitle = `Free Lift — ${dateStr}`;
+  const [title, setTitle] = useState('');
+
+  const handleStart = () => {
+    // Pass the entered title or null (backend/caller handles default)
+    onStart(title.trim() || null);
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <h3>Name Your Workout</h3>
+        <p style={{ fontSize: '0.9em', color: '#888', marginBottom: '12px' }}>
+          Optional — leave blank to use default.
+        </p>
+        <input
+          type="text"
+          placeholder={defaultTitle}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleStart()}
+          autoFocus
+          maxLength={100}
+          style={{ width: '100%', padding: '10px', marginBottom: '16px', boxSizing: 'border-box' }}
+        />
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button onClick={handleStart} className="finish-btn" style={{ flex: 1, padding: '12px' }}>
+            Start Workout
+          </button>
+          <button
+            onClick={onClose}
+            style={{ padding: '12px 16px', background: '#999', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workoutSummary, setWorkoutSummary, showNavClock, setShowNavClock }) {
   const [token, setToken] = useState(localStorage.getItem('ripfit_token'));
   const [routines, setRoutines] = useState([]);
@@ -111,6 +158,7 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
   const [showRoutineBuilder, setShowRoutineBuilder] = useState(false);
   const [editingRoutine, setEditingRoutine] = useState(null);
   const [showCardio, setShowCardio] = useState(false);
+  const [showFreeLiftModal, setShowFreeLiftModal] = useState(false);
 
   const openEditRoutine = async (routineId) => {
     try {
@@ -141,14 +189,20 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
     }
   };
 
-  const startWorkout = async (routineId) => {
+  const startWorkout = async (routineId, workout_title = null) => {
     try {
       let res;
       if (routineId === null) {
+        const today = new Date();
+        const dateStr = today.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const finalTitle = workout_title || `Free Lift — ${dateStr}`;
         res = await fetch(`${API_BASE}/workouts/start-free`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ workout_date: new Date().toISOString().split('T')[0] }),
+          body: JSON.stringify({
+            workout_date: today.toISOString().split('T')[0],
+            workout_title: finalTitle,
+          }),
         });
       } else {
         res = await fetch(`${API_BASE}/routines/${routineId}/start-workout`, {
@@ -195,7 +249,7 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
     }
   };
 
-  const finishWorkout = async (workoutNotes) => {
+  const finishWorkout = async (workoutNotes, sessionRating = null) => {
     const token = localStorage.getItem('ripfit_token');
     
     // Save any exercise notes
@@ -240,6 +294,15 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
           'Authorization': `Bearer ${token}`
         }
       });
+
+      // Save rating immediately if one was set in the finish modal
+      if (sessionRating) {
+        await fetch(`${API_BASE}/stats/workouts/${activeWorkout.workout.id}/rating`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ session_rating: sessionRating }),
+        }).catch(e => console.error('Failed to save rating:', e));
+      }
 
       // Build summary data before clearing workout (subtract any paused time)
       const pausedSeconds = activeWorkout.workout.total_paused_seconds || 0;
@@ -370,25 +433,10 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
             </div>
           )}
 
-          <SessionRatingWidget workoutId={workoutSummary.workout_id} />
-
-          <button 
-            onClick={async () => {
-              // Save the session rating if one was selected
-              const ratingEl = document.querySelector('[data-session-rating]');
-              const ratingVal = ratingEl ? parseInt(ratingEl.dataset.sessionRating) : null;
-              if (ratingVal && workoutSummary.workout_id) {
-                const tok = localStorage.getItem('ripfit_token');
-                await fetch(`${API_BASE}/stats/workouts/${workoutSummary.workout_id}/rating`, {
-                  method: 'PUT',
-                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
-                  body: JSON.stringify({ session_rating: ratingVal }),
-                }).catch(e => console.error('Failed to save rating:', e));
-              }
-              setWorkoutSummary(null);
-            }}
+          <button
+            onClick={() => setWorkoutSummary(null)}
             className="finish-btn"
-            style={{width: '100%', padding: '14px', fontSize: '1.1em', marginTop: '20px'}}
+            style={{ width: '100%', padding: '14px', fontSize: '1.1em', marginTop: '20px' }}
           >
             Done
           </button>
@@ -417,7 +465,7 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
         <h2 className="log-workout-title">Log a Workout</h2>
         <button
           className="free-lift-btn"
-          onClick={() => startWorkout(null)}
+          onClick={() => setShowFreeLiftModal(true)}
           disabled={loading}
         >
           Free Lift
@@ -475,6 +523,16 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
           )}
         </div>
       </div>
+
+      {showFreeLiftModal && (
+        <FreeLiftTitleModal
+          onStart={(title) => {
+            setShowFreeLiftModal(false);
+            startWorkout(null, title);
+          }}
+          onClose={() => setShowFreeLiftModal(false)}
+        />
+      )}
 
       {showCardio && (
         <CardioWorkout onClose={(result) => {
@@ -582,6 +640,17 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
   const [adHocChoices, setAdHocChoices] = useState({}); // { [workout_exercise_id]: true/false }
   const [savingToRoutine, setSavingToRoutine] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  // Rating captured in finish modal so it saves with the workout, not after
+  const [pendingRating, setPendingRating] = useState(null);
+  const [ratingPrefs, setRatingPrefs] = useState({ label: 'Effort & Vibes', scale: 5, display: 'slider' });
+
+  useEffect(() => {
+    const tok = localStorage.getItem('ripfit_token');
+    fetch(`${API_BASE}/users/me`, { headers: { Authorization: `Bearer ${tok}` } })
+      .then(r => r.json())
+      .then(data => { if (data.workout_rating_prefs) setRatingPrefs(data.workout_rating_prefs); })
+      .catch(() => {});
+  }, []);
 
   const exercises = workout.exercises;
   const currentExercise = exercises[currentExerciseIdx] || {};
@@ -726,7 +795,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
       setAdHocChoices(defaults);
       setShowSaveToRoutinePrompt(true);
     } else {
-      onFinish(workoutNotes);
+      onFinish(workoutNotes, pendingRating);
     }
   };
 
@@ -771,7 +840,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
     }
 
     setShowSaveToRoutinePrompt(false);
-    onFinish(workoutNotes);
+    onFinish(workoutNotes, pendingRating);
   };
 
   const handleAddExercise = async (exercise, targets) => {
@@ -1482,15 +1551,18 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
       )}
 
       {showFinishConfirm && (() => {
-        const incompleteExercises = exercises.filter(ex => 
+        const incompleteExercises = exercises.filter(ex =>
           ex.template?.target_sets && (ex.logged_sets?.length || 0) < ex.template.target_sets
         );
-        
+        const scale = ratingPrefs.scale || 5;
+        const ticks = Array.from({ length: scale }, (_, i) => i + 1);
+
         return (
           <div className="modal-overlay" onClick={() => setShowFinishConfirm(false)}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
               <h3>Finish Workout</h3>
-              
+
+              {/* Warning only shown when sets/exercises were missed */}
               {incompleteExercises.length > 0 && (
                 <div className="incomplete-warning">
                   <p><strong>⚠️ Incomplete exercises:</strong></p>
@@ -1498,13 +1570,13 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
                     <div key={idx} className="incomplete-item">
                       <span>{ex.exercise_name}</span>
                       <span>{ex.logged_sets?.length || 0} / {ex.template.target_sets} sets</span>
-                      <button 
+                      <button
                         onClick={() => {
                           const exerciseIdx = exercises.findIndex(e => e.id === ex.id);
                           setCurrentExerciseIdx(exerciseIdx);
                           setShowFinishConfirm(false);
                         }}
-                        style={{padding: '4px 8px', fontSize: '0.85em'}}
+                        style={{ padding: '4px 8px', fontSize: '0.85em' }}
                       >
                         Go to
                       </button>
@@ -1513,28 +1585,77 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
                 </div>
               )}
 
-              <div style={{marginTop: '15px'}}>
+              {/* Notes + Rating on one screen */}
+              <div style={{ marginTop: '15px' }}>
                 <h4>Workout Notes (optional)</h4>
                 <textarea
                   value={workoutNotes}
                   onChange={(e) => setWorkoutNotes(e.target.value)}
                   placeholder="How was the workout overall?"
-                  rows="4"
-                  style={{width: '100%', padding: '10px', marginBottom: '10px'}}
+                  rows="3"
+                  style={{ width: '100%', padding: '10px', marginBottom: '16px', boxSizing: 'border-box' }}
                 />
               </div>
 
-              <div style={{display: 'flex', gap: '8px'}}>
-                <button 
+              <div className="session-rating-widget">
+                <div className="session-rating-header">
+                  <span className="session-rating-label">{ratingPrefs.label}</span>
+                </div>
+                {ratingPrefs.display === 'stars' ? (
+                  <div className="session-rating-stars">
+                    {ticks.map(v => (
+                      <button
+                        key={v}
+                        className={`star-btn ${pendingRating >= v ? 'active' : ''}`}
+                        onClick={() => setPendingRating(v)}
+                        aria-label={`Rate ${v} out of ${scale}`}
+                      >★</button>
+                    ))}
+                  </div>
+                ) : ratingPrefs.display === 'number' ? (
+                  <div className="session-rating-numbers">
+                    {ticks.map(v => (
+                      <button
+                        key={v}
+                        className={`number-btn ${pendingRating === v ? 'active' : ''}`}
+                        onClick={() => setPendingRating(v)}
+                      >{v}</button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="session-rating-slider-wrap">
+                    <input
+                      type="range"
+                      min={1}
+                      max={scale}
+                      step={1}
+                      value={pendingRating || Math.ceil(scale / 2)}
+                      className="session-rating-slider"
+                      onChange={e => setPendingRating(parseInt(e.target.value))}
+                    />
+                    <div className="session-rating-ticks">
+                      <span>1</span>
+                      <span>{Math.ceil(scale / 2)}</span>
+                      <span>{scale}</span>
+                    </div>
+                    {pendingRating && (
+                      <div className="session-rating-value">{pendingRating} / {scale}</div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+                <button
                   onClick={handleFinishClick}
                   className="finish-btn"
-                  style={{flex: 1, padding: '12px'}}
+                  style={{ flex: 1, padding: '12px' }}
                 >
                   {incompleteExercises.length > 0 ? 'Finish Anyway' : 'Finish Workout'}
                 </button>
-                <button 
+                <button
                   onClick={() => setShowFinishConfirm(false)}
-                  style={{padding: '12px 16px', background: '#999', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer'}}
+                  style={{ padding: '12px 16px', background: '#999', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
                 >
                   Go Back
                 </button>

@@ -717,7 +717,7 @@ const getCombinedHistory = async (req, res) => {
         w.id, 'strength' AS type, w.workout_date AS date,
         w.start_time, w.end_time,
         EXTRACT(EPOCH FROM (w.end_time - w.start_time))::INTEGER AS duration_seconds,
-        COALESCE(wr.name, 'Free Lift') AS title,
+        COALESCE(w.workout_title, wr.name, 'Free Lift') AS title,
         COUNT(DISTINCT we.id) AS exercise_count,
         w.overall_notes, w.status
        FROM workouts w
@@ -764,7 +764,7 @@ const getWorkoutDetail = async (req, res) => {
   const user_id = req.user.userId;
   try {
     const workoutResult = await pool.query(
-      `SELECT w.*, COALESCE(wr.name, 'Free Lift') AS routine_name
+      `SELECT w.*, COALESCE(w.workout_title, wr.name, 'Free Lift') AS routine_name
        FROM workouts w
        LEFT JOIN workout_routines wr ON w.routine_id = wr.id
        WHERE w.id = $1 AND w.user_id = $2`,
@@ -802,20 +802,21 @@ const getWorkoutDetail = async (req, res) => {
 
 // POST /api/v1/workouts/start-free  (free lift - no routine)
 const startFreeLift = async (req, res) => {
-  const { workout_date } = req.body;
+  const { workout_date, workout_title } = req.body;
   const user_id = req.user.userId;
   if (!workout_date) {
     return res.status(400).json({ error: 'workout_date required' });
   }
   try {
     const result = await pool.query(
-      `INSERT INTO workouts (user_id, workout_date, routine_id, start_time)
-       VALUES ($1, $2, NULL, $3) RETURNING *`,
-      [user_id, workout_date, new Date().toISOString()]
+      `INSERT INTO workouts (user_id, workout_date, routine_id, start_time, workout_title)
+       VALUES ($1, $2, NULL, $3, $4) RETURNING *`,
+      [user_id, workout_date, new Date().toISOString(), workout_title || null]
     );
     res.status(201).json({
       workout: result.rows[0],
-      routine_name: 'Free Lift',
+      // Use custom title if provided, fall back to default
+      routine_name: workout_title || 'Free Lift',
       exercises: [],
       last_workout_date: null,
       previous_overall_notes: null,
