@@ -312,6 +312,8 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
         workout_id: activeWorkout.workout.id,
         routine_name: activeWorkout.routine_name,
         duration_minutes: duration,
+        session_rating: sessionRating,
+        rating_prefs: ratingPrefs,
         exercises: activeWorkout.exercises.map(ex => ({
           exercise_name: ex.exercise_name,
           category: ex.category,
@@ -430,6 +432,17 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
             <div className="summary-workout-notes" style={{marginTop: '10px', borderLeft: '3px solid #888'}}>
               <h4>Previous Workout Notes</h4>
               <p style={{color: '#fff', whiteSpace: 'pre-wrap'}}>{workoutSummary.previous_workout_notes}</p>
+            </div>
+          )}
+
+          {workoutSummary.session_rating && (
+            <div className="summary-rating" style={{ marginTop: '16px', padding: '12px', background: 'var(--bg-elevated)', borderRadius: '8px', textAlign: 'center' }}>
+              <span style={{ fontSize: '0.85em', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
+                {workoutSummary.rating_prefs?.label || 'Effort & Vibes'}
+              </span>
+              <span style={{ fontSize: '1.4em', fontWeight: 700, color: 'var(--color-warning)' }}>
+                {workoutSummary.session_rating} / {workoutSummary.rating_prefs?.scale || 5}
+              </span>
             </div>
           )}
 
@@ -713,15 +726,17 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
     // Don't run if there's no real exercise yet (Free Lift empty state)
     if (!currentExercise.id) return;
 
-    // Pre-fill from last set, or from template if first set
-    const defaultWeight = loggedSets.length > 0 
-      ? loggedSets[loggedSets.length - 1].weight_used 
-      : currentExercise.template?.target_weight || '';
-    
+    // Pre-fill from last set, or from template if first set.
+    // Weight is intentionally left blank when no target is set — forces user
+    // to enter it rather than silently logging 0 lbs.
+    const defaultWeight = loggedSets.length > 0
+      ? loggedSets[loggedSets.length - 1].weight_used
+      : (currentExercise.template?.target_weight ?? '');
+
     const defaultReps = loggedSets.length > 0
       ? loggedSets[loggedSets.length - 1].reps_completed
       : currentExercise.template?.target_reps || '';
-    
+
     setSetForm({ reps: defaultReps, weight: defaultWeight, rpe: '' });
   }, [currentExerciseIdx, loggedSets.length, currentExercise.id]);
 
@@ -1074,7 +1089,6 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
               {isPaused ? '▶ Resume' : '⏸ Pause'}
             </button>
             <button onClick={() => setShowFinishConfirm(true)} className="finish-btn">Finish Workout</button>
-            <button onClick={() => setShowCancelConfirm(true)} className="cancel-workout-btn">Cancel Workout</button>
           </div>
         </div>
 
@@ -1169,7 +1183,6 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
           </button>
           <button onClick={() => setShowAllExercises(true)} className="view-all-btn">View All</button>
           <button onClick={() => setShowFinishConfirm(true)} className="finish-btn">Finish Workout</button>
-          <button onClick={() => setShowCancelConfirm(true)} className="cancel-workout-btn">Cancel Workout</button>
         </div>
       </div>
 
@@ -1658,6 +1671,14 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
                   style={{ padding: '12px 16px', background: '#999', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
                 >
                   Go Back
+                </button>
+              </div>
+              <div style={{ textAlign: 'center', marginTop: '12px' }}>
+                <button
+                  onClick={() => { setShowFinishConfirm(false); setShowCancelConfirm(true); }}
+                  style={{ background: 'none', border: 'none', color: '#888', fontSize: '0.8em', cursor: 'pointer', textDecoration: 'underline', padding: '4px' }}
+                >
+                  Cancel Workout
                 </button>
               </div>
             </div>

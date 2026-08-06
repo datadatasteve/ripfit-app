@@ -1173,6 +1173,135 @@ function CombinedTab() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// HISTORY TAB
+// ═══════════════════════════════════════════════════════════════════════════
+function HistoryTab() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [weeks, setWeeks] = useState(8);
+  const [customWeeks, setCustomWeeks] = useState('');
+  const [ratingChart, setRatingChart] = useState('line');
+
+  useEffect(() => {
+    setLoading(true);
+    apiFetch(`/combined?weeks=${weeks}`)
+      .then(setData)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [weeks]);
+
+  const RATING_OPTIONS = [
+    { value: 'line',    label: 'Line',    icon: '╱'  },
+    { value: 'bar',     label: 'Bar',     icon: '▮▮' },
+    { value: 'scatter', label: 'Scatter', icon: '⋯'  },
+  ];
+
+  if (loading) return <Loading />;
+
+  // Rated sessions only
+  const ratedSessions = (data?.sessions || []).filter(s => s.session_rating != null);
+  const ratingData = ratedSessions.map(s => ({
+    date: fmtDate(s.date),
+    rating: parseFloat(s.session_rating),
+    type: s.type,
+    title: s.title,
+  }));
+
+  const renderRatingChart = () => {
+    const common = {
+      data: ratingData,
+      margin: { top: 4, right: 8, left: 0, bottom: 0 },
+    };
+    const axisStyle = { fontSize: 11, fill: 'var(--text-secondary)' };
+    const tooltipStyle = { background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' };
+
+    if (ratingChart === 'bar') return (
+      <BarChart {...common}>
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+        <XAxis dataKey="date" tick={axisStyle} />
+        <YAxis domain={[0, 5]} tick={axisStyle} />
+        <Tooltip contentStyle={tooltipStyle} />
+        <Bar dataKey="rating" fill="var(--color-warning)" radius={[2, 2, 0, 0]} name="Rating" />
+      </BarChart>
+    );
+    if (ratingChart === 'scatter') return (
+      <ScatterChart {...common}>
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+        <XAxis dataKey="date" tick={axisStyle} />
+        <YAxis dataKey="rating" domain={[0, 5]} tick={axisStyle} />
+        <Tooltip contentStyle={tooltipStyle} cursor={{ strokeDasharray: '3 3' }} />
+        <Scatter data={ratingData} fill="var(--color-warning)" name="Rating" />
+      </ScatterChart>
+    );
+    return (
+      <LineChart {...common}>
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+        <XAxis dataKey="date" tick={axisStyle} />
+        <YAxis domain={[0, 5]} tick={axisStyle} />
+        <Tooltip contentStyle={tooltipStyle} />
+        <Line type="monotone" dataKey="rating" stroke="var(--color-warning)" strokeWidth={2} dot={{ r: 3 }} connectNulls />
+      </LineChart>
+    );
+  };
+
+  return (
+    <div>
+      <TimeWindowSelector weeks={weeks} setWeeks={setWeeks} customWeeks={customWeeks} setCustomWeeks={setCustomWeeks} />
+
+      {/* Effort & Vibes over time */}
+      <Section
+        title="Effort & Vibes Over Time"
+        controls={<ChartTypeToggle options={RATING_OPTIONS} value={ratingChart} onChange={setRatingChart} />}
+      >
+        {ratingData.length === 0
+          ? <Empty message="No sessions rated yet." />
+          : <ResponsiveContainer width="100%" height={220}>{renderRatingChart()}</ResponsiveContainer>
+        }
+      </Section>
+
+      {/* Session log with rating column */}
+      {data && data.sessions.length > 0 && (
+        <Section title="Session Log">
+          <div className="sc-table-wrapper">
+            <table className="sc-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>Title</th>
+                  <th>Duration</th>
+                  <th>Effort & Vibes</th>
+                  <th>Volume / Distance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.sessions.map((s, i) => (
+                  <tr key={i}>
+                    <td>{fmtDate(s.date)}</td>
+                    <td><span className={`history-type-badge ${s.type}`}>{s.type}</span></td>
+                    <td>{s.title}</td>
+                    <td>{fmtDuration(s.duration_seconds)}</td>
+                    <td style={{ color: s.session_rating ? 'var(--color-warning)' : 'var(--text-secondary)' }}>
+                      {s.session_rating != null ? `${s.session_rating} / 5` : '—'}
+                    </td>
+                    <td>{s.volume ? s.volume.toLocaleString() : s.distance ? `${s.distance}` : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Section>
+      )}
+
+      {/* Full workout history list */}
+      <Section title="Workout Log">
+        <WorkoutHistory />
+      </Section>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // MAIN STATS CENTER
 // ═══════════════════════════════════════════════════════════════════════════
 export default function StatsCenter() {
@@ -1198,7 +1327,7 @@ export default function StatsCenter() {
         {tab === 'Cardio'    && <CardioTab />}
         {tab === 'Records'   && <RecordsTab />}
         {tab === 'Combined'  && <CombinedTab />}
-        {tab === 'History'   && <WorkoutHistory />}
+        {tab === 'History'   && <HistoryTab />}
       </div>
     </div>
   );
