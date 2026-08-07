@@ -645,10 +645,15 @@ const deleteExerciseFromWorkout = async (req, res) => {
   }
 };
 
-// Add exercises to workout
 const addExerciseToWorkout = async (req, res) => {
   const { workoutId } = req.params;
-  const { exercise_id, order_index, exercise_notes, target_sets, target_reps, target_weight } = req.body;
+  const {
+    exercise_id, order_index, exercise_notes,
+    target_sets, target_reps, target_weight,
+    // Cardio-specific goals (nullable for strength exercises)
+    goal_duration_seconds, goal_distance, goal_distance_unit,
+    goal_pace, goal_pace_unit, goal_laps, goal_lap_distance,
+  } = req.body;
   const user_id = req.user.userId;
 
   try {
@@ -662,9 +667,18 @@ const addExerciseToWorkout = async (req, res) => {
     }
 
     const result = await pool.query(
-      `INSERT INTO workout_exercises (workout_id, exercise_id, order_index, exercise_notes, target_sets, target_reps, target_weight)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [workoutId, exercise_id, order_index, exercise_notes || null, target_sets || null, target_reps || null, target_weight || null]
+      `INSERT INTO workout_exercises (
+        workout_id, exercise_id, order_index, exercise_notes,
+        target_sets, target_reps, target_weight,
+        goal_duration_seconds, goal_distance, goal_distance_unit,
+        goal_pace, goal_pace_unit, goal_laps, goal_lap_distance
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+      [
+        workoutId, exercise_id, order_index, exercise_notes || null,
+        target_sets || null, target_reps || null, target_weight || null,
+        goal_duration_seconds || null, goal_distance || null, goal_distance_unit || null,
+        goal_pace || null, goal_pace_unit || null, goal_laps || null, goal_lap_distance || null,
+      ]
     );
 
     res.status(201).json(result.rows[0]);
@@ -827,6 +841,75 @@ const startFreeLift = async (req, res) => {
   }
 };
 
+// POST /api/v1/workouts/:workoutId/exercises/:exerciseId/cardio-segments
+const logCardioSegment = async (req, res) => {
+  const { workoutId, exerciseId } = req.params;
+  const user_id = req.user.userId;
+  const {
+    segment_number, segment_label,
+    duration_seconds, distance, distance_unit,
+    pace, pace_unit, pace_overridden,
+    reps, notes,
+  } = req.body;
+
+  try {
+    const workoutCheck = await pool.query(
+      `SELECT id FROM workouts WHERE id = $1 AND user_id = $2`,
+      [workoutId, user_id]
+    );
+    if (workoutCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Workout not found' });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO workout_cardio_segments (
+        workout_exercise_id, workout_id, segment_number, segment_label,
+        duration_seconds, distance, distance_unit,
+        pace, pace_unit, pace_overridden, reps, notes
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+      [
+        exerciseId, workoutId, segment_number, segment_label || 'Segment',
+        duration_seconds || null, distance || null, distance_unit || null,
+        pace || null, pace_unit || null, pace_overridden || false,
+        reps || null, notes || null,
+      ]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Log cardio segment error:', error);
+    res.status(500).json({ error: 'Failed to log cardio segment' });
+  }
+};
+
+// GET /api/v1/workouts/:workoutId/exercises/:exerciseId/cardio-segments
+const getCardioSegments = async (req, res) => {
+  const { workoutId, exerciseId } = req.params;
+  const user_id = req.user.userId;
+
+  try {
+    const workoutCheck = await pool.query(
+      `SELECT id FROM workouts WHERE id = $1 AND user_id = $2`,
+      [workoutId, user_id]
+    );
+    if (workoutCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Workout not found' });
+    }
+
+    const result = await pool.query(
+      `SELECT * FROM workout_cardio_segments
+       WHERE workout_exercise_id = $1 AND workout_id = $2
+       ORDER BY segment_number`,
+      [exerciseId, workoutId]
+    );
+
+    res.json({ segments: result.rows });
+  } catch (error) {
+    console.error('Get cardio segments error:', error);
+    res.status(500).json({ error: 'Failed to fetch cardio segments' });
+  }
+};
+
 module.exports = {
   searchExercises,
   getExerciseById,
@@ -842,5 +925,7 @@ module.exports = {
   deleteExerciseFromWorkout,
   getCombinedHistory,
   getWorkoutDetail,
-  startFreeLift
+  startFreeLift,
+  logCardioSegment,
+  getCardioSegments,
 };

@@ -27,6 +27,8 @@ router.put('/:workoutId/notes', authenticate, workoutController.updateWorkoutNot
 router.post('/:workoutId/exercises', authenticate, workoutController.addExerciseToWorkout);
 router.delete('/:workoutId/exercises/:exerciseId', authenticate, workoutController.deleteExerciseFromWorkout);
 router.put('/:workoutId/exercises/:exerciseId/notes', authenticate, workoutController.updateExerciseNotes);
+router.post('/:workoutId/exercises/:exerciseId/cardio-segments', authenticate, workoutController.logCardioSegment);
+router.get('/:workoutId/exercises/:exerciseId/cardio-segments', authenticate, workoutController.getCardioSegments);
 
 module.exports = router;
 
