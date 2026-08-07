@@ -249,7 +249,7 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
     }
   };
 
-  const finishWorkout = async (workoutNotes, sessionRating = null) => {
+  const finishWorkout = async (workoutNotes, sessionRating = null, ratingPrefs = null) => {
     const token = localStorage.getItem('ripfit_token');
     
     // Save any exercise notes
@@ -810,7 +810,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
       setAdHocChoices(defaults);
       setShowSaveToRoutinePrompt(true);
     } else {
-      onFinish(workoutNotes, pendingRating);
+      onFinish(workoutNotes, pendingRating, ratingPrefs);
     }
   };
 
@@ -855,7 +855,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
     }
 
     setShowSaveToRoutinePrompt(false);
-    onFinish(workoutNotes, pendingRating);
+    onFinish(workoutNotes, pendingRating, ratingPrefs);
   };
 
   const handleAddExercise = async (exercise, targets) => {
@@ -1676,7 +1676,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
               <div style={{ textAlign: 'center', marginTop: '12px' }}>
                 <button
                   onClick={() => { setShowFinishConfirm(false); setShowCancelConfirm(true); }}
-                  style={{ background: 'none', border: 'none', color: '#888', fontSize: '0.8em', cursor: 'pointer', textDecoration: 'underline', padding: '4px' }}
+                  style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.8em', cursor: 'pointer', textDecoration: 'underline', padding: '4px' }}
                 >
                   Cancel Workout
                 </button>
@@ -2043,24 +2043,50 @@ function AddExerciseModal({ onAdd, onClose }) {
             <h3>Set Targets (Optional)</h3>
             <p><strong>{selectedExercise.name}</strong></p>
             <div className="target-form">
-              <input
-                type="number"
-                placeholder="Target Sets (optional)"
-                value={targets.sets}
-                onChange={(e) => setTargets({...targets, sets: e.target.value})}
-              />
-              <input
-                type="number"
-                placeholder="Target Reps (optional)"
-                value={targets.reps}
-                onChange={(e) => setTargets({...targets, reps: e.target.value})}
-              />
-              <input
-                type="text"
-                placeholder="Weight (BW, 0, - for bodyweight)"
-                value={targets.weight}
-                onChange={(e) => setTargets({...targets, weight: e.target.value})}
-              />
+              {selectedExercise.category === 'Cardio' ? (
+                <>
+                  <input
+                    type="number"
+                    placeholder="Goal Duration (minutes, optional)"
+                    value={targets.duration || ''}
+                    onChange={(e) => setTargets({ ...targets, duration: e.target.value })}
+                  />
+                  <input
+                    type="number"
+                    step="0.1"
+                    placeholder="Goal Distance (optional)"
+                    value={targets.distance || ''}
+                    onChange={(e) => setTargets({ ...targets, distance: e.target.value })}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Notes (optional)"
+                    value={targets.notes || ''}
+                    onChange={(e) => setTargets({ ...targets, notes: e.target.value })}
+                  />
+                </>
+              ) : (
+                <>
+                  <input
+                    type="number"
+                    placeholder="Target Sets (optional)"
+                    value={targets.sets}
+                    onChange={(e) => setTargets({ ...targets, sets: e.target.value })}
+                  />
+                  <input
+                    type="number"
+                    placeholder="Target Reps (optional)"
+                    value={targets.reps}
+                    onChange={(e) => setTargets({ ...targets, reps: e.target.value })}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Weight (BW, 0, - for bodyweight)"
+                    value={targets.weight}
+                    onChange={(e) => setTargets({ ...targets, weight: e.target.value })}
+                  />
+                </>
+              )}
             </div>
             <button onClick={handleAddExercise} className="add-btn">Add Exercise</button>
             <button onClick={() => setSelectedExercise(null)} className="back-btn">Back</button>
