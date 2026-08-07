@@ -183,14 +183,15 @@ function CardioSegmentForm({ exercise, workoutId, segments, setSegments, userPac
 
   const tok = localStorage.getItem('ripfit_token');
 
-  // Parse MM:SS or plain number input → seconds
+  // Parse MM:SS or plain number (treated as minutes) → seconds
   const parseDuration = (val) => {
     if (!val) return null;
-    if (val.includes(':')) {
-      const [m, s] = val.split(':').map(Number);
+    if (String(val).includes(':')) {
+      const [m, s] = String(val).split(':').map(Number);
       return (m || 0) * 60 + (s || 0);
     }
-    return parseInt(val) || null;
+    // Plain number → treat as minutes
+    return Math.round((parseFloat(val) || 0) * 60) || null;
   };
 
   // Parse pace input MM:SS → decimal minutes
@@ -239,10 +240,12 @@ function CardioSegmentForm({ exercise, workoutId, segments, setSegments, userPac
       const paceVal = parsePace(pace);
       const segNum = segments.length + 1;
 
-      // For swimming: derive duration from laps × lap distance ÷ pace if possible
       let finalDist = parseFloat(distance) || null;
+      let finalDistUnit = userDistanceUnit;
       if (isSwimming && laps && lapDistance) {
-        finalDist = finalDist || parseFloat(((parseInt(laps) * parseFloat(lapDistance)) / 1000).toFixed(3));
+        // Store swimming distance in meters (laps × lap distance)
+        finalDist = finalDist || parseFloat((parseInt(laps) * parseFloat(lapDistance)).toFixed(1));
+        finalDistUnit = 'm';
       }
 
       const body = {
@@ -250,7 +253,7 @@ function CardioSegmentForm({ exercise, workoutId, segments, setSegments, userPac
         segment_label: label,
         duration_seconds: durSecs,
         distance: finalDist,
-        distance_unit: userDistanceUnit,
+        distance_unit: finalDistUnit,
         pace: paceVal,
         pace_unit: userPaceUnit,
         pace_overridden: paceOverridden,
@@ -623,10 +626,12 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
   }
 
   if (workoutSummary) {
-    const totalSets = workoutSummary.exercises.reduce((sum, ex) => sum + ex.logged_sets.length, 0);
-    const totalReps = workoutSummary.exercises.reduce((sum, ex) => 
+    const strengthExercises = workoutSummary.exercises.filter(ex => ex.category !== 'Cardio');
+    const cardioExercises = workoutSummary.exercises.filter(ex => ex.category === 'Cardio');
+    const totalSets = strengthExercises.reduce((sum, ex) => sum + ex.logged_sets.length, 0);
+    const totalReps = strengthExercises.reduce((sum, ex) =>
       sum + ex.logged_sets.reduce((s, set) => s + (set.reps_completed || 0), 0), 0);
-    const totalWeight = workoutSummary.exercises.reduce((sum, ex) => 
+    const totalWeight = strengthExercises.reduce((sum, ex) =>
       sum + ex.logged_sets.reduce((s, set) => s + ((set.weight_used || 0) * (set.reps_completed || 0)), 0), 0);
     const totalSeconds = workoutSummary.duration_minutes * 60;
     const dHours = Math.floor(totalSeconds / 3600);
@@ -639,7 +644,7 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
         <div className="workout-summary">
           <h2>Workout Complete!</h2>
           <h3>{workoutSummary.routine_name}</h3>
-          
+
           <div className="summary-stats">
             <div className="stat-box">
               <span className="stat-value">{durationStr}</span>
@@ -649,19 +654,23 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
               <span className="stat-value">{workoutSummary.exercises.length}</span>
               <span className="stat-label">Exercises</span>
             </div>
-            <div className="stat-box">
-              <span className="stat-value">{totalSets}</span>
-              <span className="stat-label">Sets</span>
-            </div>
-            <div className="stat-box">
-              <span className="stat-value">{totalReps}</span>
-              <span className="stat-label">Total Reps</span>
-            </div>
+            {totalSets > 0 && (
+              <div className="stat-box">
+                <span className="stat-value">{totalSets}</span>
+                <span className="stat-label">Sets</span>
+              </div>
+            )}
+            {totalReps > 0 && (
+              <div className="stat-box">
+                <span className="stat-value">{totalReps}</span>
+                <span className="stat-label">Total Reps</span>
+              </div>
+            )}
           </div>
 
           <div className="summary-exercises">
             <h4>Exercise Breakdown</h4>
-            {workoutSummary.exercises.map((ex, idx) => (
+            {strengthExercises.map((ex, idx) => (
               <div key={idx} className="summary-exercise-item">
                 <strong>{ex.exercise_name}</strong>
                 <span className="summary-category">{ex.category}</span>
@@ -669,7 +678,7 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
                   {ex.logged_sets.length > 0 ? (
                     ex.logged_sets.map((set, sIdx) => (
                       <span key={sIdx} className="set-pill">
-                        {set.reps_completed} × {set.weight_used} lbs
+                        {set.reps_completed} × {set.weight_used === 0 ? 'BW' : `${set.weight_used} lbs`}
                         {set.rpe ? ` @ RPE ${set.rpe}` : ''}
                       </span>
                     ))
@@ -678,8 +687,20 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
                   )}
                 </div>
                 {ex.target_sets && ex.logged_sets.length < ex.target_sets && (
-                  <p className="sets-caution">Completed {ex.logged_sets.length} of {ex.target_sets} target sets</p>
+                  <p className="sets-caution">Completed {ex.logged_sets.length} of {ex.target_sets} sets</p>
                 )}
+                {ex.exercise_notes && (
+                  <p className="summary-notes">{ex.exercise_notes}</p>
+                )}
+              </div>
+            ))}
+            {cardioExercises.map((ex, idx) => (
+              <div key={`c${idx}`} className="summary-exercise-item">
+                <strong>{ex.exercise_name}</strong>
+                <span className="summary-category">Cardio</span>
+                <div className="summary-sets">
+                  <span className="set-pill">Logged — see cardio data</span>
+                </div>
                 {ex.exercise_notes && (
                   <p className="summary-notes">{ex.exercise_notes}</p>
                 )}
@@ -1936,7 +1957,9 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
 
       {showFinishConfirm && (() => {
         const incompleteExercises = exercises.filter(ex =>
-          ex.template?.target_sets && (ex.logged_sets?.length || 0) < ex.template.target_sets
+          ex.category !== 'Cardio' &&
+          ex.template?.target_sets &&
+          (ex.logged_sets?.length || 0) < ex.template.target_sets
         );
         const scale = ratingPrefs.scale || 5;
         const ticks = Array.from({ length: scale }, (_, i) => i + 1);
