@@ -203,26 +203,31 @@ function CardioSegmentForm({ exercise, workoutId, segments, setSegments, userPac
     return parseFloat(val) || null;
   };
 
-  // Auto-derive on blur of any field
+  // Auto-derive the third value whenever two are filled.
+  // Called on blur. Always re-derives unless pace was manually overridden.
   const handleAutoDerive = () => {
-    if (paceOverridden) return;
     const durSecs = parseDuration(durationInput);
     const dist = parseFloat(distance) || null;
     const paceVal = parsePace(pace);
 
-    if (durSecs && dist && !paceVal) {
+    if (durSecs && dist && !paceOverridden) {
+      // Duration + distance → derive pace
       const p = durationDistanceToPace(durSecs, dist);
-      setPace(formatPaceDisplay(p));
+      if (p) setPace(formatPaceDisplay(p));
       setDerived('pace');
     } else if (durSecs && paceVal && !dist) {
+      // Duration + pace → derive distance
       const d = durationPaceToDistance(durSecs, paceVal);
-      setDistance(String(d));
+      if (d) setDistance(String(d));
       setDerived('distance');
     } else if (dist && paceVal && !durSecs) {
+      // Distance + pace → derive duration
       const secs = paceDistanceToDuration(paceVal, dist);
-      const m = Math.floor(secs / 60);
-      const s = secs % 60;
-      setDurationInput(`${m}:${String(s).padStart(2, '0')}`);
+      if (secs) {
+        const m = Math.floor(secs / 60);
+        const s = secs % 60;
+        setDurationInput(`${m}:${String(s).padStart(2, '0')}`);
+      }
       setDerived('duration');
     }
   };
@@ -327,7 +332,19 @@ function CardioSegmentForm({ exercise, workoutId, segments, setSegments, userPac
               />
               {paceOverridden && (
                 <button
-                  onClick={() => { setPaceOverridden(false); setDerived(null); handleAutoDerive(); }}
+                  onClick={() => {
+                    setPaceOverridden(false);
+                    setPace('');
+                    setDerived(null);
+                    // Re-derive from duration + distance immediately
+                    const durSecs = parseDuration(durationInput);
+                    const dist = parseFloat(distance) || null;
+                    if (durSecs && dist) {
+                      const p = durationDistanceToPace(durSecs, dist);
+                      if (p) setPace(formatPaceDisplay(p));
+                      setDerived('pace');
+                    }
+                  }}
                   style={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)', fontSize: '0.7em', padding: '2px 4px', background: 'none', border: '1px solid #888', borderRadius: 3, cursor: 'pointer', color: '#888' }}
                   title="Clear override, re-derive"
                 >↺</button>
@@ -498,7 +515,7 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
     }
   };
 
-  const finishWorkout = async (workoutNotes, sessionRating = null) => {
+  const finishWorkout = async (workoutNotes, sessionRating = null, ratingPrefs = null) => {
     const token = localStorage.getItem('ripfit_token');
     
     // Save any exercise notes
@@ -882,9 +899,12 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
   };
 
   const elapsedSeconds = getElapsedSeconds();
-  const elapsedM = Math.floor(elapsedSeconds / 60);
+  const elapsedH = Math.floor(elapsedSeconds / 3600);
+  const elapsedM = Math.floor((elapsedSeconds % 3600) / 60);
   const elapsedS = elapsedSeconds % 60;
-  const elapsedStr = `${elapsedM}:${String(elapsedS).padStart(2, '0')}`;
+  const elapsedStr = elapsedH > 0
+    ? `${elapsedH}:${String(elapsedM).padStart(2, '0')}:${String(elapsedS).padStart(2, '0')}`
+    : `${elapsedM}:${String(elapsedS).padStart(2, '0')}`;
 
   const currentPauseSeconds = isPaused
     ? Math.floor((Date.now() - new Date(workout.workout.paused_at).getTime()) / 1000)
@@ -2394,24 +2414,67 @@ function AddExerciseModal({ onAdd, onClose }) {
             <h3>Set Targets (Optional)</h3>
             <p><strong>{selectedExercise.name}</strong></p>
             <div className="target-form">
-              <input
-                type="number"
-                placeholder="Target Sets (optional)"
-                value={targets.sets}
-                onChange={(e) => setTargets({...targets, sets: e.target.value})}
-              />
-              <input
-                type="number"
-                placeholder="Target Reps (optional)"
-                value={targets.reps}
-                onChange={(e) => setTargets({...targets, reps: e.target.value})}
-              />
-              <input
-                type="text"
-                placeholder="Weight (BW, 0, - for bodyweight)"
-                value={targets.weight}
-                onChange={(e) => setTargets({...targets, weight: e.target.value})}
-              />
+              {selectedExercise.category === 'Cardio' ? (
+                <>
+                  <input
+                    type="text"
+                    placeholder="Goal Duration (MM:SS, optional)"
+                    value={targets.duration}
+                    onChange={(e) => setTargets({ ...targets, duration: e.target.value })}
+                  />
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="Goal Distance (optional)"
+                    value={targets.distance}
+                    onChange={(e) => setTargets({ ...targets, distance: e.target.value })}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Goal Pace (MM:SS per mile, optional)"
+                    value={targets.pace}
+                    onChange={(e) => setTargets({ ...targets, pace: e.target.value })}
+                  />
+                  {selectedExercise.subcategory === 'Swimming' && (
+                    <>
+                      <input
+                        type="number"
+                        placeholder="Goal Laps (optional)"
+                        value={targets.laps}
+                        onChange={(e) => setTargets({ ...targets, laps: e.target.value })}
+                      />
+                      <input
+                        type="number"
+                        step="0.1"
+                        placeholder="Lap distance in metres (optional)"
+                        value={targets.lapDistance}
+                        onChange={(e) => setTargets({ ...targets, lapDistance: e.target.value })}
+                      />
+                    </>
+                  )}
+                </>
+              ) : (
+                <>
+                  <input
+                    type="number"
+                    placeholder="Target Sets (optional)"
+                    value={targets.sets}
+                    onChange={(e) => setTargets({ ...targets, sets: e.target.value })}
+                  />
+                  <input
+                    type="number"
+                    placeholder="Target Reps (optional)"
+                    value={targets.reps}
+                    onChange={(e) => setTargets({ ...targets, reps: e.target.value })}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Weight (BW, 0, - for bodyweight)"
+                    value={targets.weight}
+                    onChange={(e) => setTargets({ ...targets, weight: e.target.value })}
+                  />
+                </>
+              )}
             </div>
             <button onClick={handleAddExercise} className="add-btn">Add Exercise</button>
             <button onClick={() => setSelectedExercise(null)} className="back-btn">Back</button>
