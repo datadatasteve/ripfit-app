@@ -103,6 +103,255 @@ function SessionRatingWidget({ workoutId }) {
   );
 }
 
+// ── Cardio pace/derive utilities ──────────────────────────────────────────
+
+// Parse pace input MM:SS or decimal string → decimal minutes
+function parsePaceString(val) {
+  if (!val) return null;
+  if (typeof val === 'string' && val.includes(':')) {
+    const [m, s] = val.split(':').map(Number);
+    return parseFloat(((m || 0) + (s || 0) / 60).toFixed(4));
+  }
+  return parseFloat(val) || null;
+}
+
+// Returns segment label based on exercise subcategory
+function cardioSegmentLabel(subcategory) {
+  if (!subcategory) return 'Segment';
+  const s = subcategory.toLowerCase();
+  if (s === 'swimming') return 'Lap';
+  if (s === 'interval') return 'Round';
+  return 'Segment';
+}
+
+// Convert pace (decimal min/unit) + distance → duration seconds
+function paceDistanceToDuration(pace, distance) {
+  if (!pace || !distance) return null;
+  return Math.round(pace * distance * 60);
+}
+
+// Convert duration seconds + distance → pace (decimal min/unit)
+function durationDistanceToPace(durationSecs, distance) {
+  if (!durationSecs || !distance) return null;
+  return parseFloat(((durationSecs / 60) / distance).toFixed(4));
+}
+
+// Convert duration seconds + pace → distance
+function durationPaceToDistance(durationSecs, pace) {
+  if (!durationSecs || !pace) return null;
+  return parseFloat(((durationSecs / 60) / pace).toFixed(3));
+}
+
+// Format decimal minutes as MM:SS string
+function formatPaceDisplay(decimalMins) {
+  if (!decimalMins) return '—';
+  const mins = Math.floor(decimalMins);
+  const secs = Math.round((decimalMins - mins) * 60);
+  return `${mins}:${String(secs).padStart(2, '0')}`;
+}
+
+// Format seconds as H:MM:SS or M:SS
+function formatDurationDisplay(totalSecs) {
+  if (!totalSecs) return '—';
+  const h = Math.floor(totalSecs / 3600);
+  const m = Math.floor((totalSecs % 3600) / 60);
+  const s = totalSecs % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+// ── CardioSegmentForm ─────────────────────────────────────────────────────
+// Replaces the standard set form for Cardio category exercises.
+// Renders different fields by subcategory, auto-derives the third value
+// when two of duration/distance/pace are provided.
+function CardioSegmentForm({ exercise, workoutId, segments, setSegments, userPaceUnit = 'min/mile', userDistanceUnit = 'mi' }) {
+  const subcategory = exercise.subcategory || '';
+  const label = cardioSegmentLabel(subcategory);
+  const isInterval = subcategory.toLowerCase() === 'interval';
+  const isSwimming = subcategory.toLowerCase() === 'swimming';
+
+  const [durationInput, setDurationInput] = useState(''); // MM:SS or plain seconds
+  const [distance, setDistance] = useState('');
+  const [pace, setPace] = useState('');             // displayed as MM:SS, stored as decimal mins
+  const [paceOverridden, setPaceOverridden] = useState(false);
+  const [reps, setReps] = useState('');
+  const [laps, setLaps] = useState('');
+  const [lapDistance, setLapDistance] = useState(exercise.template?.goal_lap_distance || '');
+  const [notes, setNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [derived, setDerived] = useState(null); // which field was auto-derived
+
+  const tok = localStorage.getItem('ripfit_token');
+
+  // Parse MM:SS or plain number input → seconds
+  const parseDuration = (val) => {
+    if (!val) return null;
+    if (val.includes(':')) {
+      const [m, s] = val.split(':').map(Number);
+      return (m || 0) * 60 + (s || 0);
+    }
+    return parseInt(val) || null;
+  };
+
+  // Parse pace input MM:SS → decimal minutes
+  const parsePace = (val) => {
+    if (!val) return null;
+    if (val.includes(':')) {
+      const [m, s] = val.split(':').map(Number);
+      return parseFloat(((m || 0) + (s || 0) / 60).toFixed(4));
+    }
+    return parseFloat(val) || null;
+  };
+
+  // Auto-derive on blur of any field
+  const handleAutoDerive = () => {
+    if (paceOverridden) return;
+    const durSecs = parseDuration(durationInput);
+    const dist = parseFloat(distance) || null;
+    const paceVal = parsePace(pace);
+
+    if (durSecs && dist && !paceVal) {
+      const p = durationDistanceToPace(durSecs, dist);
+      setPace(formatPaceDisplay(p));
+      setDerived('pace');
+    } else if (durSecs && paceVal && !dist) {
+      const d = durationPaceToDistance(durSecs, paceVal);
+      setDistance(String(d));
+      setDerived('distance');
+    } else if (dist && paceVal && !durSecs) {
+      const secs = paceDistanceToDuration(paceVal, dist);
+      const m = Math.floor(secs / 60);
+      const s = secs % 60;
+      setDurationInput(`${m}:${String(s).padStart(2, '0')}`);
+      setDerived('duration');
+    }
+  };
+
+  const handleLog = async () => {
+    setSaving(true);
+    try {
+      const durSecs = parseDuration(durationInput);
+      const paceVal = parsePace(pace);
+      const segNum = segments.length + 1;
+
+      // For swimming: derive duration from laps × lap distance ÷ pace if possible
+      let finalDist = parseFloat(distance) || null;
+      if (isSwimming && laps && lapDistance) {
+        finalDist = finalDist || parseFloat(((parseInt(laps) * parseFloat(lapDistance)) / 1000).toFixed(3));
+      }
+
+      const body = {
+        segment_number: segNum,
+        segment_label: label,
+        duration_seconds: durSecs,
+        distance: finalDist,
+        distance_unit: userDistanceUnit,
+        pace: paceVal,
+        pace_unit: userPaceUnit,
+        pace_overridden: paceOverridden,
+        reps: parseInt(reps) || null,
+        notes: notes || null,
+      };
+
+      const res = await fetch(
+        `${API_BASE}/workouts/${workoutId}/exercises/${exercise.id}/cardio-segments`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` }, body: JSON.stringify(body) }
+      );
+      const data = await res.json();
+      setSegments(prev => [...prev, data]);
+
+      // Reset form
+      setDurationInput(''); setDistance(''); setPace('');
+      setPaceOverridden(false); setReps(''); setNotes('');
+      setDerived(null);
+    } catch (e) {
+      console.error('Failed to log cardio segment:', e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="set-form cardio-segment-form">
+      <h4>Log {label} {segments.length + 1}</h4>
+
+      {/* Goal display */}
+      {exercise.template && (exercise.template.goal_duration_seconds || exercise.template.goal_distance || exercise.template.goal_pace) && (
+        <div className="cardio-goal-display">
+          <strong>Goal: </strong>
+          {exercise.template.goal_distance && <span>{exercise.template.goal_distance} {userDistanceUnit}</span>}
+          {exercise.template.goal_pace && <span> @ {formatPaceDisplay(exercise.template.goal_pace)} {userPaceUnit}</span>}
+          {exercise.template.goal_duration_seconds && <span> → {formatDurationDisplay(exercise.template.goal_duration_seconds)}</span>}
+          {exercise.template.goal_laps && <span>{exercise.template.goal_laps} laps</span>}
+          {exercise.template.goal_lap_distance && <span> ({exercise.template.goal_lap_distance}m/lap)</span>}
+        </div>
+      )}
+
+      <div className="form-row">
+        {isInterval ? (
+          <>
+            <input type="number" placeholder="Rounds / Reps" value={reps} onChange={e => setReps(e.target.value)} />
+            <input type="text" placeholder="Duration (MM:SS)" value={durationInput} onChange={e => setDurationInput(e.target.value)} onBlur={handleAutoDerive} />
+          </>
+        ) : isSwimming ? (
+          <>
+            <input type="number" placeholder="Laps" value={laps} onChange={e => setLaps(e.target.value)} onBlur={handleAutoDerive} />
+            <input type="number" step="0.1" placeholder="Lap distance (m)" value={lapDistance} onChange={e => setLapDistance(e.target.value)} onBlur={handleAutoDerive} />
+            <input type="text" placeholder="Duration (MM:SS, optional)" value={durationInput} onChange={e => setDurationInput(e.target.value)} onBlur={handleAutoDerive} />
+          </>
+        ) : (
+          <>
+            <input
+              type="text"
+              placeholder={`Duration (MM:SS)${derived === 'duration' ? ' ← auto' : ''}`}
+              value={durationInput}
+              onChange={e => { setDurationInput(e.target.value); setDerived(null); }}
+              onBlur={handleAutoDerive}
+            />
+            <input
+              type="number"
+              step="0.01"
+              placeholder={`Distance (${userDistanceUnit})${derived === 'distance' ? ' ← auto' : ''}`}
+              value={distance}
+              onChange={e => { setDistance(e.target.value); setDerived(null); }}
+              onBlur={handleAutoDerive}
+            />
+            <div style={{ position: 'relative' }}>
+              <input
+                type="text"
+                placeholder={`Pace (${userPaceUnit})${derived === 'pace' ? ' ← auto' : ''}`}
+                value={pace}
+                onChange={e => { setPace(e.target.value); setPaceOverridden(true); setDerived(null); }}
+                onBlur={handleAutoDerive}
+                style={{ width: '100%' }}
+              />
+              {paceOverridden && (
+                <button
+                  onClick={() => { setPaceOverridden(false); setDerived(null); handleAutoDerive(); }}
+                  style={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)', fontSize: '0.7em', padding: '2px 4px', background: 'none', border: '1px solid #888', borderRadius: 3, cursor: 'pointer', color: '#888' }}
+                  title="Clear override, re-derive"
+                >↺</button>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
+      <input
+        type="text"
+        placeholder="Notes (optional)"
+        value={notes}
+        onChange={e => setNotes(e.target.value)}
+        style={{ width: '100%', marginTop: '8px', padding: '8px', boxSizing: 'border-box' }}
+      />
+
+      <button onClick={handleLog} className="log-set-btn" disabled={saving} style={{ marginTop: '10px' }}>
+        {saving ? 'Saving…' : `Log ${label}`}
+      </button>
+    </div>
+  );
+}
+
 // ── Free Lift Title Modal ─────────────────────────────────────────────────
 // Prompts for a custom title when starting a Free Lift. Title is optional —
 // skipping defaults to "Free Lift — <date>". Can be updated during/after workout.
@@ -656,6 +905,8 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
   // Rating captured in finish modal so it saves with the workout, not after
   const [pendingRating, setPendingRating] = useState(null);
   const [ratingPrefs, setRatingPrefs] = useState({ label: 'Effort & Vibes', scale: 5, display: 'slider' });
+  // Cardio segments keyed by workout_exercise_id — persists across exercise navigation
+  const [cardioSegmentsByExercise, setCardioSegmentsByExercise] = useState({});
 
   useEffect(() => {
     const tok = localStorage.getItem('ripfit_token');
@@ -859,37 +1110,61 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
   };
 
   const handleAddExercise = async (exercise, targets) => {
-    const token = localStorage.getItem('ripfit_token');
+    const tok = localStorage.getItem('ripfit_token');
     try {
+      const isCardio = exercise.category === 'Cardio';
+      const goalDurationSecs = targets.duration ? parseInt(targets.duration) * 60 : null;
+      const goalPaceVal = targets.pace ? parsePaceString(targets.pace) : null;
+
+      const addBody = {
+        exercise_id: exercise.id,
+        order_index: exercises.length + 1,
+        ...(isCardio ? {
+          goal_duration_seconds: goalDurationSecs,
+          goal_distance: targets.distance ? parseFloat(targets.distance) : null,
+          goal_distance_unit: 'mi',
+          goal_pace: goalPaceVal,
+          goal_pace_unit: 'min/mile',
+          goal_laps: targets.laps ? parseInt(targets.laps) : null,
+          goal_lap_distance: targets.lapDistance ? parseFloat(targets.lapDistance) : null,
+        } : {
+          target_sets: targets.sets ? parseInt(targets.sets) : null,
+          target_reps: targets.reps ? parseInt(targets.reps) : null,
+          target_weight: targets.weight && !['BW', '0', '-'].includes(targets.weight.toString().toUpperCase())
+            ? parseFloat(targets.weight) : null,
+        })
+      };
+
       const res = await fetch(`${API_BASE}/workouts/${workout.workout.id}/exercises`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          exercise_id: exercise.id,
-          order_index: exercises.length + 1
-        })
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
+        body: JSON.stringify(addBody)
       });
       const data = await res.json();
-      
-      // Update parent workout state
+
       setActiveWorkout({
         ...workout,
         exercises: [...exercises, {
           ...data,
           exercise_name: exercise.name,
           category: exercise.category,
+          subcategory: exercise.subcategory || null,
           equipment_type: exercise.equipment_type,
           logged_sets: [],
-          is_ad_hoc: true, // flags this for the end-of-workout "save to routine?" prompt
-          template: {
+          is_ad_hoc: true,
+          template: isCardio ? {
+            goal_duration_seconds: goalDurationSecs,
+            goal_distance: targets.distance ? parseFloat(targets.distance) : null,
+            goal_distance_unit: 'mi',
+            goal_pace: goalPaceVal,
+            goal_pace_unit: 'min/mile',
+            goal_laps: targets.laps ? parseInt(targets.laps) : null,
+            goal_lap_distance: targets.lapDistance ? parseFloat(targets.lapDistance) : null,
+          } : {
             target_sets: targets.sets ? parseInt(targets.sets) : null,
             target_reps: targets.reps ? parseInt(targets.reps) : null,
-            target_weight: targets.weight && !['BW', '0', '-'].includes(targets.weight.toString().toUpperCase()) 
-              ? parseFloat(targets.weight) 
-              : null
+            target_weight: targets.weight && !['BW', '0', '-'].includes(targets.weight.toString().toUpperCase())
+              ? parseFloat(targets.weight) : null,
           }
         }]
       });
@@ -1230,10 +1505,25 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
         </div>
         <p className="category">{currentExercise.category} • {currentExercise.equipment_type}</p>
 
-        {currentExercise.template && (
-          <div className="template-info">
-            <strong>Target:</strong> {currentExercise.template.target_sets} sets × {currentExercise.template.target_reps} reps @ {currentExercise.template.target_weight} lbs
-          </div>
+        {currentExercise.category === 'Cardio' ? (
+          // ── Cardio exercise goal display ──
+          currentExercise.template && (currentExercise.template.goal_duration_seconds || currentExercise.template.goal_distance || currentExercise.template.goal_pace) ? (
+            <div className="template-info">
+              <strong>Goal: </strong>
+              {currentExercise.template.goal_distance && <span>{currentExercise.template.goal_distance} {currentExercise.template.goal_distance_unit || 'mi'} </span>}
+              {currentExercise.template.goal_pace && <span>@ {formatPaceDisplay(currentExercise.template.goal_pace)} {currentExercise.template.goal_pace_unit || 'min/mile'} </span>}
+              {currentExercise.template.goal_duration_seconds && <span>→ {formatDurationDisplay(currentExercise.template.goal_duration_seconds)}</span>}
+              {currentExercise.template.goal_laps && <span>{currentExercise.template.goal_laps} laps</span>}
+              {currentExercise.template.goal_lap_distance && <span> ({currentExercise.template.goal_lap_distance}m/lap)</span>}
+            </div>
+          ) : null
+        ) : (
+          // ── Strength exercise target display ──
+          currentExercise.template && (
+            <div className="template-info">
+              <strong>Target:</strong> {currentExercise.template.target_sets} sets × {currentExercise.template.target_reps} reps @ {currentExercise.template.target_weight} lbs
+            </div>
+          )
         )}
 
         {currentExercise.last_performance && (
@@ -1268,28 +1558,50 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
           </div>
         )}
 
-        <div className="logged-sets">
-          <h4>Sets Logged:</h4>
-          {loggedSets.length === 0 ? (
-            <p>No sets yet</p>
-          ) : (
-            loggedSets.map((set, idx) => {
-              const highRPE = set.rpe && parseInt(set.rpe) >= 10;
-              const targetReps = currentExercise.template?.target_reps;
-              const targetWeight = currentExercise.template?.target_weight;
-              const underReps = targetReps && set.reps_completed < parseInt(targetReps);
-              const underWeight = targetWeight && parseFloat(set.weight_used) < parseFloat(targetWeight);
-              const underperformed = underReps || underWeight;
-              return (
-                <div key={idx} className={`set-entry ${highRPE ? 'rpe-warning' : underperformed ? 'under-target' : ''}`}>
-                  Set {set.set_number}: {set.reps_completed} reps × {set.weight_used === 0 ? 'BW' : `${set.weight_used} lbs`}
-                  {set.rpe && ` @ RPE ${set.rpe}`}
-                  {highRPE && ' ⚠️'}
+        {currentExercise.category === 'Cardio' ? (
+          // ── Cardio: logged segments ──
+          <div className="logged-sets">
+            <h4>{cardioSegmentLabel(currentExercise.subcategory)}s Logged:</h4>
+            {(cardioSegmentsByExercise[currentExercise.id] || []).length === 0 ? (
+              <p>No {cardioSegmentLabel(currentExercise.subcategory).toLowerCase()}s yet</p>
+            ) : (
+              (cardioSegmentsByExercise[currentExercise.id] || []).map((seg, idx) => (
+                <div key={idx} className="set-entry">
+                  {seg.segment_label} {seg.segment_number}:
+                  {seg.duration_seconds ? ` ${formatDurationDisplay(seg.duration_seconds)}` : ''}
+                  {seg.distance ? ` · ${seg.distance} ${seg.distance_unit || ''}` : ''}
+                  {seg.pace ? ` · ${formatPaceDisplay(seg.pace)} ${seg.pace_unit || ''}` : ''}
+                  {seg.reps ? ` · ${seg.reps} reps` : ''}
+                  {seg.notes ? ` · ${seg.notes}` : ''}
                 </div>
-              );
-            })
-          )}
-        </div>
+              ))
+            )}
+          </div>
+        ) : (
+          // ── Strength: logged sets ──
+          <div className="logged-sets">
+            <h4>Sets Logged:</h4>
+            {loggedSets.length === 0 ? (
+              <p>No sets yet</p>
+            ) : (
+              loggedSets.map((set, idx) => {
+                const highRPE = set.rpe && parseInt(set.rpe) >= 10;
+                const targetReps = currentExercise.template?.target_reps;
+                const targetWeight = currentExercise.template?.target_weight;
+                const underReps = targetReps && set.reps_completed < parseInt(targetReps);
+                const underWeight = targetWeight && parseFloat(set.weight_used) < parseFloat(targetWeight);
+                const underperformed = underReps || underWeight;
+                return (
+                  <div key={idx} className={`set-entry ${highRPE ? 'rpe-warning' : underperformed ? 'under-target' : ''}`}>
+                    Set {set.set_number}: {set.reps_completed} reps × {set.weight_used === 0 ? 'BW' : `${set.weight_used} lbs`}
+                    {set.rpe && ` @ RPE ${set.rpe}`}
+                    {highRPE && ' ⚠️'}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
 
         <div className="exercise-notes-section">
           <h4>Exercise Notes</h4>
@@ -1452,38 +1764,52 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
           </div>
         )}
 
-        <div className={`set-form ${isResting ? 'resting' : ''}`}>
-          <h4>Log Set {loggedSets.length + 1}</h4>
-          <div className="form-row">
-            <input
-              type="number"
-              placeholder="Reps"
-              value={setForm.reps}
-              onChange={(e) => setSetForm({...setForm, reps: e.target.value})}
-            />
-            <input
-              type="number"
-              step="0.1"
-              placeholder="Weight (lbs)"
-              value={setForm.weight}
-              onChange={(e) => setSetForm({...setForm, weight: e.target.value})}
-            />
-            <input
-              type="number"
-              placeholder="RPE (optional)"
-              min="1"
-              max="11"
-              value={setForm.rpe}
-              onChange={(e) => {
-                const val = e.target.value;
-                if (val === '' || (parseInt(val) >= 1 && parseInt(val) <= 11)) {
-                  setSetForm({...setForm, rpe: val});
-                }
-              }}
-            />
+        {currentExercise.category === 'Cardio' ? (
+          <CardioSegmentForm
+            exercise={currentExercise}
+            workoutId={workout.workout.id}
+            segments={cardioSegmentsByExercise[currentExercise.id] || []}
+            setSegments={(updater) => setCardioSegmentsByExercise(prev => ({
+              ...prev,
+              [currentExercise.id]: typeof updater === 'function'
+                ? updater(prev[currentExercise.id] || [])
+                : updater,
+            }))}
+          />
+        ) : (
+          <div className={`set-form ${isResting ? 'resting' : ''}`}>
+            <h4>Log Set {loggedSets.length + 1}</h4>
+            <div className="form-row">
+              <input
+                type="number"
+                placeholder="Reps"
+                value={setForm.reps}
+                onChange={(e) => setSetForm({...setForm, reps: e.target.value})}
+              />
+              <input
+                type="number"
+                step="0.1"
+                placeholder="Weight (lbs)"
+                value={setForm.weight}
+                onChange={(e) => setSetForm({...setForm, weight: e.target.value})}
+              />
+              <input
+                type="number"
+                placeholder="RPE (optional)"
+                min="1"
+                max="11"
+                value={setForm.rpe}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '' || (parseInt(val) >= 1 && parseInt(val) <= 11)) {
+                    setSetForm({...setForm, rpe: val});
+                  }
+                }}
+              />
+            </div>
+            <button onClick={handleLogSet} className="log-set-btn">Complete Set</button>
           </div>
-          <button onClick={handleLogSet} className="log-set-btn">Complete Set</button>
-        </div>
+        )}
 
         <div className="exercise-nav">
           <button onClick={prevExercise} disabled={currentExerciseIdx === 0}>
@@ -1922,7 +2248,7 @@ function AddExerciseModal({ onAdd, onClose }) {
   const [searchOffset, setSearchOffset] = useState(0);
   const [searchTotal, setSearchTotal] = useState(0);
   const [selectedExercise, setSelectedExercise] = useState(null);
-  const [targets, setTargets] = useState({ sets: '', reps: '', weight: '' });
+  const [targets, setTargets] = useState({ sets: '', reps: '', weight: '', duration: '', distance: '', pace: '', laps: '', lapDistance: '' });
   const [muscleFilter, setMuscleFilter] = useState('');
   const [equipmentFilter, setEquipmentFilter] = useState('');
   const [showMuscleFilters, setShowMuscleFilters] = useState(false);
@@ -1997,7 +2323,7 @@ function AddExerciseModal({ onAdd, onClose }) {
   const handleAddExercise = () => {
     onAdd(selectedExercise, targets);
     setSelectedExercise(null);
-    setTargets({ sets: '', reps: '', weight: '' });
+    setTargets({ sets: '', reps: '', weight: '', duration: '', distance: '', pace: '', laps: '', lapDistance: '' });
     setSearchQuery('');
     setSearchResults([]);
   };
