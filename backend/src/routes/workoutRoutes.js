@@ -31,4 +31,3 @@ router.post('/:workoutId/exercises/:exerciseId/cardio-segments', authenticate, w
 router.get('/:workoutId/exercises/:exerciseId/cardio-segments', authenticate, workoutController.getCardioSegments);
 
 module.exports = router;
-
