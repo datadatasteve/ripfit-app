@@ -205,31 +205,33 @@ function CardioSegmentForm({ exercise, workoutId, segments, setSegments, userPac
   };
 
   // Auto-derive the third value whenever two are filled.
-  // Called on blur. Always re-derives unless pace was manually overridden.
+  // Always recalculates on blur unless pace was manually overridden AND all three are filled.
   const handleAutoDerive = () => {
     const durSecs = parseDuration(durationInput);
     const dist = parseFloat(distance) || null;
     const paceVal = parsePace(pace);
 
-    if (durSecs && dist && !paceOverridden) {
+    const hasDur = !!durSecs;
+    const hasDist = !!dist;
+    const hasPace = !!paceVal;
+
+    if (hasDur && hasDist && !paceOverridden) {
       // Duration + distance → derive pace
       const p = durationDistanceToPace(durSecs, dist);
-      if (p) setPace(formatPaceDisplay(p));
-      setDerived('pace');
-    } else if (durSecs && paceVal && !dist) {
+      if (p) { setPace(formatPaceDisplay(p)); setDerived('pace'); }
+    } else if (hasDur && hasPace && !hasDist) {
       // Duration + pace → derive distance
       const d = durationPaceToDistance(durSecs, paceVal);
-      if (d) setDistance(String(d));
-      setDerived('distance');
-    } else if (dist && paceVal && !durSecs) {
+      if (d) { setDistance(String(d)); setDerived('distance'); }
+    } else if (hasDist && hasPace && !hasDur) {
       // Distance + pace → derive duration
       const secs = paceDistanceToDuration(paceVal, dist);
       if (secs) {
         const m = Math.floor(secs / 60);
         const s = secs % 60;
         setDurationInput(`${m}:${String(s).padStart(2, '0')}`);
+        setDerived('duration');
       }
-      setDerived('duration');
     }
   };
 
@@ -378,7 +380,7 @@ function CardioSegmentForm({ exercise, workoutId, segments, setSegments, userPac
 function FreeLiftTitleModal({ onStart, onClose }) {
   const today = new Date();
   const dateStr = today.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  const defaultTitle = `Free Lift — ${dateStr}`;
+  const defaultTitle = `Open Session — ${dateStr}`;
   const [title, setTitle] = useState('');
 
   const handleStart = () => {
@@ -389,7 +391,7 @@ function FreeLiftTitleModal({ onStart, onClose }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <h3>Name Your Workout</h3>
+        <h3>Name Your Session</h3>
         <p style={{ fontSize: '0.9em', color: '#888', marginBottom: '12px' }}>
           Optional — leave blank to use default.
         </p>
@@ -458,13 +460,19 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
     }
   };
 
-  const startWorkout = async (routineId, workout_title = null) => {
+  const startWorkout = async (routineId, workout_title = null, preloadCardio = null) => {
     try {
       let res;
+      const today = new Date();
+      const dateStr = today.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
       if (routineId === null) {
-        const today = new Date();
-        const dateStr = today.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        const finalTitle = workout_title || `Free Lift — ${dateStr}`;
+        let finalTitle;
+        if (preloadCardio) {
+          finalTitle = workout_title || `${preloadCardio.typeDef.name} — ${dateStr}`;
+        } else {
+          finalTitle = workout_title || `Open Session — ${dateStr}`;
+        }
         res = await fetch(`${API_BASE}/workouts/start-free`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -477,10 +485,79 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
         res = await fetch(`${API_BASE}/routines/${routineId}/start-workout`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ workout_date: new Date().toISOString().split('T')[0] }),
+          body: JSON.stringify({ workout_date: today.toISOString().split('T')[0] }),
         });
       }
       const data = await res.json();
+
+      // If Quick Cardio was used, pre-add the cardio exercise
+      if (preloadCardio && data.workout?.id) {
+        const { typeDef, goals } = preloadCardio;
+        // Find the exercise ID for this cardio type from the DB
+        const exRes = await fetch(
+          `${API_BASE}/workouts/exercises/search?q=${encodeURIComponent(typeDef.name)}&limit=1`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const exData = await exRes.json();
+        const exercise = exData.exercises?.[0];
+
+        if (exercise) {
+          // Parse pace MM:SS → decimal minutes
+          const parsePace = (val) => {
+            if (!val) return null;
+            if (String(val).includes(':')) {
+              const [m, s] = String(val).split(':').map(Number);
+              return parseFloat(((m || 0) + (s || 0) / 60).toFixed(4));
+            }
+            return parseFloat(val) || null;
+          };
+
+          const addRes = await fetch(`${API_BASE}/workouts/${data.workout.id}/exercises`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({
+              exercise_id: exercise.id,
+              order_index: 1,
+              goal_duration_seconds: goals.duration ? parseInt(goals.duration) * 60 : null,
+              goal_distance: goals.distance ? parseFloat(goals.distance) : null,
+              goal_distance_unit: goals.distance_unit || 'mi',
+              goal_pace: parsePace(goals.pace),
+              goal_pace_unit: 'min/mile',
+              goal_laps: goals.laps ? parseInt(goals.laps) : null,
+              goal_lap_distance: goals.lap_distance ? parseFloat(goals.lap_distance) : null,
+            }),
+          });
+          const addedEx = await addRes.json();
+
+          data.exercises = [{
+            ...addedEx,
+            exercise_name: exercise.name,
+            category: exercise.category,
+            subcategory: typeDef.subcategory,
+            equipment_type: exercise.equipment_type,
+            logged_sets: [],
+            template: {
+              goal_duration_seconds: goals.duration ? parseInt(goals.duration) * 60 : null,
+              goal_distance: goals.distance ? parseFloat(goals.distance) : null,
+              goal_distance_unit: goals.distance_unit || 'mi',
+              goal_pace: parsePace(goals.pace),
+              goal_pace_unit: 'min/mile',
+              goal_laps: goals.laps ? parseInt(goals.laps) : null,
+              goal_lap_distance: goals.lap_distance ? parseFloat(goals.lap_distance) : null,
+            },
+          }];
+
+          // Save pre-session notes if any
+          if (goals.pre_session_notes) {
+            await fetch(`${API_BASE}/workouts/${data.workout.id}/notes`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ overall_notes: goals.pre_session_notes }),
+            }).catch(() => {});
+          }
+        }
+      }
+
       setActiveWorkout(data);
     } catch (err) {
       console.error('Failed to start workout:', err);
@@ -776,20 +853,20 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
           onClick={() => setShowFreeLiftModal(true)}
           disabled={loading}
         >
-          Free Lift
+          Open Session
         </button>
         <div className="workout-type-row">
           <button
             className="workout-type-btn"
-            onClick={() => { /* scrolls to routines */ document.getElementById('routines-section')?.scrollIntoView({ behavior: 'smooth' }); }}
+            onClick={() => document.getElementById('routines-section')?.scrollIntoView({ behavior: 'smooth' })}
           >
-            Strength
+            Routines
           </button>
           <button
             className="workout-type-btn"
             onClick={() => setShowCardio(true)}
           >
-            Cardio
+            Quick Cardio
           </button>
         </div>
       </div>
@@ -836,17 +913,20 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
         <FreeLiftTitleModal
           onStart={(title) => {
             setShowFreeLiftModal(false);
-            startWorkout(null, title);
+            startWorkout(null, title, null);
           }}
           onClose={() => setShowFreeLiftModal(false)}
         />
       )}
 
       {showCardio && (
-        <CardioWorkout onClose={(result) => {
-          setShowCardio(false);
-          // Could show a summary toast here in future
-        }} />
+        <CardioWorkout
+          onStart={(typeDef, goals) => {
+            setShowCardio(false);
+            startWorkout(null, null, { typeDef, goals });
+          }}
+          onClose={() => setShowCardio(false)}
+        />
       )}
 
       {showRoutineBuilder && (
@@ -1407,7 +1487,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
     return (
       <div className="workout-container">
         <div className="workout-header">
-          <h2>{workout.routine_name || 'Free Lift'}</h2>
+          <h2>{workout.routine_name || 'Open Session'}</h2>
           <div className="header-buttons">
             {showHeaderClock && (
               <>
@@ -1639,8 +1719,50 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
         )}
 
         {currentExercise.category === 'Cardio' ? (
-          // ── Cardio: logged segments ──
+          // ── Cardio: running total + logged segments ──
           <div className="logged-sets">
+            {(() => {
+              const segs = cardioSegmentsByExercise[currentExercise.id] || [];
+              const totalDist = segs.reduce((s, seg) => s + (parseFloat(seg.distance) || 0), 0);
+              const totalSecs = segs.reduce((s, seg) => s + (parseInt(seg.duration_seconds) || 0), 0);
+              const goalDist = currentExercise.template?.goal_distance;
+              const goalSecs = currentExercise.template?.goal_duration_seconds;
+              const distUnit = currentExercise.template?.goal_distance_unit || 'mi';
+
+              return (segs.length > 0 || goalDist || goalSecs) ? (
+                <div className="cardio-running-total">
+                  {(totalDist > 0 || goalDist) && (
+                    <div className="cardio-total-row">
+                      <span>Distance: <strong>{totalDist.toFixed(2)} {distUnit}</strong></span>
+                      {goalDist && (
+                        <>
+                          <span> / {goalDist} {distUnit}</span>
+                          <div className="cardio-progress-bar">
+                            <div className="cardio-progress-fill"
+                              style={{ width: `${Math.min(100, (totalDist / goalDist) * 100).toFixed(1)}%` }} />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {(totalSecs > 0 || goalSecs) && (
+                    <div className="cardio-total-row">
+                      <span>Time: <strong>{formatDurationDisplay(totalSecs)}</strong></span>
+                      {goalSecs && (
+                        <>
+                          <span> / {formatDurationDisplay(goalSecs)}</span>
+                          <div className="cardio-progress-bar">
+                            <div className="cardio-progress-fill"
+                              style={{ width: `${Math.min(100, (totalSecs / goalSecs) * 100).toFixed(1)}%` }} />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : null;
+            })()}
+
             <h4>{cardioSegmentLabel(currentExercise.subcategory)}s Logged:</h4>
             {(cardioSegmentsByExercise[currentExercise.id] || []).length === 0 ? (
               <p>No {cardioSegmentLabel(currentExercise.subcategory).toLowerCase()}s yet</p>

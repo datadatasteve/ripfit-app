@@ -4,7 +4,7 @@ import {
   LineChart, Line, BarChart, Bar, ScatterChart, Scatter,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
-  AreaChart, Area,
+  AreaChart, Area, PieChart, Pie, Cell,
 } from 'recharts';
 import WorkoutHistory from './WorkoutHistory';
 import './StatsCenter.css';
@@ -281,57 +281,247 @@ function TimeWindowSelector({ weeks, setWeeks, customWeeks, setCustomWeeks }) {
   );
 }
 
+// ── WorkoutCalendar ───────────────────────────────────────────────────────
+// Renders a rolling N-month calendar. Past workout days get a dot.
+// Clicking a day with a workout opens a mini summary.
+function WorkoutCalendar({ months = 3 }) {
+  const [sessions, setSessions] = useState([]);
+  const [selected, setSelected] = useState(null); // { date, sessions[] }
+  const tooltipStyle = { background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: 6, padding: '8px 12px', fontSize: '0.85em' };
+
+  useEffect(() => {
+    apiFetch(`/combined?weeks=${months * 4}`)
+      .then(d => setSessions(d.sessions || []))
+      .catch(console.error);
+  }, [months]);
+
+  // Build a map of date → sessions[]
+  const byDate = {};
+  sessions.forEach(s => {
+    const d = s.date?.slice(0, 10);
+    if (!d) return;
+    if (!byDate[d]) byDate[d] = [];
+    byDate[d].push(s);
+  });
+
+  // Build months array
+  const today = new Date();
+  const calMonths = [];
+  for (let m = months - 1; m >= 0; m--) {
+    const d = new Date(today.getFullYear(), today.getMonth() - m, 1);
+    calMonths.push(d);
+  }
+
+  const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+
+  return (
+    <div className="sc-calendar">
+      {calMonths.map((monthStart, mIdx) => {
+        const year = monthStart.getFullYear();
+        const month = monthStart.getMonth();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const firstDow = new Date(year, month, 1).getDay();
+        const monthLabel = monthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        const cells = [];
+        for (let i = 0; i < firstDow; i++) cells.push(null);
+        for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+        return (
+          <div key={mIdx} className="sc-calendar-month">
+            <div className="sc-calendar-month-label">{monthLabel}</div>
+            <div className="sc-calendar-grid">
+              {DAY_LABELS.map(dl => <div key={dl} className="sc-cal-dow">{dl}</div>)}
+              {cells.map((day, i) => {
+                if (!day) return <div key={`e${i}`} className="sc-cal-cell empty" />;
+                const dateStr = `${year}-${String(month + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+                const daySessions = byDate[dateStr];
+                const isToday = dateStr === today.toISOString().slice(0,10);
+                const isSelected = selected?.date === dateStr;
+                return (
+                  <div
+                    key={dateStr}
+                    className={`sc-cal-cell ${daySessions ? 'has-workout' : ''} ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}`}
+                    onClick={() => daySessions && setSelected(isSelected ? null : { date: dateStr, sessions: daySessions })}
+                    title={daySessions ? daySessions.map(s => s.title).join(', ') : ''}
+                  >
+                    <span className="sc-cal-day">{day}</span>
+                    {daySessions && (
+                      <div className="sc-cal-dots">
+                        {daySessions.slice(0,3).map((s, si) => (
+                          <span key={si} className={`sc-cal-dot ${s.type}`} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+
+      {selected && (
+        <div className="sc-calendar-popup">
+          <div className="sc-cal-popup-header">
+            <strong>{new Date(selected.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</strong>
+            <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '1em' }}>✕</button>
+          </div>
+          {selected.sessions.map((s, i) => (
+            <div key={i} className="sc-cal-popup-session">
+              <span className={`history-type-badge ${s.type}`}>{s.type}</span>
+              <strong>{s.title}</strong>
+              {s.duration_seconds && <span> · {fmtDuration(s.duration_seconds)}</span>}
+              {s.session_rating && <span> · ⭐ {s.session_rating}/5</span>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="sc-calendar-legend">
+        <span><span className="sc-cal-dot strength" /> Strength</span>
+        <span><span className="sc-cal-dot cardio" /> Cardio</span>
+      </div>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // OVERVIEW TAB
 // ═══════════════════════════════════════════════════════════════════════════
 function OverviewTab() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [freqChart, setFreqChart] = useState('bar');
-  const [durationChart, setDurationChart] = useState('boxwhisker');
+  const [combinedChartMetric, setCombinedChartMetric] = useState('workouts'); // 'workouts' | 'duration' | 'both'
+  const [combinedChartType, setCombinedChartType] = useState('bar');
   const [ratingChart, setRatingChart] = useState('line');
+  const [durationPieData, setDurationPieData] = useState([]);
+  const [dayPieData, setDayPieData] = useState([]);
+  const [typePieData, setTypePieData] = useState([]);
   const [weeks, setWeeks] = useState(4);
   const [customWeeks, setCustomWeeks] = useState('');
 
   useEffect(() => {
     setLoading(true);
-    apiFetch(`/overview?weeks=${weeks}`)
-      .then(setData)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    Promise.all([
+      apiFetch(`/overview?weeks=${weeks}`),
+      apiFetch(`/combined?weeks=${weeks}`),
+    ]).then(([overview, combined]) => {
+      setData({ ...overview, sessions: combined.sessions || [] });
+
+      // Build pie chart data from combined sessions
+      const sessions = combined.sessions || [];
+
+      // Duration buckets
+      const dBuckets = { '< 30m': 0, '30–59m': 0, '60–90m': 0, '> 90m': 0 };
+      sessions.forEach(s => {
+        const m = (s.duration_seconds || 0) / 60;
+        if (m < 30) dBuckets['< 30m']++;
+        else if (m < 60) dBuckets['30–59m']++;
+        else if (m < 90) dBuckets['60–90m']++;
+        else dBuckets['> 90m']++;
+      });
+      setDurationPieData(Object.entries(dBuckets).filter(([,v]) => v > 0).map(([name, value]) => ({ name, value })));
+
+      // Day of week
+      const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      const dCounts = Array(7).fill(0);
+      sessions.forEach(s => {
+        const d = new Date(s.date + 'T12:00:00').getDay();
+        dCounts[d]++;
+      });
+      setDayPieData(DAYS.map((name, i) => ({ name, value: dCounts[i] })).filter(d => d.value > 0));
+
+      // Workout type
+      const tCounts = {};
+      sessions.forEach(s => { tCounts[s.type] = (tCounts[s.type] || 0) + 1; });
+      setTypePieData(Object.entries(tCounts).map(([name, value]) => ({ name, value })));
+    }).catch(console.error).finally(() => setLoading(false));
   }, [weeks]);
 
   if (loading) return <Loading />;
   if (!data) return <Empty />;
 
-  const { weekly_frequency, time_of_day, day_of_week, durations, ratings, totals } = data;
+  const { weekly_frequency, time_of_day, day_of_week, durations, ratings, totals, sessions } = data;
   const durationValues = durations.map(d => Math.round(d.duration_seconds / 60));
   const durationBW = boxWhisker(durationValues);
-  const freqData = weekly_frequency.map(w => ({
-    week: fmtDate(w.week_start),
-    workouts: parseInt(w.count),
-  }));
-  const ratingData = ratings.map(r => ({
-    date: fmtDate(r.date),
-    rating: parseFloat(r.rating),
-    type: r.type,
-  }));
 
-  const FREQ_OPTIONS = [
-    { value: 'bar', label: 'Bar chart', icon: '▮▮' },
-    { value: 'line', label: 'Line chart', icon: '╱' },
-    { value: 'area', label: 'Area chart', icon: '◬' },
+  // Combined freq + duration data
+  const combinedData = weekly_frequency.map(w => {
+    const weekSessions = sessions.filter(s => {
+      const sd = new Date(s.date + 'T12:00:00');
+      const wd = new Date(w.week_start);
+      const diff = (sd - wd) / (1000 * 60 * 60 * 24);
+      return diff >= 0 && diff < 7;
+    });
+    const avgDur = weekSessions.length
+      ? Math.round(weekSessions.reduce((s, x) => s + (x.duration_seconds || 0), 0) / weekSessions.length / 60)
+      : 0;
+    return { week: fmtDate(w.week_start), workouts: parseInt(w.count), avg_duration: avgDur };
+  });
+
+  const ratingData = ratings.map(r => ({ date: fmtDate(r.date), rating: parseFloat(r.rating), type: r.type }));
+
+  const COMBINED_METRIC_OPTIONS = [
+    { value: 'workouts', label: 'Frequency', icon: '▮▮' },
+    { value: 'duration', label: 'Duration', icon: '⏱' },
+    { value: 'both', label: 'Both', icon: '⊡' },
   ];
-  const DUR_OPTIONS = [
-    { value: 'boxwhisker', label: 'Box & whisker', icon: '⊡' },
-    { value: 'bar', label: 'Bar chart', icon: '▮▮' },
-    { value: 'scatter', label: 'Scatter', icon: '⋯' },
+  const COMBINED_TYPE_OPTIONS = [
+    { value: 'bar', label: 'Bar', icon: '▮▮' },
+    { value: 'line', label: 'Line', icon: '╱' },
+    { value: 'area', label: 'Area', icon: '◬' },
   ];
   const RATING_OPTIONS = [
-    { value: 'line', label: 'Line chart', icon: '╱' },
-    { value: 'bar', label: 'Bar chart', icon: '▮▮' },
+    { value: 'line', label: 'Line', icon: '╱' },
+    { value: 'bar', label: 'Bar', icon: '▮▮' },
     { value: 'scatter', label: 'Scatter', icon: '⋯' },
   ];
+
+  const PIE_COLORS = ['var(--color-primary)', 'var(--color-warning)', 'var(--color-info)', 'var(--color-success)', '#a855f7', '#ec4899'];
+  const axisStyle = { fontSize: 11, fill: 'var(--text-secondary)' };
+  const tooltipStyle = { background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' };
+
+  const renderCombinedChart = () => {
+    const ChartComp = combinedChartType === 'area' ? AreaChart : combinedChartType === 'line' ? LineChart : BarChart;
+    const DataComp = combinedChartType === 'area' ? Area : combinedChartType === 'line' ? Line : Bar;
+    const commonProps = { data: combinedData, margin: { top: 4, right: 8, left: 0, bottom: 0 } };
+
+    if (combinedChartMetric === 'both') return (
+      <ResponsiveContainer width="100%" height={240}>
+        <BarChart {...commonProps}>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+          <XAxis dataKey="week" tick={axisStyle} />
+          <YAxis yAxisId="left" tick={axisStyle} allowDecimals={false} />
+          <YAxis yAxisId="right" orientation="right" tick={axisStyle} unit="m" />
+          <Tooltip contentStyle={tooltipStyle} />
+          <Legend />
+          <Bar yAxisId="left" dataKey="workouts" fill="var(--color-primary)" radius={[2,2,0,0]} name="Workouts" />
+          <Line yAxisId="right" type="monotone" dataKey="avg_duration" stroke="var(--color-warning)" strokeWidth={2} dot={false} name="Avg Duration (m)" />
+        </BarChart>
+      </ResponsiveContainer>
+    );
+
+    const dataKey = combinedChartMetric === 'duration' ? 'avg_duration' : 'workouts';
+    const color = combinedChartMetric === 'duration' ? 'var(--color-warning)' : 'var(--color-primary)';
+    const unit = combinedChartMetric === 'duration' ? 'm' : '';
+
+    return (
+      <ResponsiveContainer width="100%" height={220}>
+        <ChartComp {...commonProps}>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+          <XAxis dataKey="week" tick={axisStyle} />
+          <YAxis tick={axisStyle} allowDecimals={false} unit={unit} />
+          <Tooltip contentStyle={tooltipStyle} />
+          {combinedChartType === 'area'
+            ? <Area type="monotone" dataKey={dataKey} stroke={color} fill={color} fillOpacity={0.15} />
+            : combinedChartType === 'line'
+            ? <Line type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2} dot={{ r: 3 }} />
+            : <Bar dataKey={dataKey} fill={color} radius={[3,3,0,0]} />
+          }
+        </ChartComp>
+      </ResponsiveContainer>
+    );
+  };
 
   return (
     <div>
@@ -342,85 +532,85 @@ function OverviewTab() {
         <StatCard label="Avg Rating" value={totals.avg_rating ?? '—'} sub="/ 5" />
       </div>
 
-      {/* Time window */}
-      <TimeWindowSelector weeks={weeks} setWeeks={setWeeks} customWeeks={customWeeks} setCustomWeeks={setCustomWeeks} />
-
-      {/* Weekly frequency */}
-      <Section
-        title="Workout Frequency"
-        controls={<ChartTypeToggle options={FREQ_OPTIONS} value={freqChart} onChange={setFreqChart} />}
-      >
-        {freqData.length === 0 ? <Empty /> : (
-          <ResponsiveContainer width="100%" height={220}>
-            {freqChart === 'bar' ? (
-              <BarChart data={freqData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
-                <XAxis dataKey="week" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
-                <YAxis tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} allowDecimals={false} />
-                <Tooltip contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }} />
-                <Bar dataKey="workouts" fill="var(--color-primary)" radius={[3, 3, 0, 0]} />
-              </BarChart>
-            ) : freqChart === 'line' ? (
-              <LineChart data={freqData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
-                <XAxis dataKey="week" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
-                <YAxis tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} allowDecimals={false} />
-                <Tooltip contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }} />
-                <Line type="monotone" dataKey="workouts" stroke="var(--color-primary)" strokeWidth={2} dot={false} />
-              </LineChart>
-            ) : (
-              <AreaChart data={freqData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
-                <XAxis dataKey="week" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
-                <YAxis tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} allowDecimals={false} />
-                <Tooltip contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }} />
-                <Area type="monotone" dataKey="workouts" stroke="var(--color-primary)" fill="var(--color-primary)" fillOpacity={0.15} />
-              </AreaChart>
-            )}
-          </ResponsiveContainer>
-        )}
+      {/* Calendar */}
+      <Section title="Activity Calendar">
+        <WorkoutCalendar months={3} />
       </Section>
 
-      {/* Day/time heatmap */}
+      {/* Time window selector */}
+      <TimeWindowSelector weeks={weeks} setWeeks={setWeeks} customWeeks={customWeeks} setCustomWeeks={setCustomWeeks} />
+
+      {/* Combined frequency + duration chart */}
+      <Section
+        title="Workout Frequency & Duration"
+        controls={
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <ChartTypeToggle options={COMBINED_METRIC_OPTIONS} value={combinedChartMetric} onChange={setCombinedChartMetric} />
+            <ChartTypeToggle options={COMBINED_TYPE_OPTIONS} value={combinedChartType} onChange={setCombinedChartType} />
+          </div>
+        }
+      >
+        {combinedData.length === 0 ? <Empty /> : renderCombinedChart()}
+      </Section>
+
+      {/* When you train heatmap */}
       <Section title="When You Train">
         {day_of_week.length === 0 && time_of_day.length === 0 ? <Empty /> : (
           <WorkoutHeatmap timeOfDay={time_of_day} dayOfWeek={day_of_week} />
         )}
       </Section>
 
-      {/* Duration distribution */}
-      <Section
-        title="Session Duration"
-        controls={<ChartTypeToggle options={DUR_OPTIONS} value={durationChart} onChange={setDurationChart} />}
-      >
-        {durationValues.length === 0 ? <Empty /> : (
-          durationChart === 'boxwhisker' ? (
-            <BoxWhiskerBar data={durationBW} unit="m" />
-          ) : durationChart === 'bar' ? (
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={durationValues.map((v, i) => ({ session: i + 1, minutes: v }))}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
-                <XAxis dataKey="session" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} label={{ value: 'Session', position: 'insideBottom', offset: -2, fill: 'var(--text-secondary)', fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} unit="m" />
-                <Tooltip contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }} formatter={v => [`${v}m`, 'Duration']} />
-                <Bar dataKey="minutes" fill="var(--color-info)" radius={[2, 2, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <ResponsiveContainer width="100%" height={200}>
-              <ScatterChart>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
-                <XAxis dataKey="session" name="Session" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
-                <YAxis dataKey="minutes" name="Minutes" unit="m" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
-                <Tooltip contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }} cursor={{ strokeDasharray: '3 3' }} />
-                <Scatter data={durationValues.map((v, i) => ({ session: i + 1, minutes: v }))} fill="var(--color-info)" />
-              </ScatterChart>
-            </ResponsiveContainer>
-          )
-        )}
+      {/* Pie chart distributions */}
+      <Section title="Workout Distributions">
+        <div className="sc-pie-row">
+          {durationPieData.length > 0 && (
+            <div className="sc-pie-card">
+              <div className="sc-pie-title">Session Length</div>
+              <ResponsiveContainer width="100%" height={180}>
+                <PieChart>
+                  <Pie data={durationPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={65} label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`} labelLine={false}>
+                    {durationPieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip contentStyle={tooltipStyle} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+          {dayPieData.length > 0 && (
+            <div className="sc-pie-card">
+              <div className="sc-pie-title">Day of Week</div>
+              <ResponsiveContainer width="100%" height={180}>
+                <PieChart>
+                  <Pie data={dayPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={65} label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`} labelLine={false}>
+                    {dayPieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip contentStyle={tooltipStyle} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+          {typePieData.length > 0 && (
+            <div className="sc-pie-card">
+              <div className="sc-pie-title">Workout Type</div>
+              <ResponsiveContainer width="100%" height={180}>
+                <PieChart>
+                  <Pie data={typePieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={65} label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`} labelLine={false}>
+                    {typePieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip contentStyle={tooltipStyle} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
       </Section>
 
-      {/* Session rating over time */}
+      {/* Session duration box & whisker */}
+      <Section title="Session Duration Spread">
+        {durationValues.length === 0 ? <Empty /> : <BoxWhiskerBar data={durationBW} unit="m" />}
+      </Section>
+
+      {/* Effort & Vibes */}
       <Section
         title="Effort & Vibes Over Time"
         controls={<ChartTypeToggle options={RATING_OPTIONS} value={ratingChart} onChange={setRatingChart} />}
@@ -430,25 +620,25 @@ function OverviewTab() {
             {ratingChart === 'scatter' ? (
               <ScatterChart>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
-                <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
-                <YAxis domain={[0, 5]} tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
-                <Tooltip contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }} />
+                <XAxis dataKey="date" tick={axisStyle} />
+                <YAxis domain={[0, 5]} tick={axisStyle} />
+                <Tooltip contentStyle={tooltipStyle} />
                 <Scatter data={ratingData} fill="var(--color-warning)" />
               </ScatterChart>
             ) : ratingChart === 'bar' ? (
               <BarChart data={ratingData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
-                <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
-                <YAxis domain={[0, 5]} tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
-                <Tooltip contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }} />
-                <Bar dataKey="rating" fill="var(--color-warning)" radius={[2, 2, 0, 0]} />
+                <XAxis dataKey="date" tick={axisStyle} />
+                <YAxis domain={[0, 5]} tick={axisStyle} />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Bar dataKey="rating" fill="var(--color-warning)" radius={[2,2,0,0]} />
               </BarChart>
             ) : (
               <LineChart data={ratingData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
-                <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
-                <YAxis domain={[0, 5]} tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
-                <Tooltip contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }} />
+                <XAxis dataKey="date" tick={axisStyle} />
+                <YAxis domain={[0, 5]} tick={axisStyle} />
+                <Tooltip contentStyle={tooltipStyle} />
                 <Line type="monotone" dataKey="rating" stroke="var(--color-warning)" strokeWidth={2} dot={{ r: 3 }} />
               </LineChart>
             )}

@@ -1,342 +1,143 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import './CardioWorkout.css';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
-
-const CARDIO_TYPES = [
-  'Indoor Cycling', 'Outdoor Cycling', 'Treadmill', 'Outdoor Running',
-  'Indoor Track', 'Walking', 'Hiking', 'Elliptical', 'Rowing Machine',
-  'Swimming', 'Jump Rope', 'Stair Climber', 'HIIT', 'Sprints', 'Suicides',
+// Cardio type definitions with subcategory and field config
+export const CARDIO_TYPES = [
+  { name: 'Indoor Cycling',   subcategory: 'Cycling',   fields: ['duration','distance','pace'] },
+  { name: 'Outdoor Cycling',  subcategory: 'Cycling',   fields: ['duration','distance','pace','elevation'] },
+  { name: 'Treadmill',        subcategory: 'Machine',   fields: ['duration','distance','pace'] },
+  { name: 'Outdoor Running',  subcategory: 'Running',   fields: ['duration','distance','pace','elevation'] },
+  { name: 'Indoor Running',   subcategory: 'Running',   fields: ['duration','distance','pace'] },
+  { name: 'Walking',          subcategory: 'Walking',   fields: ['duration','distance','pace'] },
+  { name: 'Hiking',           subcategory: 'Walking',   fields: ['duration','distance','pace','elevation'] },
+  { name: 'Elliptical',       subcategory: 'Machine',   fields: ['duration','distance','pace'] },
+  { name: 'Rowing Machine',   subcategory: 'Machine',   fields: ['duration','distance','pace'] },
+  { name: 'Swimming',         subcategory: 'Swimming',  fields: ['duration','laps','lap_distance'] },
+  { name: 'Jump Rope',        subcategory: 'Interval',  fields: ['duration','reps'] },
+  { name: 'Stair Climber',    subcategory: 'Machine',   fields: ['duration','floors','pace'] },
+  { name: 'HIIT',             subcategory: 'Interval',  fields: ['duration','reps'] },
+  { name: 'Sprints',          subcategory: 'Interval',  fields: ['duration','distance','reps'] },
+  { name: 'Suicides / Shuttles', subcategory: 'Interval', fields: ['duration','reps'] },
 ];
 
-// Types that support elevation gain
-const ELEVATION_TYPES = ['Outdoor Cycling', 'Outdoor Running', 'Hiking'];
-
-function pad(n) { return String(n).padStart(2, '0'); }
-function formatTime(s) { return `${pad(Math.floor(s / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`; }
-
-export default function CardioWorkout({ onClose }) {
-  const [phase, setPhase] = useState('select'); // select | goals | active | finish
-  const [cardioType, setCardioType] = useState('');
-  const [sessionId, setSessionId] = useState(null);
-  const [startTime, setStartTime] = useState(null);
-  const [elapsed, setElapsed] = useState(0);
-  const [notes, setNotes] = useState('');
-  const [notesSaved, setNotesSaved] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const intervalRef = useRef(null);
-
-  const token = localStorage.getItem('ripfit_token');
-
+// Quick Cardio launcher — select type + goals, then hands off to WorkoutInProgress
+// onStart(cardioTypeDef, goals) is called when user hits Start
+export default function CardioWorkout({ onStart, onClose }) {
+  const [phase, setPhase] = useState('select'); // select | goals
+  const [selected, setSelected] = useState(null);
   const [goals, setGoals] = useState({
-    goal_duration_seconds: '',
-    goal_distance: '',
-    goal_distance_unit: 'mi',
-    goal_speed: '',
-    pre_session_notes: '',
-  });
-
-  const [metrics, setMetrics] = useState({
-    duration_seconds: '',
+    duration: '',       // minutes
     distance: '',
     distance_unit: 'mi',
-    avg_heart_rate: '',
-    max_heart_rate: '',
-    calories_burned: '',
-    avg_speed: '',
-    max_speed: '',
-    elevation_gain: '',
-    hr_zone_1_seconds: '',
-    hr_zone_2_seconds: '',
-    hr_zone_3_seconds: '',
-    hr_zone_4_seconds: '',
-    hr_zone_5_seconds: '',
-    post_session_notes: '',
+    pace: '',           // MM:SS per unit
+    pre_session_notes: '',
+    laps: '',
+    lap_distance: '',   // metres
+    floors: '',
   });
 
-  // Timer
-  useEffect(() => {
-    if (phase === 'active') {
-      intervalRef.current = setInterval(() => {
-        setElapsed(Math.floor((Date.now() - startTime) / 1000));
-      }, 1000);
-    }
-    return () => clearInterval(intervalRef.current);
-  }, [phase, startTime]);
-
-  const startSession = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const res = await fetch(`${API_BASE}/cardio/start`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          cardio_type: cardioType,
-          goal_duration_seconds: goals.goal_duration_seconds ? parseInt(goals.goal_duration_seconds) : undefined,
-          goal_distance: goals.goal_distance ? parseFloat(goals.goal_distance) : undefined,
-          goal_distance_unit: goals.goal_distance_unit,
-          goal_speed: goals.goal_speed ? parseFloat(goals.goal_speed) : undefined,
-          pre_session_notes: goals.pre_session_notes || undefined,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setSessionId(data.session.id);
-      setStartTime(Date.now());
-      setPhase('active');
-    } catch (err) {
-      setError(err.message || 'Failed to start session');
-    } finally {
-      setLoading(false);
-    }
+  const handleStart = () => {
+    onStart(selected, goals);
   };
 
-  const saveNotes = async () => {
-    if (!notes.trim()) return;
-    try {
-      await fetch(`${API_BASE}/cardio/${sessionId}/notes`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ mid_session_notes: notes }),
-      });
-      setNotesSaved(true);
-      setTimeout(() => setNotesSaved(false), 2000);
-    } catch (err) {
-      console.error('Failed to save notes:', err);
-    }
-  };
-
-  const finishSession = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      // Use timer value if duration not manually entered
-      const finalDuration = metrics.duration_seconds
-        ? parseInt(metrics.duration_seconds)
-        : elapsed;
-
-      const body = {
-        duration_seconds: finalDuration,
-        post_session_notes: metrics.post_session_notes || undefined,
-      };
-
-      const numericFields = [
-        'distance', 'avg_heart_rate', 'max_heart_rate', 'calories_burned',
-        'avg_speed', 'max_speed', 'elevation_gain',
-        'hr_zone_1_seconds', 'hr_zone_2_seconds', 'hr_zone_3_seconds',
-        'hr_zone_4_seconds', 'hr_zone_5_seconds',
-      ];
-      numericFields.forEach(f => {
-        if (metrics[f]) body[f] = parseFloat(metrics[f]);
-      });
-      if (metrics.distance_unit) body.distance_unit = metrics.distance_unit;
-
-      const res = await fetch(`${API_BASE}/cardio/${sessionId}/finish`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) throw new Error('Failed to finish session');
-      clearInterval(intervalRef.current);
-      onClose({ completed: true, type: cardioType, duration: finalDuration });
-    } catch (err) {
-      setError(err.message || 'Failed to finish session');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const cancelSession = async () => {
-    if (!sessionId) { onClose(null); return; }
-    try {
-      await fetch(`${API_BASE}/cardio/${sessionId}/cancel`, {
-        method: 'PUT',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-    } catch (err) { console.error('Cancel error:', err); }
-    clearInterval(intervalRef.current);
-    onClose(null);
-  };
-
-  // ── PHASE: select ──────────────────────────────────────────────
   if (phase === 'select') return (
     <div className="cardio-overlay">
       <div className="cardio-card">
         <div className="cardio-header">
-          <h2>Select Cardio Type</h2>
-          <button className="cardio-close" onClick={() => onClose(null)}>✕</button>
+          <h2>Quick Cardio</h2>
+          <button className="cardio-close" onClick={onClose}>✕</button>
         </div>
         <div className="cardio-type-grid">
           {CARDIO_TYPES.map(t => (
             <button
-              key={t}
-              className={`cardio-type-btn ${cardioType === t ? 'active' : ''}`}
-              onClick={() => setCardioType(t)}
-            >{t}</button>
+              key={t.name}
+              className={`cardio-type-btn ${selected?.name === t.name ? 'active' : ''}`}
+              onClick={() => setSelected(t)}
+            >{t.name}</button>
           ))}
         </div>
         <button
           className="cardio-primary-btn"
-          disabled={!cardioType}
+          disabled={!selected}
           onClick={() => setPhase('goals')}
         >Next</button>
       </div>
     </div>
   );
 
-  // ── PHASE: goals ──────────────────────────────────────────────
-  if (phase === 'goals') return (
-    <div className="cardio-overlay">
-      <div className="cardio-card">
-        <div className="cardio-header">
-          <h2>{cardioType}</h2>
-          <button className="cardio-close" onClick={() => onClose(null)}>✕</button>
-        </div>
-        <p className="cardio-subtitle">Set goals (all optional)</p>
-        <div className="cardio-form">
-          <label>Goal duration (minutes)</label>
-          <input type="number" placeholder="e.g. 45" value={goals.goal_duration_seconds ? goals.goal_duration_seconds / 60 : ''}
-            onChange={e => setGoals(g => ({ ...g, goal_duration_seconds: e.target.value ? parseInt(e.target.value) * 60 : '' }))} />
+  // Goals phase
+  const hasField = (f) => selected?.fields?.includes(f);
 
-          <label>Goal distance</label>
-          <div className="cardio-row">
-            <input type="number" step="0.1" placeholder="e.g. 5" value={goals.goal_distance}
-              onChange={e => setGoals(g => ({ ...g, goal_distance: e.target.value }))} />
-            <select value={goals.goal_distance_unit}
-              onChange={e => setGoals(g => ({ ...g, goal_distance_unit: e.target.value }))}>
-              <option value="mi">mi</option>
-              <option value="km">km</option>
-              <option value="m">m</option>
-              <option value="yd">yd</option>
-            </select>
-          </div>
-
-          <label>Goal speed (mph)</label>
-          <input type="number" step="0.1" placeholder="e.g. 12" value={goals.goal_speed}
-            onChange={e => setGoals(g => ({ ...g, goal_speed: e.target.value }))} />
-
-          <label>Pre-session notes</label>
-          <textarea placeholder="How are you feeling? Any plans for today?"
-            value={goals.pre_session_notes}
-            onChange={e => setGoals(g => ({ ...g, pre_session_notes: e.target.value }))} />
-        </div>
-        {error && <p className="cardio-error">{error}</p>}
-        <div className="cardio-btn-row">
-          <button className="cardio-secondary-btn" onClick={() => setPhase('select')}>Back</button>
-          <button className="cardio-primary-btn" onClick={startSession} disabled={loading}>
-            {loading ? 'Starting...' : 'Start'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  // ── PHASE: active ──────────────────────────────────────────────
-  if (phase === 'active') return (
-    <div className="cardio-overlay">
-      <div className="cardio-card">
-        <div className="cardio-header">
-          <h2>{cardioType}</h2>
-          <span className="cardio-timer">{formatTime(elapsed)}</span>
-        </div>
-        <div className="cardio-form">
-          <label>Mid-session notes</label>
-          <textarea placeholder="Add notes at any point during your session..."
-            value={notes} onChange={e => setNotes(e.target.value)} />
-          <button className="cardio-secondary-btn" onClick={saveNotes}>
-            {notesSaved ? 'Saved ✓' : 'Save Note'}
-          </button>
-        </div>
-        <div className="cardio-btn-row">
-          <button className="cardio-cancel-btn" onClick={cancelSession}>Cancel</button>
-          <button className="cardio-primary-btn" onClick={() => setPhase('finish')}>Finish</button>
-        </div>
-      </div>
-    </div>
-  );
-
-  // ── PHASE: finish ──────────────────────────────────────────────
   return (
     <div className="cardio-overlay">
       <div className="cardio-card">
         <div className="cardio-header">
-          <h2>Finish — {cardioType}</h2>
-          <span className="cardio-timer">{formatTime(elapsed)}</span>
+          <h2>{selected.name}</h2>
+          <button className="cardio-close" onClick={onClose}>✕</button>
         </div>
-        <p className="cardio-subtitle">All fields optional. Timer time used if duration left blank.</p>
+        <p className="cardio-subtitle">Set goals — all optional</p>
         <div className="cardio-form">
-          <label>Duration (minutes) — leave blank to use timer</label>
-          <input type="number" placeholder={Math.round(elapsed / 60)} value={metrics.duration_seconds ? metrics.duration_seconds / 60 : ''}
-            onChange={e => setMetrics(m => ({ ...m, duration_seconds: e.target.value ? parseInt(e.target.value) * 60 : '' }))} />
 
-          <label>Distance</label>
-          <div className="cardio-row">
-            <input type="number" step="0.01" placeholder="e.g. 8.5" value={metrics.distance}
-              onChange={e => setMetrics(m => ({ ...m, distance: e.target.value }))} />
-            <select value={metrics.distance_unit}
-              onChange={e => setMetrics(m => ({ ...m, distance_unit: e.target.value }))}>
-              <option value="mi">mi</option>
-              <option value="km">km</option>
-              <option value="m">m</option>
-              <option value="yd">yd</option>
-            </select>
-          </div>
-
-          <label>Avg heart rate (bpm)</label>
-          <input type="number" placeholder="e.g. 145" value={metrics.avg_heart_rate}
-            onChange={e => setMetrics(m => ({ ...m, avg_heart_rate: e.target.value }))} />
-
-          <label>Max heart rate (bpm)</label>
-          <input type="number" placeholder="e.g. 178" value={metrics.max_heart_rate}
-            onChange={e => setMetrics(m => ({ ...m, max_heart_rate: e.target.value }))} />
-
-          <label>Calories burned</label>
-          <input type="number" placeholder="e.g. 420" value={metrics.calories_burned}
-            onChange={e => setMetrics(m => ({ ...m, calories_burned: e.target.value }))} />
-
-          <label>Avg speed (mph)</label>
-          <input type="number" step="0.1" placeholder="e.g. 14.2" value={metrics.avg_speed}
-            onChange={e => setMetrics(m => ({ ...m, avg_speed: e.target.value }))} />
-
-          <label>Max speed (mph)</label>
-          <input type="number" step="0.1" placeholder="e.g. 22.1" value={metrics.max_speed}
-            onChange={e => setMetrics(m => ({ ...m, max_speed: e.target.value }))} />
-
-          {ELEVATION_TYPES.includes(cardioType) && (
+          {hasField('duration') && (
             <>
-              <label>Elevation gain (ft)</label>
-              <input type="number" placeholder="e.g. 850" value={metrics.elevation_gain}
-                onChange={e => setMetrics(m => ({ ...m, elevation_gain: e.target.value }))} />
+              <label>Goal duration (minutes)</label>
+              <input type="number" placeholder="e.g. 45" value={goals.duration}
+                onChange={e => setGoals(g => ({ ...g, duration: e.target.value }))} />
             </>
           )}
 
-          <details className="cardio-hr-zones">
-            <summary>Heart rate zones (seconds in each zone)</summary>
-            <div className="cardio-zones-grid">
-              {[1,2,3,4,5].map(z => (
-                <div key={z}>
-                  <label>Zone {z}</label>
-                  <input type="number" placeholder="sec"
-                    value={metrics[`hr_zone_${z}_seconds`]}
-                    onChange={e => setMetrics(m => ({ ...m, [`hr_zone_${z}_seconds`]: e.target.value }))} />
-                </div>
-              ))}
-            </div>
-          </details>
+          {hasField('distance') && (
+            <>
+              <label>Goal distance</label>
+              <div className="cardio-row">
+                <input type="number" step="0.1" placeholder="e.g. 5" value={goals.distance}
+                  onChange={e => setGoals(g => ({ ...g, distance: e.target.value }))} />
+                <select value={goals.distance_unit}
+                  onChange={e => setGoals(g => ({ ...g, distance_unit: e.target.value }))}>
+                  <option value="mi">mi</option>
+                  <option value="km">km</option>
+                  <option value="m">m</option>
+                </select>
+              </div>
+            </>
+          )}
 
-          <label>Post-session notes</label>
-          <textarea placeholder="How did it go? Any observations?"
-            value={metrics.post_session_notes}
-            onChange={e => setMetrics(m => ({ ...m, post_session_notes: e.target.value }))} />
+          {hasField('pace') && (
+            <>
+              <label>Goal pace (MM:SS per {goals.distance_unit || 'mi'})</label>
+              <input type="text" placeholder="e.g. 8:30" value={goals.pace}
+                onChange={e => setGoals(g => ({ ...g, pace: e.target.value }))} />
+            </>
+          )}
+
+          {hasField('laps') && (
+            <>
+              <label>Goal laps</label>
+              <input type="number" placeholder="e.g. 20" value={goals.laps}
+                onChange={e => setGoals(g => ({ ...g, laps: e.target.value }))} />
+              <label>Lap distance (metres)</label>
+              <input type="number" placeholder="e.g. 25 or 50" value={goals.lap_distance}
+                onChange={e => setGoals(g => ({ ...g, lap_distance: e.target.value }))} />
+            </>
+          )}
+
+          {hasField('floors') && (
+            <>
+              <label>Goal floors</label>
+              <input type="number" placeholder="e.g. 30" value={goals.floors}
+                onChange={e => setGoals(g => ({ ...g, floors: e.target.value }))} />
+            </>
+          )}
+
+          <label>Pre-session notes</label>
+          <textarea placeholder="How are you feeling? Any plans?"
+            value={goals.pre_session_notes}
+            onChange={e => setGoals(g => ({ ...g, pre_session_notes: e.target.value }))} />
         </div>
-        {error && <p className="cardio-error">{error}</p>}
+
         <div className="cardio-btn-row">
-          <button className="cardio-cancel-btn" onClick={cancelSession}>Cancel Session</button>
-          <button className="cardio-primary-btn" onClick={finishSession} disabled={loading}>
-            {loading ? 'Saving...' : 'Save & Finish'}
-          </button>
+          <button className="cardio-secondary-btn" onClick={() => setPhase('select')}>Back</button>
+          <button className="cardio-primary-btn" onClick={handleStart}>Start Workout</button>
         </div>
       </div>
     </div>

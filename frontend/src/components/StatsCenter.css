@@ -534,3 +534,125 @@
   margin-left: 4px;
   vertical-align: middle;
 }
+
+/* Workout Calendar */
+.sc-calendar {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.sc-calendar-month-label {
+  font-size: 0.9em;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+.sc-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.sc-cal-dow {
+  font-size: 0.72em;
+  color: var(--text-secondary);
+  text-align: center;
+  padding-bottom: 4px;
+  font-weight: 600;
+}
+.sc-cal-cell {
+  aspect-ratio: 1;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78em;
+  cursor: default;
+  position: relative;
+  min-height: 32px;
+  background: var(--bg-base);
+}
+.sc-cal-cell.empty { background: transparent; }
+.sc-cal-cell.has-workout {
+  background: var(--bg-elevated);
+  cursor: pointer;
+}
+.sc-cal-cell.has-workout:hover { background: var(--border-color); }
+.sc-cal-cell.today .sc-cal-day {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+.sc-cal-cell.selected {
+  outline: 2px solid var(--color-primary);
+}
+.sc-cal-day { line-height: 1; }
+.sc-cal-dots {
+  display: flex;
+  gap: 2px;
+  margin-top: 2px;
+}
+.sc-cal-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.sc-cal-dot.strength { background: var(--color-primary); }
+.sc-cal-dot.cardio   { background: var(--color-warning); }
+ 
+.sc-calendar-popup {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-top: 8px;
+}
+.sc-cal-popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 0.9em;
+}
+.sc-cal-popup-session {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85em;
+  padding: 4px 0;
+  border-top: 1px solid var(--border-color);
+}
+.sc-calendar-legend {
+  display: flex;
+  gap: 16px;
+  font-size: 0.8em;
+  color: var(--text-secondary);
+  align-items: center;
+}
+.sc-calendar-legend span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+ 
+/* Pie chart distributions */
+.sc-pie-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.sc-pie-card {
+  flex: 1;
+  min-width: 160px;
+  background: var(--bg-base);
+  border-radius: 8px;
+  padding: 12px 8px 8px;
+}
+.sc-pie-title {
+  font-size: 0.8em;
+  color: var(--text-secondary);
+  text-align: center;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+ 
