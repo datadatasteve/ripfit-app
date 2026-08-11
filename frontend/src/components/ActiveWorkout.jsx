@@ -518,7 +518,7 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
     }
   };
 
-  const finishWorkout = async (workoutNotes, sessionRating = null, ratingPrefs = null) => {
+  const finishWorkout = async (workoutNotes, sessionRating = null, ratingPrefs = null, cardioSegmentsByExercise = {}) => {
     const token = localStorage.getItem('ripfit_token');
     
     // Save any exercise notes
@@ -583,15 +583,20 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
         duration_minutes: duration,
         session_rating: sessionRating,
         rating_prefs: ratingPrefs,
-        exercises: activeWorkout.exercises.map(ex => ({
-          exercise_name: ex.exercise_name,
-          category: ex.category,
-          logged_sets: ex.logged_sets || [],
-          target_sets: ex.template?.target_sets,
-          target_reps: ex.template?.target_reps,
-          target_weight: ex.template?.target_weight,
-          exercise_notes: ex.exercise_notes
-        })),
+        exercises: [...activeWorkout.exercises]
+          .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+          .map(ex => ({
+            exercise_name: ex.exercise_name,
+            category: ex.category,
+            subcategory: ex.subcategory || null,
+            order_index: ex.order_index,
+            logged_sets: ex.logged_sets || [],
+            cardio_segments: cardioSegmentsByExercise[ex.id] || [],
+            target_sets: ex.template?.target_sets,
+            target_reps: ex.template?.target_reps,
+            target_weight: ex.template?.target_weight,
+            exercise_notes: ex.exercise_notes
+          })),
         workout_notes: workoutNotes || '',
         previous_workout_notes: activeWorkout.previous_overall_notes || null
       });
@@ -627,12 +632,9 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
 
   if (workoutSummary) {
     const strengthExercises = workoutSummary.exercises.filter(ex => ex.category !== 'Cardio');
-    const cardioExercises = workoutSummary.exercises.filter(ex => ex.category === 'Cardio');
-    const totalSets = strengthExercises.reduce((sum, ex) => sum + ex.logged_sets.length, 0);
+    const totalSets = strengthExercises.reduce((sum, ex) => sum + (ex.logged_sets?.length || 0), 0);
     const totalReps = strengthExercises.reduce((sum, ex) =>
-      sum + ex.logged_sets.reduce((s, set) => s + (set.reps_completed || 0), 0), 0);
-    const totalWeight = strengthExercises.reduce((sum, ex) =>
-      sum + ex.logged_sets.reduce((s, set) => s + ((set.weight_used || 0) * (set.reps_completed || 0)), 0), 0);
+      sum + (ex.logged_sets || []).reduce((s, set) => s + (set.reps_completed || 0), 0), 0);
     const totalSeconds = workoutSummary.duration_minutes * 60;
     const dHours = Math.floor(totalSeconds / 3600);
     const dMins = Math.floor((totalSeconds % 3600) / 60);
@@ -670,37 +672,43 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
 
           <div className="summary-exercises">
             <h4>Exercise Breakdown</h4>
-            {strengthExercises.map((ex, idx) => (
+            {workoutSummary.exercises.map((ex, idx) => (
               <div key={idx} className="summary-exercise-item">
                 <strong>{ex.exercise_name}</strong>
                 <span className="summary-category">{ex.category}</span>
-                <div className="summary-sets">
-                  {ex.logged_sets.length > 0 ? (
-                    ex.logged_sets.map((set, sIdx) => (
-                      <span key={sIdx} className="set-pill">
-                        {set.reps_completed} × {set.weight_used === 0 ? 'BW' : `${set.weight_used} lbs`}
-                        {set.rpe ? ` @ RPE ${set.rpe}` : ''}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="skipped">Skipped</span>
-                  )}
-                </div>
-                {ex.target_sets && ex.logged_sets.length < ex.target_sets && (
-                  <p className="sets-caution">Completed {ex.logged_sets.length} of {ex.target_sets} sets</p>
+                {ex.category === 'Cardio' ? (
+                  <div className="summary-sets">
+                    {ex.cardio_segments && ex.cardio_segments.length > 0 ? (
+                      ex.cardio_segments.map((seg, sIdx) => (
+                        <span key={sIdx} className="set-pill">
+                          {seg.segment_label} {seg.segment_number}:
+                          {seg.duration_seconds ? ` ${formatDurationDisplay(seg.duration_seconds)}` : ''}
+                          {seg.distance ? ` · ${seg.distance}${seg.distance_unit ? ` ${seg.distance_unit}` : ''}` : ''}
+                          {seg.pace ? ` · ${formatPaceDisplay(seg.pace)}/${seg.pace_unit || 'mi'}` : ''}
+                          {seg.reps ? ` · ${seg.reps} reps` : ''}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="skipped">No segments logged</span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="summary-sets">
+                    {ex.logged_sets && ex.logged_sets.length > 0 ? (
+                      ex.logged_sets.map((set, sIdx) => (
+                        <span key={sIdx} className="set-pill">
+                          {set.reps_completed} × {set.weight_used === 0 ? 'BW' : `${set.weight_used} lbs`}
+                          {set.rpe ? ` @ RPE ${set.rpe}` : ''}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="skipped">Skipped</span>
+                    )}
+                  </div>
                 )}
-                {ex.exercise_notes && (
-                  <p className="summary-notes">{ex.exercise_notes}</p>
+                {ex.category !== 'Cardio' && ex.target_sets && (ex.logged_sets?.length || 0) < ex.target_sets && (
+                  <p className="sets-caution">Completed {ex.logged_sets?.length || 0} of {ex.target_sets} sets</p>
                 )}
-              </div>
-            ))}
-            {cardioExercises.map((ex, idx) => (
-              <div key={`c${idx}`} className="summary-exercise-item">
-                <strong>{ex.exercise_name}</strong>
-                <span className="summary-category">Cardio</span>
-                <div className="summary-sets">
-                  <span className="set-pill">Logged — see cardio data</span>
-                </div>
                 {ex.exercise_notes && (
                   <p className="summary-notes">{ex.exercise_notes}</p>
                 )}
@@ -1102,7 +1110,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
       setAdHocChoices(defaults);
       setShowSaveToRoutinePrompt(true);
     } else {
-      onFinish(workoutNotes, pendingRating);
+      onFinish(workoutNotes, pendingRating, ratingPrefs, cardioSegmentsByExercise);
     }
   };
 
@@ -1147,7 +1155,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
     }
 
     setShowSaveToRoutinePrompt(false);
-    onFinish(workoutNotes, pendingRating);
+    onFinish(workoutNotes, pendingRating, ratingPrefs, cardioSegmentsByExercise);
   };
 
   const handleAddExercise = async (exercise, targets) => {
@@ -1449,22 +1457,53 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
           />
         )}
 
-        {showFinishConfirm && (
-          <div className="modal-overlay" onClick={() => setShowFinishConfirm(false)}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-              <h3>Finish Workout</h3>
-              <p>No exercises were logged. Are you sure you want to finish?</p>
-              <div style={{ display: 'flex', gap: '8px', marginTop: '15px' }}>
-                <button onClick={() => onFinish(workoutNotes)} className="finish-btn" style={{ flex: 1, padding: '12px' }}>
-                  Finish Anyway
-                </button>
-                <button onClick={() => setShowFinishConfirm(false)} style={{ padding: '12px 16px', background: '#999', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-                  Go Back
-                </button>
+        {showFinishConfirm && (() => {
+          const scale = ratingPrefs.scale || 5;
+          return (
+            <div className="modal-overlay" onClick={() => setShowFinishConfirm(false)}>
+              <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                <h3>Finish Workout</h3>
+                <p>No exercises were logged yet.</p>
+                <div style={{ marginTop: '12px' }}>
+                  <textarea
+                    value={workoutNotes}
+                    onChange={(e) => setWorkoutNotes(e.target.value)}
+                    placeholder="Workout notes (optional)"
+                    rows="3"
+                    style={{ width: '100%', padding: '10px', marginBottom: '12px', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div className="session-rating-widget">
+                  <div className="session-rating-header">
+                    <span className="session-rating-label">{ratingPrefs.label || 'Effort & Vibes'}</span>
+                  </div>
+                  <div className="session-rating-slider-wrap">
+                    <input type="range" min={1} max={scale} step={1}
+                      value={pendingRating || Math.ceil(scale / 2)}
+                      className="session-rating-slider"
+                      onChange={e => setPendingRating(parseInt(e.target.value))} />
+                    <div className="session-rating-ticks"><span>1</span><span>{scale}</span></div>
+                    {pendingRating && <div className="session-rating-value">{pendingRating} / {scale}</div>}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+                  <button onClick={() => onFinish(workoutNotes, pendingRating, ratingPrefs, {})} className="finish-btn" style={{ flex: 1, padding: '12px' }}>
+                    Finish Anyway
+                  </button>
+                  <button onClick={() => setShowFinishConfirm(false)} style={{ padding: '12px 16px', background: '#999', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                    Go Back
+                  </button>
+                </div>
+                <div style={{ textAlign: 'center', marginTop: '12px' }}>
+                  <button onClick={() => { setShowFinishConfirm(false); setShowCancelConfirm(true); }}
+                    style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.8em', cursor: 'pointer', textDecoration: 'underline' }}>
+                    Cancel Workout
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {showCancelConfirm && (
           <div className="modal-overlay" onClick={() => setShowCancelConfirm(false)}>
