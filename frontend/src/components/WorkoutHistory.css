@@ -88,6 +88,16 @@
   color: #3498db;
 }
 
+.history-type-badge.mixed {
+  background: rgba(168, 85, 247, 0.15);
+  color: #a855f7;
+}
+
+.history-type-badge.open {
+  background: rgba(20, 184, 166, 0.15);
+  color: #14b8a6;
+}
+
 .history-entry-title {
   font-weight: 500;
   font-size: 0.95rem;

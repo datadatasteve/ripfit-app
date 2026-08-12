@@ -768,7 +768,7 @@ const getWorkoutDetail = async (req, res) => {
   const user_id = req.user.userId;
   try {
     const workoutResult = await pool.query(
-      `SELECT w.*, COALESCE(w.workout_title, wr.name, 'Free Lift') AS routine_name
+      `SELECT w.*, COALESCE(w.workout_title, wr.name, 'Open Session') AS routine_name
        FROM workouts w
        LEFT JOIN workout_routines wr ON w.routine_id = wr.id
        WHERE w.id = $1 AND w.user_id = $2`,

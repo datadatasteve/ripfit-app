@@ -5,6 +5,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   AreaChart, Area, PieChart, Pie, Cell,
+  ComposedChart,
 } from 'recharts';
 import WorkoutHistory from './WorkoutHistory';
 import './StatsCenter.css';
@@ -417,14 +418,23 @@ function OverviewTab({ onSelectWorkout }) {
       // Build pie chart data from combined sessions
       const sessions = combined.sessions || [];
 
-      // Duration buckets
-      const dBuckets = { '< 30m': 0, '30–59m': 0, '60–90m': 0, '> 90m': 0 };
+      // Duration buckets — dynamic 30-minute intervals up to longest session
+      const maxMinutes = sessions.reduce((max, s) => Math.max(max, (s.duration_seconds || 0) / 60), 0);
+      const bucketCount = Math.max(4, Math.ceil(maxMinutes / 30));
+      const dBuckets = {};
+      for (let i = 0; i < bucketCount; i++) {
+        const lo = i * 30;
+        const hi = (i + 1) * 30;
+        const label = i === bucketCount - 1
+          ? `> ${lo}m`
+          : lo === 0 ? `< ${hi}m` : `${lo}–${hi}m`;
+        dBuckets[label] = 0;
+      }
       sessions.forEach(s => {
         const m = (s.duration_seconds || 0) / 60;
-        if (m < 30) dBuckets['< 30m']++;
-        else if (m < 60) dBuckets['30–59m']++;
-        else if (m < 90) dBuckets['60–90m']++;
-        else dBuckets['> 90m']++;
+        const bucketIdx = Math.min(Math.floor(m / 30), bucketCount - 1);
+        const label = Object.keys(dBuckets)[bucketIdx];
+        if (label !== undefined) dBuckets[label]++;
       });
       setDurationPieData(Object.entries(dBuckets).filter(([,v]) => v > 0).map(([name, value]) => ({ name, value })));
 
@@ -494,16 +504,21 @@ function OverviewTab({ onSelectWorkout }) {
 
     if (combinedChartMetric === 'both') return (
       <ResponsiveContainer width="100%" height={240}>
-        <BarChart {...commonProps}>
+        <ComposedChart {...commonProps}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
           <XAxis dataKey="week" tick={axisStyle} />
           <YAxis yAxisId="left" tick={axisStyle} allowDecimals={false} />
           <YAxis yAxisId="right" orientation="right" tick={axisStyle} unit="m" />
           <Tooltip contentStyle={tooltipStyle} />
           <Legend />
-          <Bar yAxisId="left" dataKey="workouts" fill="var(--color-primary)" radius={[2,2,0,0]} name="Workouts" />
+          {combinedChartType === 'area'
+            ? <Area yAxisId="left" type="monotone" dataKey="workouts" fill="var(--color-primary)" stroke="var(--color-primary)" fillOpacity={0.3} name="Workouts" />
+            : combinedChartType === 'line'
+            ? <Line yAxisId="left" type="monotone" dataKey="workouts" stroke="var(--color-primary)" strokeWidth={2} dot={{ r: 3 }} name="Workouts" />
+            : <Bar yAxisId="left" dataKey="workouts" fill="var(--color-primary)" radius={[2,2,0,0]} name="Workouts" />
+          }
           <Line yAxisId="right" type="monotone" dataKey="avg_duration" stroke="var(--color-warning)" strokeWidth={2} dot={false} name="Avg Duration (m)" />
-        </BarChart>
+        </ComposedChart>
       </ResponsiveContainer>
     );
 
@@ -1254,7 +1269,7 @@ function RecordsTab() {
 // ═══════════════════════════════════════════════════════════════════════════
 // COMBINED TAB
 // ═══════════════════════════════════════════════════════════════════════════
-function CombinedTab() {
+function CombinedTab({ onSelectWorkout }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [weeks, setWeeks] = useState(8);
@@ -1351,7 +1366,12 @@ function CombinedTab() {
             </thead>
             <tbody>
               {data.sessions.map((s, i) => (
-                <tr key={i}>
+                <tr
+                  key={i}
+                  className={onSelectWorkout ? 'sc-clickable-row' : ''}
+                  onClick={() => onSelectWorkout && onSelectWorkout(s)}
+                  title={onSelectWorkout ? 'View workout detail' : undefined}
+                >
                   <td>{fmtDate(s.date)}</td>
                   <td><span className={`history-type-badge ${s.type}`}>{s.type}</span></td>
                   <td>{s.title}</td>
@@ -1371,7 +1391,7 @@ function CombinedTab() {
 // ═══════════════════════════════════════════════════════════════════════════
 // HISTORY TAB
 // ═══════════════════════════════════════════════════════════════════════════
-function HistoryTab({ initialWorkoutId, onClearSelected }) {
+function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [weeks, setWeeks] = useState(8);
@@ -1472,7 +1492,12 @@ function HistoryTab({ initialWorkoutId, onClearSelected }) {
               </thead>
               <tbody>
                 {data.sessions.map((s, i) => (
-                  <tr key={i}>
+                  <tr
+                    key={i}
+                    className={onSelectWorkout ? 'sc-clickable-row' : ''}
+                    onClick={() => onSelectWorkout && onSelectWorkout(s)}
+                    title={onSelectWorkout ? 'View workout detail' : undefined}
+                  >
                     <td>{fmtDate(s.date)}</td>
                     <td><span className={`history-type-badge ${s.type}`}>{s.type}</span></td>
                     <td>{s.title}</td>
@@ -1490,9 +1515,7 @@ function HistoryTab({ initialWorkoutId, onClearSelected }) {
       )}
 
       {/* Full workout history list */}
-      <Section title="Workout Log">
-        <WorkoutHistory initialWorkoutId={initialWorkoutId} onClearSelected={onClearSelected} />
-      </Section>
+      <WorkoutHistory initialWorkoutId={initialWorkoutId} onClearSelected={onClearSelected} />
     </div>
   );
 }
@@ -1505,7 +1528,8 @@ export default function StatsCenter() {
   const [selectedHistoryId, setSelectedHistoryId] = useState(null);
 
   const handleSelectWorkout = (session) => {
-    setSelectedHistoryId(session.id);
+    // Sessions from getCombinedStats return workout_id; sessions from getCombinedHistory return id
+    setSelectedHistoryId(session.workout_id ?? session.id);
     setTab('History');
   };
 
@@ -1528,10 +1552,9 @@ export default function StatsCenter() {
         {tab === 'Strength'  && <StrengthTab />}
         {tab === 'Cardio'    && <CardioTab />}
         {tab === 'Records'   && <RecordsTab />}
-        {tab === 'Combined'  && <CombinedTab />}
-        {tab === 'History'   && <HistoryTab initialWorkoutId={selectedHistoryId} onClearSelected={() => setSelectedHistoryId(null)} />}
+        {tab === 'Combined'  && <CombinedTab onSelectWorkout={handleSelectWorkout} />}
+        {tab === 'History'   && <HistoryTab initialWorkoutId={selectedHistoryId} onClearSelected={() => setSelectedHistoryId(null)} onSelectWorkout={handleSelectWorkout} />}
       </div>
     </div>
   );
 }
-

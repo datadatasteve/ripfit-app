@@ -75,9 +75,10 @@ export default function WorkoutHistory({ initialWorkoutId, onClearSelected }) {
     setSelectedEntry(entry);
     setDetailLoading(true);
     try {
-      const url = entry.type === 'strength'
-        ? `${API_BASE}/workouts/history/${entry.id}`
-        : `${API_BASE}/cardio/${entry.id}`;
+      // cardio-only sessions live in cardio_sessions; everything else (strength/mixed/open) is in workouts
+      const url = entry.type === 'cardio'
+        ? `${API_BASE}/cardio/${entry.id}`
+        : `${API_BASE}/workouts/history/${entry.id}`;
       const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       setDetailData(data);
@@ -97,15 +98,20 @@ export default function WorkoutHistory({ initialWorkoutId, onClearSelected }) {
   };
 
   const hasNotes = (entry) => {
-    if (entry.type === 'strength') return !!entry.overall_notes;
-    return !!(entry.pre_session_notes || entry.mid_session_notes || entry.post_session_notes);
+    if (entry.type === 'cardio') return !!(entry.pre_session_notes || entry.mid_session_notes || entry.post_session_notes);
+    return !!entry.overall_notes;
   };
 
-  const filtered = filter === 'all' ? entries : entries.filter(e => e.type === filter);
+  // 'strength' filter shows strength + mixed + open; 'cardio' shows cardio only
+  const filtered = filter === 'all'
+    ? entries
+    : filter === 'cardio'
+      ? entries.filter(e => e.type === 'cardio')
+      : entries.filter(e => e.type !== 'cardio');
 
   // ── Detail View ──
   if (selectedEntry) {
-    const isStrength = selectedEntry.type === 'strength';
+    const isStrength = selectedEntry.type !== 'cardio';
     return (
       <div className="history-container">
         <button className="history-back-btn" onClick={() => { setSelectedEntry(null); setDetailData(null); }}>
@@ -229,8 +235,6 @@ export default function WorkoutHistory({ initialWorkoutId, onClearSelected }) {
   // ── List View ──
   return (
     <div className="history-container">
-      <h2>Workout History</h2>
-
       <div className="history-filters">
         {['all', 'strength', 'cardio'].map(f => (
           <button
@@ -255,14 +259,17 @@ export default function WorkoutHistory({ initialWorkoutId, onClearSelected }) {
             <div className="history-entry-main" onClick={() => openDetail(entry)}>
               <div className="history-entry-left">
                 <span className={`history-type-badge ${entry.type}`}>
-                  {entry.type === 'strength' ? 'Strength' : 'Cardio'}
+                  {entry.type === 'strength' ? 'Strength'
+                    : entry.type === 'cardio' ? 'Cardio'
+                    : entry.type === 'mixed' ? 'Mixed'
+                    : 'Open'}
                 </span>
                 <span className="history-entry-title">{entry.title}</span>
               </div>
               <div className="history-entry-right">
                 <span className="history-entry-date">{formatDate(entry.date)}</span>
                 <span className="history-entry-duration">{formatDuration(entry.duration_seconds)}</span>
-                {entry.type === 'strength' && entry.exercise_count > 0 && (
+                {entry.type !== 'cardio' && entry.exercise_count > 0 && (
                   <span className="history-entry-meta">{entry.exercise_count} exercises</span>
                 )}
                 {entry.type === 'cardio' && entry.distance && (
@@ -277,7 +284,7 @@ export default function WorkoutHistory({ initialWorkoutId, onClearSelected }) {
                 </button>
                 {expandedNotes.has(`${entry.type}-${entry.id}`) && (
                   <div className="history-notes-preview">
-                    {entry.type === 'strength' && entry.overall_notes && <p>{entry.overall_notes}</p>}
+                    {entry.type !== 'cardio' && entry.overall_notes && <p>{entry.overall_notes}</p>}
                     {entry.type === 'cardio' && (
                       <>
                         {entry.pre_session_notes && <p><em>Pre:</em> {entry.pre_session_notes}</p>}

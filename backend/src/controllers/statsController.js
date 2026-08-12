@@ -448,26 +448,28 @@ async function getCombinedStats(req, res) {
         est_1rm,
         distance,
         avg_heart_rate,
-        start_time
+        start_time,
+        workout_id
       FROM (
-        -- Strength sessions
+        -- Strength/mixed/open sessions
         SELECT
           w.workout_date AS date,
-          'strength' AS type,
-          COALESCE(wr.name, 'Free Lift') AS title,
+          COALESCE(w.workout_type, 'strength') AS type,
+          COALESCE(w.workout_title, wr.name, 'Open Session') AS title,
           EXTRACT(EPOCH FROM (w.end_time - w.start_time))::INTEGER AS duration_seconds,
           w.session_rating,
           SUM(ws.reps_completed * ws.weight_used)::INTEGER AS volume,
           ROUND(MAX(ws.weight_used * (1 + ws.reps_completed::NUMERIC / 30))::NUMERIC, 1) AS est_1rm,
           NULL::NUMERIC AS distance,
           NULL::INTEGER AS avg_heart_rate,
-          w.start_time
+          w.start_time,
+          w.id AS workout_id
         FROM workouts w
         LEFT JOIN workout_routines wr ON w.routine_id = wr.id
         LEFT JOIN workout_exercises we ON w.id = we.workout_id
         LEFT JOIN workout_sets ws ON we.id = ws.workout_exercise_id
         WHERE w.user_id = $1 AND w.status = 'completed'
-          AND w.start_time >= NOW() - ($2 || ' weeks')::INTERVAL
+          AND COALESCE(w.start_time, w.workout_date::timestamptz) >= NOW() - ($2 || ' weeks')::INTERVAL
         GROUP BY w.id, wr.name
 
         UNION ALL
@@ -483,12 +485,13 @@ async function getCombinedStats(req, res) {
           NULL::NUMERIC AS est_1rm,
           cs.distance,
           cs.avg_heart_rate,
-          cs.start_time
+          cs.start_time,
+          cs.id AS workout_id
         FROM cardio_sessions cs
         WHERE cs.user_id = $1 AND cs.status = 'finished'
-          AND cs.start_time >= NOW() - ($2 || ' weeks')::INTERVAL
+          AND COALESCE(cs.start_time, cs.session_date::timestamptz) >= NOW() - ($2 || ' weeks')::INTERVAL
       ) all_sessions
-      ORDER BY start_time
+      ORDER BY COALESCE(start_time, date::timestamptz) DESC
     `, [userId, weeks]);
 
     res.json({ sessions: combined.rows });
