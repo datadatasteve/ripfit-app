@@ -85,10 +85,10 @@ function SessionRatingWidget({ workoutId }) {
             type="range"
             min={1}
             max={scale}
-            step={1}
+            step={0.5}
             value={rating || Math.ceil(scale / 2)}
             className="session-rating-slider"
-            onChange={e => setRating(parseInt(e.target.value))}
+            onChange={e => setRating(parseFloat(e.target.value))}
             disabled={saved}
           />
           <div className="session-rating-ticks">
@@ -1589,10 +1589,10 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
                     <span className="session-rating-label">{ratingPrefs.label || 'Effort & Vibes'}</span>
                   </div>
                   <div className="session-rating-slider-wrap">
-                    <input type="range" min={1} max={scale} step={1}
+                    <input type="range" min={1} max={scale} step={0.5}
                       value={pendingRating || Math.ceil(scale / 2)}
                       className="session-rating-slider"
-                      onChange={e => setPendingRating(parseInt(e.target.value))} />
+                      onChange={e => setPendingRating(parseFloat(e.target.value))} />
                     <div className="session-rating-ticks"><span>1</span><span>{scale}</span></div>
                     {pendingRating && <div className="session-rating-value">{pendingRating} / {scale}</div>}
                   </div>
@@ -2227,10 +2227,10 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
                       type="range"
                       min={1}
                       max={scale}
-                      step={1}
+                      step={0.5}
                       value={pendingRating || Math.ceil(scale / 2)}
                       className="session-rating-slider"
-                      onChange={e => setPendingRating(parseInt(e.target.value))}
+                      onChange={e => setPendingRating(parseFloat(e.target.value))}
                     />
                     <div className="session-rating-ticks">
                       <span>1</span>

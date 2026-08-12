@@ -1,0 +1,209 @@
+/* frontend/src/components/WorkoutDetailPage.css */
+
+.wdp-container {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 20px 16px 40px;
+}
+
+.wdp-back {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0;
+  margin-bottom: 20px;
+  display: block;
+}
+
+.wdp-header {
+  margin-bottom: 20px;
+}
+
+.wdp-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.wdp-title {
+  margin: 0;
+  font-size: 1.3rem;
+}
+
+.wdp-type-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.wdp-date {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+/* Stat grid */
+.wdp-stat-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.wdp-stat-box {
+  flex: 1 1 100px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 90px;
+}
+
+.wdp-stat-value {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.wdp-stat-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+/* Notes */
+.wdp-notes-block {
+  background: var(--bg-secondary);
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+}
+
+.wdp-notes-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+.wdp-notes-text {
+  margin: 0;
+  font-size: 0.9rem;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+/* Sections */
+.wdp-section {
+  margin-bottom: 28px;
+}
+
+.wdp-section-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0 0 12px;
+  color: var(--text-primary);
+}
+
+/* Exercise list */
+.wdp-exercise-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.wdp-exercise {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.wdp-ex-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.wdp-ex-name {
+  font-size: 0.95rem;
+}
+
+.wdp-ex-cat {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.wdp-ex-notes {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin: 0 0 8px;
+}
+
+.wdp-skipped {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin: 0;
+  font-style: italic;
+}
+
+/* Sets table */
+.wdp-sets-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.wdp-sets-table th {
+  text-align: left;
+  color: var(--text-secondary);
+  font-weight: 500;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.wdp-sets-table td {
+  padding: 5px 8px;
+}
+
+.wdp-sets-table tr:nth-child(even) td {
+  background: var(--bg-secondary);
+}
+
+/* Cardio rows */
+.wdp-cardio-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wdp-cardio-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.wdp-cardio-row span:first-child {
+  color: var(--text-secondary);
+}
+
+.wdp-loading,
+.wdp-error {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin-top: 24px;
+}

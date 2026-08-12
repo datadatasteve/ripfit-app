@@ -597,8 +597,10 @@
   border-radius: 50%;
   display: inline-block;
 }
-.sc-cal-dot.strength { background: var(--color-primary); }
-.sc-cal-dot.cardio   { background: var(--color-warning); }
+.sc-cal-dot.strength { background: var(--color-primary); }   /* orange — matches strength badge */
+.sc-cal-dot.cardio   { background: #3498db; }                 /* blue — matches cardio badge */
+.sc-cal-dot.mixed    { background: #a855f7; }                 /* purple — matches mixed badge */
+.sc-cal-dot.open     { background: #14b8a6; }                 /* teal — matches open badge */
  
 .sc-calendar-popup {
   background: var(--bg-elevated);
@@ -707,4 +709,3 @@
 .sc-cal-cell.has-workout {
   background: var(--bg-elevated);
 }
-.sc-cal-dot.mixed { background: var(--color-info); }

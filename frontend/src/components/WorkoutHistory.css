@@ -1,17 +1,16 @@
+/* frontend/src/components/WorkoutHistory.css */
+
 .history-container {
   max-width: 700px;
   margin: 0 auto;
-  padding: 20px 16px;
-}
-
-.history-container h2 {
-  margin: 0 0 16px;
+  padding: 8px 0 20px;
 }
 
 .history-filters {
   display: flex;
   gap: 8px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
 }
 
 .history-filter-btn {
@@ -22,6 +21,7 @@
   color: var(--text-secondary, #aaa);
   cursor: pointer;
   font-size: 0.875rem;
+  white-space: nowrap;
 }
 
 .history-filter-btn.active {
@@ -34,28 +34,33 @@
 .history-empty {
   color: var(--text-secondary, #aaa);
   font-size: 0.9rem;
-  margin-top: 24px;
+  margin-top: 16px;
 }
 
+/* ── Entry list ── */
 .history-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 }
 
 .history-entry {
   border: 1px solid var(--border-color, #333);
   border-radius: 8px;
   overflow: hidden;
+  transition: border-color 0.15s;
+}
+
+.history-entry.expanded {
+  border-color: var(--color-primary, #e05c2a);
 }
 
 .history-entry-main {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 12px 14px;
+  padding: 11px 14px;
   cursor: pointer;
-  gap: 12px;
+  gap: 10px;
 }
 
 .history-entry-main:hover {
@@ -65,17 +70,20 @@
 .history-entry-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
+  flex: 1;
 }
 
+/* ── Type badges ── */
 .history-type-badge {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 10px;
   flex-shrink: 0;
   text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .history-type-badge.strength {
@@ -100,7 +108,7 @@
 
 .history-entry-title {
   font-weight: 500;
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -110,12 +118,12 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 2px;
+  gap: 1px;
   flex-shrink: 0;
 }
 
 .history-entry-date {
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   color: var(--text-secondary, #aaa);
 }
 
@@ -125,152 +133,91 @@
 }
 
 .history-entry-meta {
+  font-size: 0.73rem;
+  color: var(--text-secondary, #aaa);
+}
+
+.history-expand-chevron {
   font-size: 0.75rem;
   color: var(--text-secondary, #aaa);
+  flex-shrink: 0;
+  margin-left: 2px;
 }
 
-.history-notes-toggle {
+/* ── Inline dropdown ── */
+.wh-dropdown {
   border-top: 1px solid var(--border-color, #333);
-  padding: 8px 14px;
+  padding: 12px 14px;
+  background: var(--bg-secondary, #1a1a1a);
 }
 
-.history-notes-toggle button {
-  background: none;
-  border: none;
+.wh-dropdown-loading {
+  padding: 12px 14px;
+  border-top: 1px solid var(--border-color, #333);
   color: var(--text-secondary, #aaa);
-  cursor: pointer;
-  font-size: 0.8rem;
-  padding: 0;
+  font-size: 0.85rem;
 }
 
-.history-notes-preview {
-  margin-top: 8px;
+.wh-dropdown-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 10px;
   font-size: 0.85rem;
   color: var(--text-secondary, #aaa);
+}
+
+.wh-dropdown-notes {
+  font-size: 0.85rem;
+  color: var(--text-secondary, #aaa);
+  margin-bottom: 10px;
   line-height: 1.5;
 }
 
-.history-notes-preview p { margin: 4px 0; }
+.wh-dropdown-notes p { margin: 2px 0; }
 
-/* ── Detail View ── */
-.history-back-btn {
-  background: none;
-  border: none;
-  color: var(--color-primary, #e05c2a);
-  cursor: pointer;
-  font-size: 0.9rem;
-  padding: 0;
-  margin-bottom: 20px;
-  display: block;
-}
-
-.history-detail h2 { margin: 0 0 4px; }
-
-.history-detail-meta {
-  color: var(--text-secondary, #aaa);
-  font-size: 0.875rem;
-  margin: 0 0 20px;
-}
-
-.history-notes-block {
-  background: var(--bg-secondary, #1e1e1e);
-  border-radius: 6px;
-  padding: 10px 12px;
-  margin-bottom: 16px;
-}
-
-.history-notes-block strong {
-  display: block;
-  font-size: 0.8rem;
-  color: var(--text-secondary, #aaa);
-  margin-bottom: 4px;
-}
-
-.history-notes-block p { margin: 0; font-size: 0.9rem; }
-
-.history-exercises {
+.wh-dropdown-exercises {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 6px;
+  margin-bottom: 12px;
 }
 
-.history-exercise h4 {
-  margin: 0 0 6px;
-  font-size: 0.95rem;
-}
-
-.history-cat {
-  font-size: 0.75rem;
-  color: var(--text-secondary, #aaa);
-  font-weight: 400;
-  margin-left: 6px;
-}
-
-.history-ex-notes {
-  font-size: 0.82rem;
-  color: var(--text-secondary, #aaa);
-  margin: 0 0 8px;
-}
-
-.history-sets-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
-}
-
-.history-sets-table th {
-  text-align: left;
-  color: var(--text-secondary, #aaa);
-  font-weight: 500;
-  padding: 4px 8px;
-  border-bottom: 1px solid var(--border-color, #333);
-}
-
-.history-sets-table td {
-  padding: 4px 8px;
-}
-
-.history-cardio-detail {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.history-stat-row {
+.wh-dropdown-ex {
   display: flex;
   justify-content: space-between;
-  padding: 8px 12px;
-  background: var(--bg-secondary, #1e1e1e);
-  border-radius: 6px;
-  font-size: 0.9rem;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 0.85rem;
 }
 
-.history-stat-row span:first-child {
+.wh-dropdown-ex-name {
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.wh-dropdown-ex-detail {
   color: var(--text-secondary, #aaa);
-}
-
-.history-hr-zones {
-  padding: 10px 12px;
-  background: var(--bg-secondary, #1e1e1e);
-  border-radius: 6px;
-}
-
-.history-hr-zones strong {
-  display: block;
   font-size: 0.8rem;
-  color: var(--text-secondary, #aaa);
-  margin-bottom: 8px;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.history-zones-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.history-zone-chip {
-  font-size: 0.78rem;
-  padding: 3px 10px;
+.wh-view-full-btn {
+  background: none;
   border: 1px solid var(--border-color, #444);
-  border-radius: 12px;
+  color: var(--color-primary, #e05c2a);
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 4px;
+  transition: background 0.15s;
+}
+
+.wh-view-full-btn:hover {
+  background: rgba(224, 92, 42, 0.08);
 }

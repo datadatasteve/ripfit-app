@@ -8,6 +8,7 @@ import {
   ComposedChart,
 } from 'recharts';
 import WorkoutHistory from './WorkoutHistory';
+import WorkoutDetailPage from './WorkoutDetailPage';
 import './StatsCenter.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
@@ -84,7 +85,8 @@ function fmtDuration(s) {
   if (!s) return '—';
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  if (h > 0) return m > 0 ? `${h}h ${m}min` : `${h}h`;
+  return `${m}min`;
 }
 
 function fmtDate(d, includeYear = false) {
@@ -297,7 +299,8 @@ function WorkoutCalendar({ onSelectWorkout }) {
 
   const byDate = {};
   sessions.forEach(s => {
-    const d = s.date?.slice(0, 10);
+    // Normalize date: bare dates are already YYYY-MM-DD; timestamps extract local date
+    let d = s.date?.slice(0, 10);
     if (!d) return;
     if (!byDate[d]) byDate[d] = [];
     byDate[d].push(s);
@@ -307,7 +310,9 @@ function WorkoutCalendar({ onSelectWorkout }) {
   const month = currentMonth.getMonth();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDow = new Date(year, month, 1).getDay();
-  const todayStr = new Date().toISOString().slice(0, 10);
+  // Use local date to avoid UTC offset pushing "today" to yesterday
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
   const monthLabel = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   const cells = [];
@@ -387,6 +392,7 @@ function WorkoutCalendar({ onSelectWorkout }) {
         <span><span className="sc-cal-dot strength" /> Strength</span>
         <span><span className="sc-cal-dot cardio" /> Cardio</span>
         <span><span className="sc-cal-dot mixed" /> Mixed</span>
+        <span><span className="sc-cal-dot open" /> Open</span>
       </div>
     </div>
   );
@@ -422,12 +428,18 @@ function OverviewTab({ onSelectWorkout }) {
       const maxMinutes = sessions.reduce((max, s) => Math.max(max, (s.duration_seconds || 0) / 60), 0);
       const bucketCount = Math.max(4, Math.ceil(maxMinutes / 30));
       const dBuckets = {};
+      const fmtMin = (mins) => {
+        if (mins < 60) return `${mins}min`;
+        const h = Math.floor(mins / 60);
+        const m = mins % 60;
+        return m > 0 ? `${h}h ${m}min` : `${h}h`;
+      };
       for (let i = 0; i < bucketCount; i++) {
         const lo = i * 30;
         const hi = (i + 1) * 30;
         const label = i === bucketCount - 1
-          ? `> ${lo}m`
-          : lo === 0 ? `< ${hi}m` : `${lo}–${hi}m`;
+          ? `> ${fmtMin(lo)}`
+          : lo === 0 ? `< ${fmtMin(hi)}` : `${fmtMin(lo)}–${fmtMin(hi)}`;
         dBuckets[label] = 0;
       }
       sessions.forEach(s => {
@@ -1293,13 +1305,15 @@ function CombinedTab({ onSelectWorkout }) {
   if (loading) return <Loading />;
   if (!data || data.sessions.length === 0) return <Empty />;
 
-  const chartData = data.sessions.map(s => ({
+  // Sessions arrive newest-first from API — reverse for chronological chart display
+  const sessionsChronological = [...data.sessions].reverse();
+  const chartData = sessionsChronological.map(s => ({
     date: fmtDate(s.date),
-    volume: s.volume,
+    volume: s.volume || null,
     duration: s.duration_seconds ? Math.round(s.duration_seconds / 60) : null,
-    rating: s.session_rating,
+    rating: s.session_rating ? parseFloat(s.session_rating) : null,
     distance: s.distance ? parseFloat(s.distance) : null,
-    hr: s.avg_heart_rate,
+    hr: s.avg_heart_rate || null,
     type: s.type,
   }));
 
@@ -1526,12 +1540,25 @@ function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout }) {
 export default function StatsCenter() {
   const [tab, setTab] = useState('Overview');
   const [selectedHistoryId, setSelectedHistoryId] = useState(null);
+  const [detailWorkout, setDetailWorkout] = useState(null); // { id, type }
 
   const handleSelectWorkout = (session) => {
-    // Sessions from getCombinedStats return workout_id; sessions from getCombinedHistory return id
-    setSelectedHistoryId(session.workout_id ?? session.id);
-    setTab('History');
+    const id = session.workout_id ?? session.id;
+    const type = session.type || 'strength';
+    setDetailWorkout({ id, type });
   };
+
+  if (detailWorkout) {
+    return (
+      <div className="sc-container">
+        <WorkoutDetailPage
+          workoutId={detailWorkout.id}
+          workoutType={detailWorkout.type}
+          onBack={() => setDetailWorkout(null)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="sc-container">
