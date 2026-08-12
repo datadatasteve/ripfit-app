@@ -12,7 +12,7 @@ router.get('/exercises/:id', workoutController.getExerciseById);
 router.get('/history', authenticate, workoutController.getCombinedHistory);
 router.get('/history/:id', authenticate, workoutController.getWorkoutDetail);
 
-// Free lift (no routine) — must come before /:workoutId routes
+// Open session / Quick Cardio start — must come before /:workoutId routes
 router.post('/start-free', authenticate, workoutController.startFreeLift);
 
 // Workout logging
@@ -23,6 +23,7 @@ router.post('/:workoutId/sets', authenticate, workoutController.logWorkoutSet);
 router.put('/:workoutId/finish', authenticate, workoutController.finishWorkout);
 router.put('/:workoutId/cancel', authenticate, workoutController.cancelWorkout);
 router.put('/:workoutId/notes', authenticate, workoutController.updateWorkoutNotes);
+router.put('/:workoutId/type', authenticate, workoutController.updateWorkoutType);
 
 router.post('/:workoutId/exercises', authenticate, workoutController.addExerciseToWorkout);
 router.delete('/:workoutId/exercises/:exerciseId', authenticate, workoutController.deleteExerciseFromWorkout);

@@ -170,13 +170,15 @@ function CardioSegmentForm({ exercise, workoutId, segments, setSegments, userPac
   const isInterval = subcategory.toLowerCase() === 'interval';
   const isSwimming = subcategory.toLowerCase() === 'swimming';
 
-  const [durationInput, setDurationInput] = useState(''); // MM:SS or plain seconds
+  const [durationInput, setDurationInput] = useState(''); // MM:SS or plain minutes
   const [distance, setDistance] = useState('');
   const [pace, setPace] = useState('');             // displayed as MM:SS, stored as decimal mins
   const [paceOverridden, setPaceOverridden] = useState(false);
   const [reps, setReps] = useState('');
   const [laps, setLaps] = useState('');
   const [lapDistance, setLapDistance] = useState(exercise.template?.goal_lap_distance || '');
+  const [avgSpeed, setAvgSpeed] = useState('');
+  const [maxSpeed, setMaxSpeed] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [derived, setDerived] = useState(null); // which field was auto-derived
@@ -260,6 +262,8 @@ function CardioSegmentForm({ exercise, workoutId, segments, setSegments, userPac
         pace_unit: userPaceUnit,
         pace_overridden: paceOverridden,
         reps: parseInt(reps) || null,
+        avg_speed: avgSpeed ? parseFloat(avgSpeed) : null,
+        max_speed: maxSpeed ? parseFloat(maxSpeed) : null,
         notes: notes || null,
       };
 
@@ -273,7 +277,7 @@ function CardioSegmentForm({ exercise, workoutId, segments, setSegments, userPac
       // Reset form
       setDurationInput(''); setDistance(''); setPace('');
       setPaceOverridden(false); setReps(''); setNotes('');
-      setDerived(null);
+      setAvgSpeed(''); setMaxSpeed(''); setDerived(null);
     } catch (e) {
       console.error('Failed to log cardio segment:', e);
     } finally {
@@ -366,6 +370,26 @@ function CardioSegmentForm({ exercise, workoutId, segments, setSegments, userPac
         onChange={e => setNotes(e.target.value)}
         style={{ width: '100%', marginTop: '8px', padding: '8px', boxSizing: 'border-box' }}
       />
+
+      {/* Avg/max speed — shown for cycling, running, machine subtypes */}
+      {!isSwimming && (
+        <div className="form-row" style={{ marginTop: '8px' }}>
+          <input
+            type="number"
+            step="0.1"
+            placeholder="Avg speed (mph, optional)"
+            value={avgSpeed}
+            onChange={e => setAvgSpeed(e.target.value)}
+          />
+          <input
+            type="number"
+            step="0.1"
+            placeholder="Max speed (mph, optional)"
+            value={maxSpeed}
+            onChange={e => setMaxSpeed(e.target.value)}
+          />
+        </div>
+      )}
 
       <button onClick={handleLog} className="log-set-btn" disabled={saving} style={{ marginTop: '10px' }}>
         {saving ? 'Saving…' : `Log ${label}`}
@@ -479,6 +503,7 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
           body: JSON.stringify({
             workout_date: today.toISOString().split('T')[0],
             workout_title: finalTitle,
+            workout_type: preloadCardio ? 'cardio' : 'open',
           }),
         });
       } else {
@@ -1297,6 +1322,12 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
           }
         }]
       });
+
+      // Update workout type dynamically (e.g. cardio session gets strength exercise added → mixed)
+      fetch(`${API_BASE}/workouts/${workout.workout.id}/type`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
+      }).catch(() => {});
       
       setShowAddExercise(false);
       setShowToast(true);
@@ -2334,10 +2365,19 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
 // Maps a muscle-filter pill value to the category/subcategory pair the
 // backend expects. Shared by AddExerciseModal and ChangeExerciseModal.
 function mapMuscleFilterToCategory(value) {
-  if (value === 'biceps') return { category: 'Arms', subcategory: 'Biceps' };
-  if (value === 'triceps') return { category: 'Arms', subcategory: 'Triceps' };
-  if (value === 'arms') return { category: 'Arms', subcategory: '' };
-  return { category: value.charAt(0).toUpperCase() + value.slice(1), subcategory: '' };
+  const map = {
+    'biceps':    { category: 'Arms',       subcategory: 'Biceps' },
+    'triceps':   { category: 'Arms',       subcategory: 'Triceps' },
+    'arms':      { category: 'Arms',       subcategory: '' },
+    'chest':     { category: 'Chest',      subcategory: '' },
+    'back':      { category: 'Back',       subcategory: '' },
+    'shoulders': { category: 'Shoulders',  subcategory: '' },
+    'legs':      { category: 'Legs',       subcategory: '' },
+    'abs':       { category: 'Core',       subcategory: '' },
+    'core':      { category: 'Core',       subcategory: '' },
+    'cardio':    { category: 'Cardio',     subcategory: '' },
+  };
+  return map[value.toLowerCase()] || { category: value.charAt(0).toUpperCase() + value.slice(1), subcategory: '' };
 }
 
 // Shared page size for exercise results in both modals below.

@@ -29,20 +29,18 @@ async function apiFetch(path) {
 }
 
 // ── Chart type toggle ─────────────────────────────────────────────────────
-function ChartTypeToggle({ options, value, onChange }) {
+function ChartTypeToggle({ options, value, onChange, label = 'Chart type' }) {
   return (
-    <div className="sc-chart-toggle">
+    <select
+      className="sc-chart-select"
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      title={label}
+    >
       {options.map(o => (
-        <button
-          key={o.value}
-          className={`sc-chart-toggle-btn ${value === o.value ? 'active' : ''}`}
-          onClick={() => onChange(o.value)}
-          title={o.label}
-        >
-          {o.icon}
-        </button>
+        <option key={o.value} value={o.value}>{o.label}</option>
       ))}
-    </div>
+    </select>
   );
 }
 
@@ -282,20 +280,20 @@ function TimeWindowSelector({ weeks, setWeeks, customWeeks, setCustomWeeks }) {
 }
 
 // ── WorkoutCalendar ───────────────────────────────────────────────────────
-// Renders a rolling N-month calendar. Past workout days get a dot.
-// Clicking a day with a workout opens a mini summary.
-function WorkoutCalendar({ months = 3 }) {
+function WorkoutCalendar({ onSelectWorkout }) {
   const [sessions, setSessions] = useState([]);
-  const [selected, setSelected] = useState(null); // { date, sessions[] }
-  const tooltipStyle = { background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: 6, padding: '8px 12px', fontSize: '0.85em' };
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+  const [selected, setSelected] = useState(null);
 
   useEffect(() => {
-    apiFetch(`/combined?weeks=${months * 4}`)
+    apiFetch('/combined?weeks=52')
       .then(d => setSessions(d.sessions || []))
       .catch(console.error);
-  }, [months]);
+  }, []);
 
-  // Build a map of date → sessions[]
   const byDate = {};
   sessions.forEach(s => {
     const d = s.date?.slice(0, 10);
@@ -304,74 +302,81 @@ function WorkoutCalendar({ months = 3 }) {
     byDate[d].push(s);
   });
 
-  // Build months array
-  const today = new Date();
-  const calMonths = [];
-  for (let m = months - 1; m >= 0; m--) {
-    const d = new Date(today.getFullYear(), today.getMonth() - m, 1);
-    calMonths.push(d);
-  }
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDow = new Date(year, month, 1).getDay();
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const monthLabel = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  const cells = [];
+  for (let i = 0; i < firstDow; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
 
   const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
+  const prevMonth = () => setCurrentMonth(new Date(year, month - 1, 1));
+  const nextMonth = () => {
+    const next = new Date(year, month + 1, 1);
+    if (next <= new Date()) setCurrentMonth(next);
+  };
+  const isNextDisabled = new Date(year, month + 1, 1) > new Date();
+
   return (
     <div className="sc-calendar">
-      {calMonths.map((monthStart, mIdx) => {
-        const year = monthStart.getFullYear();
-        const month = monthStart.getMonth();
-        const daysInMonth = new Date(year, month + 1, 0).getDate();
-        const firstDow = new Date(year, month, 1).getDay();
-        const monthLabel = monthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-        const cells = [];
-        for (let i = 0; i < firstDow; i++) cells.push(null);
-        for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+      <div className="sc-calendar-nav">
+        <button className="sc-cal-nav-btn" onClick={prevMonth}>‹</button>
+        <span className="sc-calendar-month-label">{monthLabel}</span>
+        <button className="sc-cal-nav-btn" onClick={nextMonth} disabled={isNextDisabled}
+          style={{ opacity: isNextDisabled ? 0.3 : 1 }}>›</button>
+      </div>
 
-        return (
-          <div key={mIdx} className="sc-calendar-month">
-            <div className="sc-calendar-month-label">{monthLabel}</div>
-            <div className="sc-calendar-grid">
-              {DAY_LABELS.map(dl => <div key={dl} className="sc-cal-dow">{dl}</div>)}
-              {cells.map((day, i) => {
-                if (!day) return <div key={`e${i}`} className="sc-cal-cell empty" />;
-                const dateStr = `${year}-${String(month + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-                const daySessions = byDate[dateStr];
-                const isToday = dateStr === today.toISOString().slice(0,10);
-                const isSelected = selected?.date === dateStr;
-                return (
-                  <div
-                    key={dateStr}
-                    className={`sc-cal-cell ${daySessions ? 'has-workout' : ''} ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}`}
-                    onClick={() => daySessions && setSelected(isSelected ? null : { date: dateStr, sessions: daySessions })}
-                    title={daySessions ? daySessions.map(s => s.title).join(', ') : ''}
-                  >
-                    <span className="sc-cal-day">{day}</span>
-                    {daySessions && (
-                      <div className="sc-cal-dots">
-                        {daySessions.slice(0,3).map((s, si) => (
-                          <span key={si} className={`sc-cal-dot ${s.type}`} />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+      <div className="sc-calendar-grid">
+        {DAY_LABELS.map(dl => <div key={dl} className="sc-cal-dow">{dl}</div>)}
+        {cells.map((day, i) => {
+          if (!day) return <div key={`e${i}`} className="sc-cal-cell empty" />;
+          const dateStr = `${year}-${String(month + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+          const daySessions = byDate[dateStr];
+          const isToday = dateStr === todayStr;
+          const isSelected = selected === dateStr;
+          return (
+            <div
+              key={dateStr}
+              className={`sc-cal-cell ${daySessions ? 'has-workout' : ''} ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}`}
+              onClick={() => daySessions && setSelected(isSelected ? null : dateStr)}
+            >
+              <span className="sc-cal-day">{day}</span>
+              {daySessions && (
+                <div className="sc-cal-dots">
+                  {daySessions.slice(0, 3).map((s, si) => (
+                    <span key={si} className={`sc-cal-dot ${s.type}`} />
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
 
-      {selected && (
+      {selected && byDate[selected] && (
         <div className="sc-calendar-popup">
           <div className="sc-cal-popup-header">
-            <strong>{new Date(selected.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</strong>
-            <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '1em' }}>✕</button>
+            <strong>{new Date(selected + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</strong>
+            <button onClick={() => setSelected(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>✕</button>
           </div>
-          {selected.sessions.map((s, i) => (
-            <div key={i} className="sc-cal-popup-session">
+          {byDate[selected].map((s, i) => (
+            <div
+              key={i}
+              className="sc-cal-popup-session"
+              style={{ cursor: 'pointer' }}
+              onClick={() => onSelectWorkout && onSelectWorkout(s)}
+            >
               <span className={`history-type-badge ${s.type}`}>{s.type}</span>
               <strong>{s.title}</strong>
               {s.duration_seconds && <span> · {fmtDuration(s.duration_seconds)}</span>}
               {s.session_rating && <span> · ⭐ {s.session_rating}/5</span>}
+              <span style={{ marginLeft: 'auto', color: 'var(--color-primary)', fontSize: '0.8em' }}>View →</span>
             </div>
           ))}
         </div>
@@ -380,6 +385,7 @@ function WorkoutCalendar({ months = 3 }) {
       <div className="sc-calendar-legend">
         <span><span className="sc-cal-dot strength" /> Strength</span>
         <span><span className="sc-cal-dot cardio" /> Cardio</span>
+        <span><span className="sc-cal-dot mixed" /> Mixed</span>
       </div>
     </div>
   );
@@ -388,7 +394,7 @@ function WorkoutCalendar({ months = 3 }) {
 // ═══════════════════════════════════════════════════════════════════════════
 // OVERVIEW TAB
 // ═══════════════════════════════════════════════════════════════════════════
-function OverviewTab() {
+function OverviewTab({ onSelectWorkout }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [combinedChartMetric, setCombinedChartMetric] = useState('workouts'); // 'workouts' | 'duration' | 'both'
@@ -462,19 +468,19 @@ function OverviewTab() {
   const ratingData = ratings.map(r => ({ date: fmtDate(r.date), rating: parseFloat(r.rating), type: r.type }));
 
   const COMBINED_METRIC_OPTIONS = [
-    { value: 'workouts', label: 'Frequency', icon: '▮▮' },
-    { value: 'duration', label: 'Duration', icon: '⏱' },
-    { value: 'both', label: 'Both', icon: '⊡' },
+    { value: 'workouts',  label: 'Workout Frequency' },
+    { value: 'duration',  label: 'Avg Session Duration' },
+    { value: 'both',      label: 'Frequency + Duration' },
   ];
   const COMBINED_TYPE_OPTIONS = [
-    { value: 'bar', label: 'Bar', icon: '▮▮' },
-    { value: 'line', label: 'Line', icon: '╱' },
-    { value: 'area', label: 'Area', icon: '◬' },
+    { value: 'bar',   label: 'Bar chart' },
+    { value: 'line',  label: 'Line chart' },
+    { value: 'area',  label: 'Area chart (shaded)' },
   ];
   const RATING_OPTIONS = [
-    { value: 'line', label: 'Line', icon: '╱' },
-    { value: 'bar', label: 'Bar', icon: '▮▮' },
-    { value: 'scatter', label: 'Scatter', icon: '⋯' },
+    { value: 'line',    label: 'Line chart' },
+    { value: 'bar',     label: 'Bar chart' },
+    { value: 'scatter', label: 'Scatter plot' },
   ];
 
   const PIE_COLORS = ['var(--color-primary)', 'var(--color-warning)', 'var(--color-info)', 'var(--color-success)', '#a855f7', '#ec4899'];
@@ -534,7 +540,7 @@ function OverviewTab() {
 
       {/* Calendar */}
       <Section title="Activity Calendar">
-        <WorkoutCalendar months={3} />
+        <WorkoutCalendar onSelectWorkout={onSelectWorkout} />
       </Section>
 
       {/* Time window selector */}
@@ -544,9 +550,9 @@ function OverviewTab() {
       <Section
         title="Workout Frequency & Duration"
         controls={
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <ChartTypeToggle options={COMBINED_METRIC_OPTIONS} value={combinedChartMetric} onChange={setCombinedChartMetric} />
-            <ChartTypeToggle options={COMBINED_TYPE_OPTIONS} value={combinedChartType} onChange={setCombinedChartType} />
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <ChartTypeToggle options={COMBINED_METRIC_OPTIONS} value={combinedChartMetric} onChange={setCombinedChartMetric} label="What to show" />
+            <ChartTypeToggle options={COMBINED_TYPE_OPTIONS} value={combinedChartType} onChange={setCombinedChartType} label="Chart type" />
           </div>
         }
       >
@@ -686,10 +692,10 @@ function StrengthTab() {
   }, []);
 
   const CHART_OPTIONS = [
-    { value: 'line', label: 'Line', icon: '╱' },
-    { value: 'bar', label: 'Bar', icon: '▮▮' },
-    { value: 'area', label: 'Area', icon: '◬' },
-    { value: 'scatter', label: 'Scatter', icon: '⋯' },
+    { value: 'line', label: 'Line chart' },
+    { value: 'bar', label: 'Bar chart' },
+    { value: 'area', label: 'Area chart' },
+    { value: 'scatter', label: 'Scatter plot' },
   ];
 
   const METRIC_OPTIONS = [
@@ -930,10 +936,10 @@ function CardioTab() {
   }, [cardioType]);
 
   const CHART_OPTIONS = [
-    { value: 'line', label: 'Line', icon: '╱' },
-    { value: 'bar', label: 'Bar', icon: '▮▮' },
-    { value: 'area', label: 'Area', icon: '◬' },
-    { value: 'scatter', label: 'Scatter', icon: '⋯' },
+    { value: 'line', label: 'Line chart' },
+    { value: 'bar', label: 'Bar chart' },
+    { value: 'area', label: 'Area chart' },
+    { value: 'scatter', label: 'Scatter plot' },
   ];
   const METRIC_OPTIONS = [
     { value: 'duration_seconds', label: 'Duration (min)' },
@@ -1099,10 +1105,10 @@ function RecordsTab() {
       sets: s.sets,
     }));
     const CHART_OPTIONS = [
-      { value: 'line', label: 'Line', icon: '╱' },
-      { value: 'bar', label: 'Bar', icon: '▮▮' },
-      { value: 'area', label: 'Area', icon: '◬' },
-      { value: 'scatter', label: 'Scatter', icon: '⋯' },
+      { value: 'line', label: 'Line chart' },
+      { value: 'bar', label: 'Bar chart' },
+      { value: 'area', label: 'Area chart' },
+      { value: 'scatter', label: 'Scatter plot' },
     ];
     const METRIC_OPTIONS = [
       { value: 'max_weight', label: 'Max Weight' },
@@ -1264,9 +1270,9 @@ function CombinedTab() {
   }, [weeks]);
 
   const CHART_OPTIONS = [
-    { value: 'line', label: 'Line', icon: '╱' },
-    { value: 'bar', label: 'Bar', icon: '▮▮' },
-    { value: 'scatter', label: 'Scatter', icon: '⋯' },
+    { value: 'line', label: 'Line chart' },
+    { value: 'bar', label: 'Bar chart' },
+    { value: 'scatter', label: 'Scatter plot' },
   ];
 
   if (loading) return <Loading />;
@@ -1365,7 +1371,7 @@ function CombinedTab() {
 // ═══════════════════════════════════════════════════════════════════════════
 // HISTORY TAB
 // ═══════════════════════════════════════════════════════════════════════════
-function HistoryTab() {
+function HistoryTab({ initialWorkoutId, onClearSelected }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [weeks, setWeeks] = useState(8);
@@ -1381,9 +1387,9 @@ function HistoryTab() {
   }, [weeks]);
 
   const RATING_OPTIONS = [
-    { value: 'line',    label: 'Line',    icon: '╱'  },
-    { value: 'bar',     label: 'Bar',     icon: '▮▮' },
-    { value: 'scatter', label: 'Scatter', icon: '⋯'  },
+    { value: 'line', label: 'Line chart' },
+    { value: 'bar', label: 'Bar chart' },
+    { value: 'scatter', label: 'Scatter plot' },
   ];
 
   if (loading) return <Loading />;
@@ -1485,7 +1491,7 @@ function HistoryTab() {
 
       {/* Full workout history list */}
       <Section title="Workout Log">
-        <WorkoutHistory />
+        <WorkoutHistory initialWorkoutId={initialWorkoutId} onClearSelected={onClearSelected} />
       </Section>
     </div>
   );
@@ -1496,6 +1502,12 @@ function HistoryTab() {
 // ═══════════════════════════════════════════════════════════════════════════
 export default function StatsCenter() {
   const [tab, setTab] = useState('Overview');
+  const [selectedHistoryId, setSelectedHistoryId] = useState(null);
+
+  const handleSelectWorkout = (session) => {
+    setSelectedHistoryId(session.id);
+    setTab('History');
+  };
 
   return (
     <div className="sc-container">
@@ -1512,13 +1524,14 @@ export default function StatsCenter() {
       </div>
 
       <div className="sc-content">
-        {tab === 'Overview'  && <OverviewTab />}
+        {tab === 'Overview'  && <OverviewTab onSelectWorkout={handleSelectWorkout} />}
         {tab === 'Strength'  && <StrengthTab />}
         {tab === 'Cardio'    && <CardioTab />}
         {tab === 'Records'   && <RecordsTab />}
         {tab === 'Combined'  && <CombinedTab />}
-        {tab === 'History'   && <HistoryTab />}
+        {tab === 'History'   && <HistoryTab initialWorkoutId={selectedHistoryId} onClearSelected={() => setSelectedHistoryId(null)} />}
       </div>
     </div>
   );
 }
+

@@ -645,15 +645,10 @@ const deleteExerciseFromWorkout = async (req, res) => {
   }
 };
 
+// Add exercises to workout
 const addExerciseToWorkout = async (req, res) => {
   const { workoutId } = req.params;
-  const {
-    exercise_id, order_index, exercise_notes,
-    target_sets, target_reps, target_weight,
-    // Cardio-specific goals (nullable for strength exercises)
-    goal_duration_seconds, goal_distance, goal_distance_unit,
-    goal_pace, goal_pace_unit, goal_laps, goal_lap_distance,
-  } = req.body;
+  const { exercise_id, order_index, exercise_notes, target_sets, target_reps, target_weight } = req.body;
   const user_id = req.user.userId;
 
   try {
@@ -667,18 +662,9 @@ const addExerciseToWorkout = async (req, res) => {
     }
 
     const result = await pool.query(
-      `INSERT INTO workout_exercises (
-        workout_id, exercise_id, order_index, exercise_notes,
-        target_sets, target_reps, target_weight,
-        goal_duration_seconds, goal_distance, goal_distance_unit,
-        goal_pace, goal_pace_unit, goal_laps, goal_lap_distance
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
-      [
-        workoutId, exercise_id, order_index, exercise_notes || null,
-        target_sets || null, target_reps || null, target_weight || null,
-        goal_duration_seconds || null, goal_distance || null, goal_distance_unit || null,
-        goal_pace || null, goal_pace_unit || null, goal_laps || null, goal_lap_distance || null,
-      ]
+      `INSERT INTO workout_exercises (workout_id, exercise_id, order_index, exercise_notes, target_sets, target_reps, target_weight)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [workoutId, exercise_id, order_index, exercise_notes || null, target_sets || null, target_reps || null, target_weight || null]
     );
 
     res.status(201).json(result.rows[0]);
@@ -728,12 +714,15 @@ const getCombinedHistory = async (req, res) => {
   try {
     const strengthResult = await pool.query(
       `SELECT
-        w.id, 'strength' AS type, w.workout_date AS date,
+        w.id,
+        COALESCE(w.workout_type, 'strength') AS type,
+        w.workout_date AS date,
         w.start_time, w.end_time,
         EXTRACT(EPOCH FROM (w.end_time - w.start_time))::INTEGER AS duration_seconds,
-        COALESCE(w.workout_title, wr.name, 'Free Lift') AS title,
+        COALESCE(w.workout_title, wr.name, 'Open Session') AS title,
         COUNT(DISTINCT we.id) AS exercise_count,
-        w.overall_notes, w.status
+        w.overall_notes, w.status,
+        w.session_rating, w.session_notes
        FROM workouts w
        LEFT JOIN workout_routines wr ON w.routine_id = wr.id
        LEFT JOIN workout_exercises we ON w.id = we.workout_id
@@ -748,7 +737,8 @@ const getCombinedHistory = async (req, res) => {
         start_time, end_time, duration_seconds,
         cardio_type AS title, distance, distance_unit,
         calories_burned, avg_heart_rate,
-        pre_session_notes, mid_session_notes, post_session_notes, status
+        pre_session_notes, mid_session_notes, post_session_notes,
+        status, session_rating, session_notes
        FROM cardio_sessions
        WHERE user_id = $1 AND status != 'cancelled'
        ORDER BY session_date DESC, start_time DESC`,
@@ -814,30 +804,29 @@ const getWorkoutDetail = async (req, res) => {
   }
 };
 
-// POST /api/v1/workouts/start-free  (free lift - no routine)
+// POST /api/v1/workouts/start-free  (open session / quick cardio)
 const startFreeLift = async (req, res) => {
-  const { workout_date, workout_title } = req.body;
+  const { workout_date, workout_title, workout_type = 'open' } = req.body;
   const user_id = req.user.userId;
   if (!workout_date) {
     return res.status(400).json({ error: 'workout_date required' });
   }
   try {
     const result = await pool.query(
-      `INSERT INTO workouts (user_id, workout_date, routine_id, start_time, workout_title)
-       VALUES ($1, $2, NULL, $3, $4) RETURNING *`,
-      [user_id, workout_date, new Date().toISOString(), workout_title || null]
+      `INSERT INTO workouts (user_id, workout_date, routine_id, start_time, workout_title, workout_type)
+       VALUES ($1, $2, NULL, $3, $4, $5) RETURNING *`,
+      [user_id, workout_date, new Date().toISOString(), workout_title || null, workout_type]
     );
     res.status(201).json({
       workout: result.rows[0],
-      // Use custom title if provided, fall back to default
-      routine_name: workout_title || 'Free Lift',
+      routine_name: workout_title || 'Open Session',
       exercises: [],
       last_workout_date: null,
       previous_overall_notes: null,
     });
   } catch (err) {
-    console.error('Start free lift error:', err);
-    res.status(500).json({ error: 'Failed to start free lift workout' });
+    console.error('Start workout error:', err);
+    res.status(500).json({ error: 'Failed to start workout' });
   }
 };
 
@@ -849,7 +838,7 @@ const logCardioSegment = async (req, res) => {
     segment_number, segment_label,
     duration_seconds, distance, distance_unit,
     pace, pace_unit, pace_overridden,
-    reps, notes,
+    reps, avg_speed, max_speed, notes,
   } = req.body;
 
   try {
@@ -865,13 +854,14 @@ const logCardioSegment = async (req, res) => {
       `INSERT INTO workout_cardio_segments (
         workout_exercise_id, workout_id, segment_number, segment_label,
         duration_seconds, distance, distance_unit,
-        pace, pace_unit, pace_overridden, reps, notes
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+        pace, pace_unit, pace_overridden, reps,
+        avg_speed, max_speed, notes
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
       [
         exerciseId, workoutId, segment_number, segment_label || 'Segment',
         duration_seconds || null, distance || null, distance_unit || null,
         pace || null, pace_unit || null, pace_overridden || false,
-        reps || null, notes || null,
+        reps || null, avg_speed || null, max_speed || null, notes || null,
       ]
     );
 
@@ -910,6 +900,39 @@ const getCardioSegments = async (req, res) => {
   }
 };
 
+// PUT /api/v1/workouts/:workoutId/type
+// Called when exercises are added/removed to keep workout_type accurate
+const updateWorkoutType = async (req, res) => {
+  const { workoutId } = req.params;
+  const user_id = req.user.userId;
+  try {
+    // Determine type from current exercise categories
+    const result = await pool.query(
+      `SELECT DISTINCT e.category
+       FROM workout_exercises we
+       JOIN exercises e ON we.exercise_id = e.id
+       WHERE we.workout_id = $1`,
+      [workoutId]
+    );
+    const categories = result.rows.map(r => r.category);
+    const hasStrength = categories.some(c => c !== 'Cardio');
+    const hasCardio = categories.some(c => c === 'Cardio');
+    let workout_type = 'open';
+    if (hasStrength && hasCardio) workout_type = 'mixed';
+    else if (hasCardio) workout_type = 'cardio';
+    else if (hasStrength) workout_type = 'strength';
+
+    await pool.query(
+      `UPDATE workouts SET workout_type = $1 WHERE id = $2 AND user_id = $3`,
+      [workout_type, workoutId, user_id]
+    );
+    res.json({ workout_type });
+  } catch (err) {
+    console.error('Update workout type error:', err);
+    res.status(500).json({ error: 'Failed to update workout type' });
+  }
+};
+
 module.exports = {
   searchExercises,
   getExerciseById,
@@ -928,4 +951,5 @@ module.exports = {
   startFreeLift,
   logCardioSegment,
   getCardioSegments,
+  updateWorkoutType,
 };

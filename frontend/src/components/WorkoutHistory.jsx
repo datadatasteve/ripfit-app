@@ -30,7 +30,7 @@ function formatDate(d) {
   return new Date(year, month - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-export default function WorkoutHistory() {
+export default function WorkoutHistory({ initialWorkoutId, onClearSelected }) {
   const [entries, setEntries] = useState([]);
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -44,6 +44,17 @@ export default function WorkoutHistory() {
   useEffect(() => {
     fetchHistory();
   }, []);
+
+  // Auto-open a specific workout when navigated from calendar
+  useEffect(() => {
+    if (initialWorkoutId && entries.length > 0) {
+      const entry = entries.find(e => e.id === initialWorkoutId);
+      if (entry) {
+        openDetail(entry);
+        onClearSelected?.();
+      }
+    }
+  }, [initialWorkoutId, entries]);
 
   const fetchHistory = async () => {
     setLoading(true);

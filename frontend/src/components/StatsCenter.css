@@ -656,3 +656,55 @@
   font-weight: 600;
 }
  
+/* Chart type dropdown (replaces pill toggles) */
+.sc-chart-select {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.82em;
+  cursor: pointer;
+  height: 28px;
+}
+.sc-chart-select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+/* Calendar nav */
+.sc-calendar-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.sc-cal-nav-btn {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  font-size: 1.1em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sc-cal-nav-btn:hover { background: var(--bg-secondary); }
+
+/* Calendar cells — bordered, contrasting background */
+.sc-cal-cell {
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  min-height: 38px;
+}
+.sc-cal-cell.empty {
+  background: transparent;
+  border-color: transparent;
+}
+.sc-cal-cell.has-workout {
+  background: var(--bg-elevated);
+}
+.sc-cal-dot.mixed { background: var(--color-info); }
