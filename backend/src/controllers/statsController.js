@@ -44,7 +44,7 @@ async function getOverview(req, res) {
         WHERE user_id = $1 AND (status = 'completed' OR (status IS NULL AND end_time IS NOT NULL)) ${weeksCond}
         UNION ALL
         SELECT COALESCE(start_time, session_date::timestamptz) AS d FROM cardio_sessions
-        WHERE user_id = $1 AND status = 'finished' ${weeksCond2}
+        WHERE user_id = $1 AND status = 'completed' ${weeksCond2}
       ) combined
       WHERE d IS NOT NULL
       GROUP BY week_start
@@ -61,7 +61,7 @@ async function getOverview(req, res) {
         WHERE user_id = $1 AND (status = 'completed' OR (status IS NULL AND end_time IS NOT NULL)) AND start_time IS NOT NULL
         UNION ALL
         SELECT start_time AS d FROM cardio_sessions
-        WHERE user_id = $1 AND status = 'finished' AND start_time IS NOT NULL
+        WHERE user_id = $1 AND status = 'completed' AND start_time IS NOT NULL
       ) combined
       GROUP BY hour
       ORDER BY hour
@@ -77,7 +77,7 @@ async function getOverview(req, res) {
         WHERE user_id = $1 AND (status = 'completed' OR (status IS NULL AND end_time IS NOT NULL))
         UNION ALL
         SELECT COALESCE(start_time, session_date::timestamptz) AS d FROM cardio_sessions
-        WHERE user_id = $1 AND status = 'finished'
+        WHERE user_id = $1 AND status = 'completed'
       ) combined
       WHERE d IS NOT NULL
       GROUP BY dow
@@ -97,7 +97,7 @@ async function getOverview(req, res) {
       UNION ALL
       SELECT duration_seconds, 'cardio' AS type, start_time
       FROM cardio_sessions
-      WHERE user_id = $1 AND status = 'finished'
+      WHERE user_id = $1 AND status = 'completed'
         AND duration_seconds IS NOT NULL AND duration_seconds > 0
       ORDER BY start_time
     `, [userId]);
@@ -118,7 +118,7 @@ async function getOverview(req, res) {
         'cardio' AS type,
         start_time
       FROM cardio_sessions
-      WHERE user_id = $1 AND session_rating IS NOT NULL AND status = 'finished'
+      WHERE user_id = $1 AND session_rating IS NOT NULL AND status = 'completed'
       ORDER BY start_time
     `, [userId]);
 
@@ -136,7 +136,7 @@ async function getOverview(req, res) {
         WHERE user_id = $1 AND (status = 'completed' OR (status IS NULL AND end_time IS NOT NULL))
         UNION ALL
         SELECT duration_seconds AS dur, session_rating FROM cardio_sessions
-        WHERE user_id = $1 AND status = 'finished'
+        WHERE user_id = $1 AND status = 'completed'
       ) all_sessions
     `, [userId]);
 
@@ -488,7 +488,7 @@ async function getCombinedStats(req, res) {
           cs.start_time,
           cs.id AS workout_id
         FROM cardio_sessions cs
-        WHERE cs.user_id = $1 AND cs.status = 'finished'
+        WHERE cs.user_id = $1 AND cs.status = 'completed'
           AND COALESCE(cs.start_time, cs.session_date::timestamptz) >= NOW() - ($2 || ' weeks')::INTERVAL
       ) all_sessions
       ORDER BY COALESCE(start_time, date::timestamptz) DESC

@@ -678,11 +678,11 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
       // Build summary data before clearing workout (subtract any paused time)
       const pausedSeconds = activeWorkout.workout.total_paused_seconds || 0;
       const rawMs = Date.now() - new Date(activeWorkout.workout.start_time).getTime();
-      const duration = Math.round((rawMs / 1000 - pausedSeconds) / 60);
+      const durationSeconds = Math.round(rawMs / 1000 - pausedSeconds);
       setWorkoutSummary({
         workout_id: activeWorkout.workout.id,
         routine_name: activeWorkout.routine_name,
-        duration_minutes: duration,
+        duration_seconds: durationSeconds,
         session_rating: sessionRating,
         rating_prefs: ratingPrefs,
         exercises: [...activeWorkout.exercises]
@@ -737,11 +737,13 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
     const totalSets = strengthExercises.reduce((sum, ex) => sum + (ex.logged_sets?.length || 0), 0);
     const totalReps = strengthExercises.reduce((sum, ex) =>
       sum + (ex.logged_sets || []).reduce((s, set) => s + (set.reps_completed || 0), 0), 0);
-    const totalSeconds = workoutSummary.duration_minutes * 60;
+    const totalSeconds = workoutSummary.duration_seconds || 0;
     const dHours = Math.floor(totalSeconds / 3600);
     const dMins = Math.floor((totalSeconds % 3600) / 60);
     const dSecs = totalSeconds % 60;
-    const durationStr = `${String(dHours).padStart(2,'0')}:${String(dMins).padStart(2,'0')}:${String(dSecs).padStart(2,'0')}`;
+    const durationStr = dHours > 0
+      ? `${String(dHours).padStart(2,'0')}:${String(dMins).padStart(2,'0')}:${String(dSecs).padStart(2,'0')}`
+      : `${String(dMins).padStart(2,'0')}:${String(dSecs).padStart(2,'0')}`;
 
     return (
       <div className="workout-container">

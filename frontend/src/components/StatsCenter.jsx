@@ -120,7 +120,14 @@ function fmtDate(d, includeYear = false) {
   return date.toLocaleDateString('en-US', opts);
 }
 
-// Box-and-whisker calculation from array of values
+// Rating color: red (0-2) → amber (2.5-3.5) → green (4-5)
+function ratingColor(r) {
+  if (r == null) return 'var(--text-secondary)';
+  const v = parseFloat(r);
+  if (v <= 2) return '#ef4444';
+  if (v <= 3.5) return 'var(--color-warning)';
+  return '#22c55e';
+}
 function boxWhisker(values) {
   if (!values || values.length === 0) return null;
   const sorted = [...values].sort((a, b) => a - b);
@@ -381,7 +388,7 @@ function WorkoutCalendar({ onSelectWorkout }) {
               <span className={`history-type-badge ${s.type}`}>{s.type}</span>
               <strong>{s.title}</strong>
               {s.duration_seconds && <span> · {fmtDuration(s.duration_seconds)}</span>}
-              {s.session_rating && <span> · ⭐ {s.session_rating}/5</span>}
+              {s.session_rating && <span style={{ color: ratingColor(s.session_rating) }}> · {s.session_rating}/5</span>}
               <span style={{ marginLeft: 'auto', color: 'var(--color-primary)', fontSize: '0.8em' }}>View →</span>
             </div>
           ))}
@@ -1390,7 +1397,9 @@ function CombinedTab({ onSelectWorkout }) {
                   <td><span className={`history-type-badge ${s.type}`}>{s.type}</span></td>
                   <td>{s.title}</td>
                   <td>{fmtDuration(s.duration_seconds)}</td>
-                  <td>{s.session_rating ?? '—'}</td>
+                  <td style={{ color: ratingColor(s.session_rating), fontWeight: s.session_rating != null ? 600 : 400 }}>
+                    {s.session_rating ?? '—'}
+                  </td>
                   <td>{s.volume ? s.volume.toLocaleString() : s.distance ? `${s.distance}` : '—'}</td>
                 </tr>
               ))}
@@ -1428,8 +1437,8 @@ function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout }) {
 
   if (loading) return <Loading />;
 
-  // Rated sessions only
-  const ratedSessions = (data?.sessions || []).filter(s => s.session_rating != null);
+  // Rated sessions only — reverse to chronological for chart display
+  const ratedSessions = (data?.sessions || []).filter(s => s.session_rating != null).reverse();
   const ratingData = ratedSessions.map(s => ({
     date: fmtDate(s.date),
     rating: parseFloat(s.session_rating),
@@ -1516,7 +1525,7 @@ function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout }) {
                     <td><span className={`history-type-badge ${s.type}`}>{s.type}</span></td>
                     <td>{s.title}</td>
                     <td>{fmtDuration(s.duration_seconds)}</td>
-                    <td style={{ color: s.session_rating ? 'var(--color-warning)' : 'var(--text-secondary)' }}>
+                    <td style={{ color: ratingColor(s.session_rating), fontWeight: s.session_rating != null ? 600 : 400 }}>
                       {s.session_rating != null ? `${s.session_rating} / 5` : '—'}
                     </td>
                     <td>{s.volume ? s.volume.toLocaleString() : s.distance ? `${s.distance}` : '—'}</td>
