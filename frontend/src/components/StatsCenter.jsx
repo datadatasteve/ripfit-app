@@ -47,9 +47,13 @@ function ChartTypeToggle({ options, value, onChange, label = 'Chart type' }) {
 }
 
 // ── Stat card ─────────────────────────────────────────────────────────────
-function StatCard({ label, value, sub }) {
+function StatCard({ label, value, sub, onClick, clickable }) {
   return (
-    <div className="sc-stat-card">
+    <div
+      className={`sc-stat-card${clickable ? ' sc-stat-card-clickable' : ''}`}
+      onClick={onClick}
+      title={clickable ? `View ${label} details` : undefined}
+    >
       <span className="sc-stat-value">{value ?? '—'}</span>
       <span className="sc-stat-label">{label}</span>
       {sub && <span className="sc-stat-sub">{sub}</span>}
@@ -955,12 +959,14 @@ function StrengthTab() {
 // ═══════════════════════════════════════════════════════════════════════════
 // CARDIO TAB
 // ═══════════════════════════════════════════════════════════════════════════
-function CardioTab() {
+function CardioTab({ onSelectWorkout }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [cardioType, setCardioType] = useState('');
+  const [cardioType, setCardioType] = useState('');       // active filter
+  const [drillType, setDrillType] = useState(null);       // clicked activity type → drill view
   const [metric, setMetric] = useState('duration_seconds');
   const [chartType, setChartType] = useState('line');
+  const [showAllTypes, setShowAllTypes] = useState(false);
 
   useEffect(() => {
     const params = cardioType ? `?cardioType=${encodeURIComponent(cardioType)}` : '';
@@ -972,69 +978,208 @@ function CardioTab() {
   }, [cardioType]);
 
   const CHART_OPTIONS = [
-    { value: 'line', label: 'Line chart' },
-    { value: 'bar', label: 'Bar chart' },
-    { value: 'area', label: 'Area chart' },
-    { value: 'scatter', label: 'Scatter plot' },
+    { value: 'line', label: 'Line' },
+    { value: 'bar', label: 'Bar' },
+    { value: 'area', label: 'Area' },
+    { value: 'scatter', label: 'Scatter' },
   ];
   const METRIC_OPTIONS = [
-    { value: 'duration_seconds', label: 'Duration (min)' },
+    { value: 'duration_seconds', label: 'Duration' },
     { value: 'distance', label: 'Distance' },
     { value: 'avg_speed', label: 'Avg Speed' },
-    { value: 'avg_heart_rate', label: 'Avg Heart Rate' },
+    { value: 'avg_heart_rate', label: 'Avg HR' },
     { value: 'calories_burned', label: 'Calories' },
-    { value: 'session_rating', label: 'Session Rating' },
+    { value: 'session_rating', label: 'Rating' },
   ];
+
+  const TS = { fontSize: 11, fill: 'var(--text-secondary)' };
+  const TT = { background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: 12 };
 
   if (loading) return <Loading />;
   if (!data) return <Empty />;
 
   const { summary, time_series } = data;
-  const types = [...new Set(time_series.map(s => s.cardio_type))];
 
-  const chartData = time_series.map(s => ({
-    date: fmtDate(s.session_date),
-    value: metric === 'duration_seconds'
-      ? Math.round(s.duration_seconds / 60)
-      : parseFloat(s[metric]) || 0,
-    type: s.cardio_type,
+  // ── Drill-down: one activity type, all its sessions ──────────────────────
+  if (drillType) {
+    const drillSessions = time_series.filter(s => s.cardio_type === drillType)
+      .sort((a, b) => new Date(a.start_time || a.session_date) - new Date(b.start_time || b.session_date));
+    const drillSummary = summary.find(s => s.cardio_type === drillType);
+
+    const drillChartData = drillSessions.map(s => ({
+      date: fmtDate(s.session_date),
+      value: metric === 'duration_seconds'
+        ? Math.round((s.duration_seconds || 0) / 60)
+        : parseFloat(s[metric]) || null,
+      raw: s,
+    })).filter(d => d.value != null);
+
+    const metricLabel = METRIC_OPTIONS.find(m => m.value === metric)?.label;
+
+    const renderDrillChart = () => (
+      <ResponsiveContainer width="100%" height={240}>
+        {chartType === 'bar' ? (
+          <BarChart data={drillChartData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+            <XAxis dataKey="date" tick={TS} />
+            <YAxis tick={TS} domain={[0, 'auto']} allowDataOverflow={false} />
+            <Tooltip contentStyle={TT} />
+            <Bar dataKey="value" fill="#3498db" radius={[3,3,0,0]} name={metricLabel} />
+          </BarChart>
+        ) : chartType === 'area' ? (
+          <AreaChart data={drillChartData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+            <XAxis dataKey="date" tick={TS} />
+            <YAxis tick={TS} domain={[0, 'auto']} allowDataOverflow={false} />
+            <Tooltip contentStyle={TT} />
+            <Area type="monotone" dataKey="value" stroke="#3498db" fill="#3498db" fillOpacity={0.15} name={metricLabel} />
+          </AreaChart>
+        ) : chartType === 'scatter' ? (
+          <ScatterChart>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+            <XAxis dataKey="date" tick={TS} />
+            <YAxis dataKey="value" tick={TS} domain={[0, 'auto']} />
+            <Tooltip contentStyle={TT} />
+            <Scatter data={drillChartData} fill="#3498db" name={metricLabel} />
+          </ScatterChart>
+        ) : (
+          <LineChart data={drillChartData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+            <XAxis dataKey="date" tick={TS} />
+            <YAxis tick={TS} domain={[0, 'auto']} allowDataOverflow={false} />
+            <Tooltip contentStyle={TT} />
+            <Line type="monotone" dataKey="value" stroke="#3498db" strokeWidth={2} dot={{ r: 3 }} name={metricLabel} />
+          </LineChart>
+        )}
+      </ResponsiveContainer>
+    );
+
+    return (
+      <div>
+        <button className="sc-back-btn" onClick={() => setDrillType(null)}>← Back to Cardio</button>
+        <h3 className="sc-ex-title">{drillType}</h3>
+
+        {/* Summary stats for this type */}
+        {drillSummary && (
+          <div className="sc-stat-grid">
+            <StatCard label="Sessions" value={drillSummary.sessions} />
+            <StatCard label="Avg Duration" value={fmtDuration(drillSummary.avg_duration_seconds)} />
+            {drillSummary.total_distance > 0 && <StatCard label="Total Distance" value={`${drillSummary.total_distance}`} />}
+            {drillSummary.avg_speed && <StatCard label="Avg Speed" value={drillSummary.avg_speed} />}
+            {drillSummary.avg_rating && <StatCard label="Avg Rating" value={`${drillSummary.avg_rating} / 5`} />}
+            {drillSummary.total_calories > 0 && <StatCard label="Total Calories" value={drillSummary.total_calories?.toLocaleString()} />}
+          </div>
+        )}
+
+        {/* Chart */}
+        <Section
+          title={`${metricLabel} Over Time`}
+          controls={
+            <div style={{ display: 'flex', gap: 8 }}>
+              <select className="sc-select" value={metric} onChange={e => setMetric(e.target.value)}>
+                {METRIC_OPTIONS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+              </select>
+              <ChartTypeToggle options={CHART_OPTIONS} value={chartType} onChange={setChartType} />
+            </div>
+          }
+        >
+          {drillChartData.length === 0 ? <Empty message="No data for this metric." /> : renderDrillChart()}
+        </Section>
+
+        {/* Individual session list */}
+        <Section title="Sessions">
+          <div className="sc-table-wrapper">
+            <table className="sc-table">
+              <thead>
+                <tr><th>Date</th><th>Duration</th><th>Distance</th><th>Avg Speed</th><th>Avg HR</th><th>Rating</th></tr>
+              </thead>
+              <tbody>
+                {[...drillSessions].reverse().map((s, i) => (
+                  <tr
+                    key={i}
+                    className="sc-clickable-row"
+                    onClick={() => onSelectWorkout && onSelectWorkout({ workout_id: s.session_id, id: s.session_id, type: 'cardio' })}
+                  >
+                    <td>{fmtDate(s.session_date)}</td>
+                    <td>{fmtDuration(s.duration_seconds)}</td>
+                    <td>{s.distance ? `${s.distance} ${s.distance_unit || ''}` : '—'}</td>
+                    <td>{s.avg_speed ?? '—'}</td>
+                    <td>{s.avg_heart_rate ? `${s.avg_heart_rate} bpm` : '—'}</td>
+                    <td style={{ color: ratingColor(s.session_rating), fontWeight: s.session_rating != null ? 600 : 400 }}>
+                      {s.session_rating ?? '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Section>
+      </div>
+    );
+  }
+
+  // ── Main cardio view ─────────────────────────────────────────────────────
+  const types = [...new Set(time_series.map(s => s.cardio_type))];
+  const totalSessions = summary.reduce((n, s) => n + s.sessions, 0);
+
+  // Top 5 by session count for the stat cards
+  const sortedSummary = [...summary].sort((a, b) => b.sessions - a.sessions);
+  const visibleSummary = showAllTypes ? sortedSummary : sortedSummary.slice(0, 5);
+
+  // Pie data — all types
+  const PIE_COLORS = ['#3498db','var(--color-primary)','#a855f7','#14b8a6','var(--color-warning)','#22c55e','#ef4444','#f97316','#8b5cf6','#06b6d4'];
+  const pieData = sortedSummary.map((s, i) => ({
+    name: s.cardio_type,
+    value: s.sessions,
+    color: PIE_COLORS[i % PIE_COLORS.length],
   }));
 
+  const chartData = time_series
+    .sort((a, b) => new Date(a.start_time || a.session_date) - new Date(b.start_time || b.session_date))
+    .map(s => ({
+      date: fmtDate(s.session_date),
+      value: metric === 'duration_seconds'
+        ? Math.round((s.duration_seconds || 0) / 60)
+        : parseFloat(s[metric]) || null,
+      type: s.cardio_type,
+    }))
+    .filter(d => d.value != null);
+
   const metricLabel = METRIC_OPTIONS.find(m => m.value === metric)?.label;
-  const strokeColor = 'var(--color-info)';
+  const strokeColor = '#3498db';
 
   const renderChart = () => (
     <ResponsiveContainer width="100%" height={240}>
       {chartType === 'bar' ? (
         <BarChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
-          <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
-          <YAxis tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
-          <Tooltip contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }} />
-          <Bar dataKey="value" fill={strokeColor} radius={[3, 3, 0, 0]} name={metricLabel} />
+          <XAxis dataKey="date" tick={TS} />
+          <YAxis tick={TS} domain={[0, 'auto']} allowDataOverflow={false} />
+          <Tooltip contentStyle={TT} />
+          <Bar dataKey="value" fill={strokeColor} radius={[3,3,0,0]} name={metricLabel} />
         </BarChart>
       ) : chartType === 'area' ? (
         <AreaChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
-          <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
-          <YAxis tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
-          <Tooltip contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }} />
+          <XAxis dataKey="date" tick={TS} />
+          <YAxis tick={TS} domain={[0, 'auto']} allowDataOverflow={false} />
+          <Tooltip contentStyle={TT} />
           <Area type="monotone" dataKey="value" stroke={strokeColor} fill={strokeColor} fillOpacity={0.15} name={metricLabel} />
         </AreaChart>
       ) : chartType === 'scatter' ? (
         <ScatterChart>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
-          <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
-          <YAxis dataKey="value" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
-          <Tooltip contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }} />
+          <XAxis dataKey="date" tick={TS} />
+          <YAxis dataKey="value" tick={TS} domain={[0, 'auto']} />
+          <Tooltip contentStyle={TT} />
           <Scatter data={chartData} fill={strokeColor} name={metricLabel} />
         </ScatterChart>
       ) : (
         <LineChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
-          <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
-          <YAxis tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
-          <Tooltip contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }} />
+          <XAxis dataKey="date" tick={TS} />
+          <YAxis tick={TS} domain={[0, 'auto']} allowDataOverflow={false} />
+          <Tooltip contentStyle={TT} />
           <Line type="monotone" dataKey="value" stroke={strokeColor} strokeWidth={2} dot={{ r: 3 }} name={metricLabel} />
         </LineChart>
       )}
@@ -1043,14 +1188,63 @@ function CardioTab() {
 
   return (
     <div>
-      {/* Summary cards per type */}
+      {/* Top activity type cards — top 5, expandable */}
       <div className="sc-stat-grid">
-        {summary.map(s => (
-          <StatCard key={s.cardio_type} label={s.cardio_type} value={s.sessions} sub="sessions" />
+        {visibleSummary.map(s => (
+          <StatCard
+            key={s.cardio_type}
+            label={s.cardio_type}
+            value={s.sessions}
+            sub="sessions"
+            onClick={() => setDrillType(s.cardio_type)}
+            clickable
+          />
         ))}
       </div>
+      {sortedSummary.length > 5 && (
+        <button className="sc-show-more-btn" onClick={() => setShowAllTypes(v => !v)}>
+          {showAllTypes ? `Show fewer` : `Show all ${sortedSummary.length} types`}
+        </button>
+      )}
 
-      {/* Type filter */}
+      {/* Ratio bars + pie */}
+      <Section title="Activity Mix">
+        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          {/* Progress bars */}
+          <div style={{ flex: '1 1 220px' }}>
+            {sortedSummary.map((s, i) => (
+              <div key={s.cardio_type} style={{ marginBottom: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
+                  <span>{s.cardio_type}</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>{s.sessions} ({Math.round(s.sessions / totalSessions * 100)}%)</span>
+                </div>
+                <div style={{ height: 6, background: 'var(--border-color)', borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${(s.sessions / totalSessions) * 100}%`,
+                    background: PIE_COLORS[i % PIE_COLORS.length],
+                    borderRadius: 3,
+                    transition: 'width 0.4s ease',
+                  }} />
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Pie chart */}
+          <div style={{ flex: '0 0 180px' }}>
+            <ResponsiveContainer width={180} height={180}>
+              <PieChart>
+                <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={40}>
+                  {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                </Pie>
+                <Tooltip contentStyle={TT} formatter={(v, name) => [`${v} sessions`, name]} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </Section>
+
+      {/* Type filter pills */}
       <div className="sc-filter-row">
         <button className={`sc-window-btn ${!cardioType ? 'active' : ''}`} onClick={() => setCardioType('')}>All</button>
         {types.map(t => (
@@ -1058,7 +1252,7 @@ function CardioTab() {
         ))}
       </div>
 
-      {/* Chart */}
+      {/* Time series chart */}
       <Section
         title={metricLabel}
         controls={
@@ -1073,27 +1267,31 @@ function CardioTab() {
         {chartData.length === 0 ? <Empty /> : renderChart()}
       </Section>
 
-      {/* Summary table */}
+      {/* By Activity Type table — rows clickable → drill */}
       <Section title="By Activity Type">
         <div className="sc-table-wrapper">
           <table className="sc-table">
             <thead>
-              <tr><th>Type</th><th>Sessions</th><th>Avg Duration</th><th>Avg Distance</th><th>Avg HR</th><th>Total Calories</th></tr>
+              <tr><th>Type</th><th>Sessions</th><th>Avg Duration</th><th>Avg Distance</th><th>Avg Speed</th><th>Avg Rating</th><th>Total Calories</th></tr>
             </thead>
             <tbody>
-              {summary.map(s => (
-                <tr key={s.cardio_type}>
+              {sortedSummary.map(s => (
+                <tr key={s.cardio_type} className="sc-clickable-row" onClick={() => setDrillType(s.cardio_type)}>
                   <td>{s.cardio_type}</td>
                   <td>{s.sessions}</td>
                   <td>{fmtDuration(s.avg_duration_seconds)}</td>
-                  <td>{s.avg_distance ? `${s.avg_distance} ${time_series.find(t => t.cardio_type === s.cardio_type)?.distance_unit || ''}` : '—'}</td>
-                  <td>{s.avg_hr ? `${s.avg_hr} bpm` : '—'}</td>
-                  <td>{s.total_calories?.toLocaleString() ?? '—'}</td>
+                  <td>{s.total_distance > 0 ? `${s.total_distance}` : '—'}</td>
+                  <td>{s.avg_speed ?? '—'}</td>
+                  <td style={{ color: ratingColor(s.avg_rating), fontWeight: s.avg_rating ? 600 : 400 }}>
+                    {s.avg_rating ?? '—'}
+                  </td>
+                  <td>{s.total_calories ? s.total_calories.toLocaleString() : '—'}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 8 }}>Click any row to see sessions for that activity.</p>
       </Section>
     </div>
   );
@@ -1485,6 +1683,23 @@ function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout }) {
     );
   };
 
+  const TS = { fontSize: 11, fill: 'var(--text-secondary)' };
+  const TT = { background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: 12 };
+
+  // Chronological sessions for charts
+  const chronoSessions = [...(data?.sessions || [])].reverse();
+
+  // Duration over time chart data
+  const durationData = chronoSessions
+    .filter(s => s.duration_seconds)
+    .map(s => ({
+      date: fmtDate(s.date),
+      duration: Math.round(s.duration_seconds / 60),
+      durationRaw: s.duration_seconds,
+      title: s.title,
+      type: s.type,
+    }));
+
   return (
     <div>
       <TimeWindowSelector weeks={weeks} setWeeks={setWeeks} customWeeks={customWeeks} setCustomWeeks={setCustomWeeks} />
@@ -1500,7 +1715,34 @@ function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout }) {
         }
       </Section>
 
-      {/* Session log with rating column */}
+      {/* Workout duration over time */}
+      {durationData.length > 0 && (
+        <Section title="Workout Duration Over Time">
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={durationData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+              <XAxis dataKey="date" tick={TS} />
+              <YAxis tick={TS} domain={[0, 'auto']} allowDataOverflow={false} unit="m" />
+              <Tooltip
+                contentStyle={TT}
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const d = payload[0].payload;
+                  return (
+                    <div style={{ ...TT, padding: '8px 10px' }}>
+                      <p style={{ margin: '0 0 3px', fontWeight: 600 }}>{d.title}</p>
+                      <p style={{ margin: 0 }}>{fmtDuration(d.durationRaw)}</p>
+                    </div>
+                  );
+                }}
+              />
+              <Bar dataKey="duration" name="Duration (min)" fill="var(--color-primary)" radius={[3,3,0,0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </Section>
+      )}
+
+      {/* Session log */}
       {data && data.sessions.length > 0 && (
         <Section title="Session Log">
           <div className="sc-table-wrapper">
@@ -1588,7 +1830,7 @@ export default function StatsCenter() {
       <div className="sc-content">
         {tab === 'Overview'  && <OverviewTab onSelectWorkout={handleSelectWorkout} />}
         {tab === 'Strength'  && <StrengthTab />}
-        {tab === 'Cardio'    && <CardioTab />}
+        {tab === 'Cardio'    && <CardioTab onSelectWorkout={handleSelectWorkout} />}
         {tab === 'Records'   && <RecordsTab />}
         {tab === 'Combined'  && <CombinedTab onSelectWorkout={handleSelectWorkout} />}
         {tab === 'History'   && <HistoryTab initialWorkoutId={selectedHistoryId} onClearSelected={() => setSelectedHistoryId(null)} onSelectWorkout={handleSelectWorkout} />}

@@ -597,10 +597,8 @@
   border-radius: 50%;
   display: inline-block;
 }
-.sc-cal-dot.strength { background: var(--color-primary); }   /* orange — matches strength badge */
-.sc-cal-dot.cardio   { background: #3498db; }                 /* blue — matches cardio badge */
-.sc-cal-dot.mixed    { background: #a855f7; }                 /* purple — matches mixed badge */
-.sc-cal-dot.open     { background: #14b8a6; }                 /* teal — matches open badge */
+.sc-cal-dot.strength { background: var(--color-primary); }
+.sc-cal-dot.cardio   { background: var(--color-warning); }
  
 .sc-calendar-popup {
   background: var(--bg-elevated);
@@ -708,4 +706,30 @@
 }
 .sc-cal-cell.has-workout {
   background: var(--bg-elevated);
+}
+.sc-cal-dot.mixed { background: var(--color-info); }
+
+.sc-stat-card-clickable {
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.sc-stat-card-clickable:hover {
+  border-color: var(--color-primary);
+  background: var(--bg-hover, rgba(255,255,255,0.04));
+}
+
+.sc-show-more-btn {
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  border-radius: 16px;
+  padding: 5px 14px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  margin: 8px 0 16px;
+  display: block;
+}
+.sc-show-more-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
