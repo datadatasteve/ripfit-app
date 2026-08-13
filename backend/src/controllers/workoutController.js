@@ -780,6 +780,7 @@ const getWorkoutDetail = async (req, res) => {
     const exercisesResult = await pool.query(
       `SELECT
         we.id, we.exercise_id, we.order_index, we.exercise_notes,
+        we.target_sets, we.target_reps, we.target_weight,
         e.name AS exercise_name, e.category,
         json_agg(
           json_build_object(

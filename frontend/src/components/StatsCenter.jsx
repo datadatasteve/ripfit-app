@@ -82,11 +82,13 @@ function Loading() {
 
 // ── formatters ────────────────────────────────────────────────────────────
 function fmtDuration(s) {
-  if (!s) return '—';
+  if (!s && s !== 0) return '—';
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
   if (h > 0) return m > 0 ? `${h}h ${m}min` : `${h}h`;
-  return `${m}min`;
+  if (m > 0) return sec > 0 ? `${m}m ${sec}s` : `${m}min`;
+  return `${sec}s`;
 }
 
 function fmtDate(d, includeYear = false) {

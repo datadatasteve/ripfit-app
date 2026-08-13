@@ -298,70 +298,100 @@ async function getStrengthStats(req, res) {
 }
 
 // ── GET /api/v1/stats/cardio ───────────────────────────────────────────────
+// Pulls from both cardio_sessions (Quick Cardio dedicated flow) and
+// workouts (Open/Mixed sessions with cardio exercises logged via segments)
 async function getCardioStats(req, res) {
   const userId = resolveUserId(req);
   const { cardioType, weeks } = req.query;
 
   try {
-    let whereClause = 'user_id = $1 AND status = \'finished\'';
-    const params = [userId];
-    let paramIdx = 2;
+    // Simpler approach — run two separate queries and merge in JS
+    const csParams = [userId];
+    let csWhere = "user_id = $1 AND status = 'completed'";
+    let csIdx = 2;
+    if (weeks) { csWhere += ` AND COALESCE(start_time, session_date::timestamptz) >= NOW() - ($${csIdx} || ' weeks')::INTERVAL`; csParams.push(weeks); csIdx++; }
+    if (cardioType) { csWhere += ` AND cardio_type = $${csIdx}`; csParams.push(cardioType); csIdx++; }
 
-    if (weeks) {
-      whereClause += ` AND start_time >= NOW() - ($${paramIdx} || ' weeks')::INTERVAL`;
-      params.push(weeks);
-      paramIdx++;
-    }
-    if (cardioType) {
-      whereClause += ` AND cardio_type = $${paramIdx}`;
-      params.push(cardioType);
-      paramIdx++;
-    }
+    const wParams = [userId];
+    let wWhere = "w.user_id = $1 AND w.status = 'completed'";
+    let wIdx = 2;
+    if (weeks) { wWhere += ` AND COALESCE(w.start_time, w.workout_date::timestamptz) >= NOW() - ($${wIdx} || ' weeks')::INTERVAL`; wParams.push(weeks); wIdx++; }
+    if (cardioType) { wWhere += ` AND e.name = $${wIdx}`; wParams.push(cardioType); wIdx++; }
 
-    // Per-type summary
-    const summary = await pool.query(`
+    // cardio_sessions rows
+    const csRows = await pool.query(`
       SELECT
-        cardio_type,
-        COUNT(*)::INTEGER AS sessions,
-        ROUND(AVG(duration_seconds)::NUMERIC, 0) AS avg_duration_seconds,
-        ROUND(AVG(distance)::NUMERIC, 2) AS avg_distance,
-        SUM(distance)::NUMERIC AS total_distance,
-        ROUND(AVG(avg_speed)::NUMERIC, 2) AS avg_speed,
-        ROUND(AVG(avg_heart_rate)::NUMERIC, 0) AS avg_hr,
-        MAX(avg_heart_rate)::INTEGER AS max_hr_seen,
-        SUM(calories_burned)::INTEGER AS total_calories,
-        ROUND(AVG(session_rating)::NUMERIC, 1) AS avg_rating
+        id AS session_id, session_date, start_time, cardio_type,
+        duration_seconds, distance, distance_unit,
+        avg_speed, max_speed, avg_heart_rate, max_heart_rate,
+        calories_burned, elevation_gain, session_rating
       FROM cardio_sessions
-      WHERE ${whereClause}
-      GROUP BY cardio_type
-      ORDER BY sessions DESC
-    `, params);
+      WHERE ${csWhere}
+      ORDER BY COALESCE(start_time, session_date::timestamptz) ASC
+    `, csParams);
 
-    // Time series for charting
-    const timeSeries = await pool.query(`
+    // workout-based cardio rows (one row per exercise per workout)
+    const wRows = await pool.query(`
       SELECT
-        id AS session_id,
-        session_date,
-        start_time,
-        cardio_type,
-        duration_seconds,
-        distance,
-        distance_unit,
-        avg_speed,
-        max_speed,
-        avg_heart_rate,
-        max_heart_rate,
-        calories_burned,
-        elevation_gain,
-        session_rating
-      FROM cardio_sessions
-      WHERE ${whereClause}
-      ORDER BY start_time
-    `, params);
+        w.id AS session_id,
+        w.workout_date AS session_date,
+        w.start_time,
+        e.name AS cardio_type,
+        EXTRACT(EPOCH FROM (w.end_time - w.start_time))::INTEGER AS duration_seconds,
+        ROUND(SUM(wcs.distance)::NUMERIC, 2) AS distance,
+        MAX(wcs.distance_unit) AS distance_unit,
+        ROUND(AVG(wcs.avg_speed)::NUMERIC, 2) AS avg_speed,
+        ROUND(MAX(wcs.max_speed)::NUMERIC, 2) AS max_speed,
+        NULL::INTEGER AS avg_heart_rate,
+        NULL::INTEGER AS max_heart_rate,
+        NULL::INTEGER AS calories_burned,
+        NULL::NUMERIC AS elevation_gain,
+        w.session_rating
+      FROM workouts w
+      JOIN workout_exercises we ON we.workout_id = w.id
+      JOIN exercises e ON e.id = we.exercise_id AND e.category = 'Cardio'
+      LEFT JOIN workout_cardio_segments wcs ON wcs.workout_exercise_id = we.id
+      WHERE ${wWhere}
+      GROUP BY w.id, w.workout_date, w.start_time, w.end_time, w.session_rating, e.name
+      ORDER BY COALESCE(w.start_time, w.workout_date::timestamptz) ASC
+    `, wParams);
+
+    // Merge and sort chronologically
+    const allRows = [...csRows.rows, ...wRows.rows].sort((a, b) => {
+      const ta = a.start_time ? new Date(a.start_time) : new Date(a.session_date);
+      const tb = b.start_time ? new Date(b.start_time) : new Date(b.session_date);
+      return ta - tb;
+    });
+
+    // Build per-type summary from merged rows
+    const summaryMap = {};
+    allRows.forEach(r => {
+      const t = r.cardio_type;
+      if (!summaryMap[t]) {
+        summaryMap[t] = { cardio_type: t, sessions: 0, total_duration: 0, total_distance: 0, total_calories: 0, ratings: [], speeds: [] };
+      }
+      const s = summaryMap[t];
+      s.sessions++;
+      s.total_duration += r.duration_seconds || 0;
+      s.total_distance += parseFloat(r.distance || 0);
+      s.total_calories += r.calories_burned || 0;
+      if (r.session_rating) s.ratings.push(parseFloat(r.session_rating));
+      if (r.avg_speed) s.speeds.push(parseFloat(r.avg_speed));
+    });
+
+    const summary = Object.values(summaryMap).map(s => ({
+      cardio_type: s.cardio_type,
+      sessions: s.sessions,
+      avg_duration_seconds: Math.round(s.total_duration / s.sessions),
+      total_distance: Math.round(s.total_distance * 100) / 100,
+      avg_speed: s.speeds.length ? Math.round((s.speeds.reduce((a,b)=>a+b,0)/s.speeds.length)*100)/100 : null,
+      total_calories: s.total_calories || null,
+      avg_rating: s.ratings.length ? Math.round((s.ratings.reduce((a,b)=>a+b,0)/s.ratings.length)*10)/10 : null,
+    })).sort((a, b) => b.sessions - a.sessions);
 
     res.json({
-      summary: summary.rows,
-      time_series: timeSeries.rows,
+      summary,
+      time_series: allRows,
     });
   } catch (err) {
     console.error('getCardioStats error:', err);
