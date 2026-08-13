@@ -959,14 +959,19 @@ function StrengthTab() {
 // ═══════════════════════════════════════════════════════════════════════════
 // CARDIO TAB
 // ═══════════════════════════════════════════════════════════════════════════
-function CardioTab({ onSelectWorkout }) {
+function CardioTab({ onSelectWorkout, initialDrillType, onDrillChange }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [cardioType, setCardioType] = useState('');       // active filter
-  const [drillType, setDrillType] = useState(null);       // clicked activity type → drill view
+  const [cardioType, setCardioType] = useState('');
+  const [drillType, setDrillType] = useState(initialDrillType || null);
   const [metric, setMetric] = useState('duration_seconds');
   const [chartType, setChartType] = useState('line');
   const [showAllTypes, setShowAllTypes] = useState(false);
+
+  const setDrill = (type) => {
+    setDrillType(type);
+    onDrillChange?.(type);
+  };
 
   useEffect(() => {
     const params = cardioType ? `?cardioType=${encodeURIComponent(cardioType)}` : '';
@@ -1022,7 +1027,7 @@ function CardioTab({ onSelectWorkout }) {
           <BarChart data={drillChartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
             <XAxis dataKey="date" tick={TS} />
-            <YAxis tick={TS} domain={[0, 'auto']} allowDataOverflow={false} />
+            <YAxis tick={TS} domain={[0, dataMax => Math.max(dataMax * 1.1, 1)]} />
             <Tooltip contentStyle={TT} />
             <Bar dataKey="value" fill="#3498db" radius={[3,3,0,0]} name={metricLabel} />
           </BarChart>
@@ -1030,7 +1035,7 @@ function CardioTab({ onSelectWorkout }) {
           <AreaChart data={drillChartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
             <XAxis dataKey="date" tick={TS} />
-            <YAxis tick={TS} domain={[0, 'auto']} allowDataOverflow={false} />
+            <YAxis tick={TS} domain={[0, dataMax => Math.max(dataMax * 1.1, 1)]} />
             <Tooltip contentStyle={TT} />
             <Area type="monotone" dataKey="value" stroke="#3498db" fill="#3498db" fillOpacity={0.15} name={metricLabel} />
           </AreaChart>
@@ -1038,7 +1043,7 @@ function CardioTab({ onSelectWorkout }) {
           <ScatterChart>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
             <XAxis dataKey="date" tick={TS} />
-            <YAxis dataKey="value" tick={TS} domain={[0, 'auto']} />
+            <YAxis dataKey="value" tick={TS} domain={[0, dataMax => Math.max(dataMax * 1.1, 1)]} />
             <Tooltip contentStyle={TT} />
             <Scatter data={drillChartData} fill="#3498db" name={metricLabel} />
           </ScatterChart>
@@ -1046,7 +1051,7 @@ function CardioTab({ onSelectWorkout }) {
           <LineChart data={drillChartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
             <XAxis dataKey="date" tick={TS} />
-            <YAxis tick={TS} domain={[0, 'auto']} allowDataOverflow={false} />
+            <YAxis tick={TS} domain={[0, dataMax => Math.max(dataMax * 1.1, 1)]} />
             <Tooltip contentStyle={TT} />
             <Line type="monotone" dataKey="value" stroke="#3498db" strokeWidth={2} dot={{ r: 3 }} name={metricLabel} />
           </LineChart>
@@ -1056,7 +1061,7 @@ function CardioTab({ onSelectWorkout }) {
 
     return (
       <div>
-        <button className="sc-back-btn" onClick={() => setDrillType(null)}>← Back to Cardio</button>
+        <button className="sc-back-btn" onClick={() => setDrill(null)}>← Back to Cardio</button>
         <h3 className="sc-ex-title">{drillType}</h3>
 
         {/* Summary stats for this type */}
@@ -1126,13 +1131,47 @@ function CardioTab({ onSelectWorkout }) {
   const sortedSummary = [...summary].sort((a, b) => b.sessions - a.sessions);
   const visibleSummary = showAllTypes ? sortedSummary : sortedSummary.slice(0, 5);
 
-  // Pie data — all types
-  const PIE_COLORS = ['#3498db','var(--color-primary)','#a855f7','#14b8a6','var(--color-warning)','#22c55e','#ef4444','#f97316','#8b5cf6','#06b6d4'];
+  // Better differentiated color palette — visually distinct even for color-blind users
+  const PIE_COLORS = [
+    '#3498db', // blue
+    '#e05c2a', // orange (primary)
+    '#22c55e', // green
+    '#a855f7', // purple
+    '#ef4444', // red
+    '#14b8a6', // teal
+    '#f59e0b', // amber
+    '#6366f1', // indigo
+    '#ec4899', // pink
+    '#84cc16', // lime
+    '#0ea5e9', // sky
+    '#f97316', // deep orange
+    '#8b5cf6', // violet
+    '#10b981', // emerald
+    '#e11d48', // rose
+  ];
+
+  const [showAllMix, setShowAllMix] = useState(false);
+  const visibleMixRows = showAllMix ? sortedSummary : sortedSummary.slice(0, 5);
+
   const pieData = sortedSummary.map((s, i) => ({
     name: s.cardio_type,
     value: s.sessions,
     color: PIE_COLORS[i % PIE_COLORS.length],
+    pct: Math.round(s.sessions / totalSessions * 100),
   }));
+
+  const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, pct, name }) => {
+    if (pct < 5) return null; // skip tiny slices
+    const RADIAN = Math.PI / 180;
+    const r = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + r * Math.cos(-midAngle * RADIAN);
+    const y = cy + r * Math.sin(-midAngle * RADIAN);
+    return (
+      <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight={600}>
+        {pct}%
+      </text>
+    );
+  };
 
   const chartData = time_series
     .sort((a, b) => new Date(a.start_time || a.session_date) - new Date(b.start_time || b.session_date))
@@ -1154,7 +1193,7 @@ function CardioTab({ onSelectWorkout }) {
         <BarChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
           <XAxis dataKey="date" tick={TS} />
-          <YAxis tick={TS} domain={[0, 'auto']} allowDataOverflow={false} />
+          <YAxis tick={TS} domain={[0, dataMax => Math.max(dataMax * 1.1, 1)]} />
           <Tooltip contentStyle={TT} />
           <Bar dataKey="value" fill={strokeColor} radius={[3,3,0,0]} name={metricLabel} />
         </BarChart>
@@ -1162,7 +1201,7 @@ function CardioTab({ onSelectWorkout }) {
         <AreaChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
           <XAxis dataKey="date" tick={TS} />
-          <YAxis tick={TS} domain={[0, 'auto']} allowDataOverflow={false} />
+          <YAxis tick={TS} domain={[0, dataMax => Math.max(dataMax * 1.1, 1)]} />
           <Tooltip contentStyle={TT} />
           <Area type="monotone" dataKey="value" stroke={strokeColor} fill={strokeColor} fillOpacity={0.15} name={metricLabel} />
         </AreaChart>
@@ -1170,7 +1209,7 @@ function CardioTab({ onSelectWorkout }) {
         <ScatterChart>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
           <XAxis dataKey="date" tick={TS} />
-          <YAxis dataKey="value" tick={TS} domain={[0, 'auto']} />
+          <YAxis dataKey="value" tick={TS} domain={[0, dataMax => Math.max(dataMax * 1.1, 1)]} />
           <Tooltip contentStyle={TT} />
           <Scatter data={chartData} fill={strokeColor} name={metricLabel} />
         </ScatterChart>
@@ -1178,7 +1217,7 @@ function CardioTab({ onSelectWorkout }) {
         <LineChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
           <XAxis dataKey="date" tick={TS} />
-          <YAxis tick={TS} domain={[0, 'auto']} allowDataOverflow={false} />
+          <YAxis tick={TS} domain={[0, dataMax => Math.max(dataMax * 1.1, 1)]} />
           <Tooltip contentStyle={TT} />
           <Line type="monotone" dataKey="value" stroke={strokeColor} strokeWidth={2} dot={{ r: 3 }} name={metricLabel} />
         </LineChart>
@@ -1196,7 +1235,7 @@ function CardioTab({ onSelectWorkout }) {
             label={s.cardio_type}
             value={s.sessions}
             sub="sessions"
-            onClick={() => setDrillType(s.cardio_type)}
+            onClick={() => setDrill(s.cardio_type)}
             clickable
           />
         ))}
@@ -1210,34 +1249,60 @@ function CardioTab({ onSelectWorkout }) {
       {/* Ratio bars + pie */}
       <Section title="Activity Mix">
         <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-          {/* Progress bars */}
+          {/* Progress bars — top 5 with expand */}
           <div style={{ flex: '1 1 220px' }}>
-            {sortedSummary.map((s, i) => (
-              <div key={s.cardio_type} style={{ marginBottom: 10 }}>
+            {visibleMixRows.map((s, i) => (
+              <div
+                key={s.cardio_type}
+                style={{ marginBottom: 10, cursor: 'pointer' }}
+                onClick={() => setDrill(s.cardio_type)}
+                title={`View ${s.cardio_type} sessions`}
+              >
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
-                  <span>{s.cardio_type}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: PIE_COLORS[sortedSummary.indexOf(s) % PIE_COLORS.length], display: 'inline-block', flexShrink: 0 }} />
+                    {s.cardio_type}
+                  </span>
                   <span style={{ color: 'var(--text-secondary)' }}>{s.sessions} ({Math.round(s.sessions / totalSessions * 100)}%)</span>
                 </div>
                 <div style={{ height: 6, background: 'var(--border-color)', borderRadius: 3, overflow: 'hidden' }}>
                   <div style={{
                     height: '100%',
                     width: `${(s.sessions / totalSessions) * 100}%`,
-                    background: PIE_COLORS[i % PIE_COLORS.length],
+                    background: PIE_COLORS[sortedSummary.indexOf(s) % PIE_COLORS.length],
                     borderRadius: 3,
                     transition: 'width 0.4s ease',
                   }} />
                 </div>
               </div>
             ))}
+            {sortedSummary.length > 5 && (
+              <button className="sc-show-more-btn" onClick={() => setShowAllMix(v => !v)}>
+                {showAllMix ? 'Show fewer' : `Show all ${sortedSummary.length} types`}
+              </button>
+            )}
           </div>
-          {/* Pie chart */}
-          <div style={{ flex: '0 0 180px' }}>
-            <ResponsiveContainer width={180} height={180}>
+          {/* Pie chart with % labels */}
+          <div style={{ flex: '0 0 200px' }}>
+            <ResponsiveContainer width={200} height={200}>
               <PieChart>
-                <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={40}>
+                <Pie
+                  data={pieData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={90}
+                  innerRadius={44}
+                  labelLine={false}
+                  label={renderPieLabel}
+                >
                   {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                 </Pie>
-                <Tooltip contentStyle={TT} formatter={(v, name) => [`${v} sessions`, name]} />
+                <Tooltip
+                  contentStyle={TT}
+                  formatter={(v, name) => [`${v} sessions (${pieData.find(p => p.name === name)?.pct ?? 0}%)`, name]}
+                />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -1276,7 +1341,7 @@ function CardioTab({ onSelectWorkout }) {
             </thead>
             <tbody>
               {sortedSummary.map(s => (
-                <tr key={s.cardio_type} className="sc-clickable-row" onClick={() => setDrillType(s.cardio_type)}>
+                <tr key={s.cardio_type} className="sc-clickable-row" onClick={() => setDrill(s.cardio_type)}>
                   <td>{s.cardio_type}</td>
                   <td>{s.sessions}</td>
                   <td>{fmtDuration(s.avg_duration_seconds)}</td>
@@ -1620,6 +1685,7 @@ function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout }) {
   const [weeks, setWeeks] = useState(8);
   const [customWeeks, setCustomWeeks] = useState('');
   const [ratingChart, setRatingChart] = useState('line');
+  const [durationChart, setDurationChart] = useState('bar');
 
   useEffect(() => {
     setLoading(true);
@@ -1629,6 +1695,12 @@ function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout }) {
       .finally(() => setLoading(false));
   }, [weeks]);
 
+  const CHART_OPTIONS = [
+    { value: 'line', label: 'Line chart' },
+    { value: 'bar', label: 'Bar chart' },
+    { value: 'area', label: 'Area chart' },
+    { value: 'scatter', label: 'Scatter plot' },
+  ];
   const RATING_OPTIONS = [
     { value: 'line', label: 'Line chart' },
     { value: 'bar', label: 'Bar chart' },
@@ -1717,27 +1789,60 @@ function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout }) {
 
       {/* Workout duration over time */}
       {durationData.length > 0 && (
-        <Section title="Workout Duration Over Time">
+        <Section
+          title="Workout Duration Over Time"
+          controls={<ChartTypeToggle options={CHART_OPTIONS} value={durationChart} onChange={setDurationChart} />}
+        >
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={durationData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
-              <XAxis dataKey="date" tick={TS} />
-              <YAxis tick={TS} domain={[0, 'auto']} allowDataOverflow={false} unit="m" />
-              <Tooltip
-                contentStyle={TT}
-                content={({ active, payload }) => {
+            {durationChart === 'area' ? (
+              <AreaChart data={durationData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                <XAxis dataKey="date" tick={TS} />
+                <YAxis tick={TS} domain={[0, dataMax => Math.max(dataMax * 1.1, 1)]} unit="m" />
+                <Tooltip contentStyle={TT} content={({ active, payload }) => {
                   if (!active || !payload?.length) return null;
                   const d = payload[0].payload;
-                  return (
-                    <div style={{ ...TT, padding: '8px 10px' }}>
-                      <p style={{ margin: '0 0 3px', fontWeight: 600 }}>{d.title}</p>
-                      <p style={{ margin: 0 }}>{fmtDuration(d.durationRaw)}</p>
-                    </div>
-                  );
-                }}
-              />
-              <Bar dataKey="duration" name="Duration (min)" fill="var(--color-primary)" radius={[3,3,0,0]} />
-            </BarChart>
+                  return <div style={{ ...TT, padding: '8px 10px' }}><p style={{ margin: '0 0 3px', fontWeight: 600 }}>{d.title}</p><p style={{ margin: 0 }}>{fmtDuration(d.durationRaw)}</p></div>;
+                }} />
+                <Area type="monotone" dataKey="duration" name="Duration (min)" stroke="var(--color-primary)" fill="var(--color-primary)" fillOpacity={0.2} />
+              </AreaChart>
+            ) : durationChart === 'scatter' ? (
+              <ScatterChart data={durationData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                <XAxis dataKey="date" tick={TS} />
+                <YAxis dataKey="duration" tick={TS} domain={[0, dataMax => Math.max(dataMax * 1.1, 1)]} unit="m" />
+                <Tooltip contentStyle={TT} content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const d = payload[0].payload;
+                  return <div style={{ ...TT, padding: '8px 10px' }}><p style={{ margin: '0 0 3px', fontWeight: 600 }}>{d.title}</p><p style={{ margin: 0 }}>{fmtDuration(d.durationRaw)}</p></div>;
+                }} />
+                <Scatter data={durationData} fill="var(--color-primary)" name="Duration (min)" />
+              </ScatterChart>
+            ) : durationChart === 'line' ? (
+              <LineChart data={durationData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                <XAxis dataKey="date" tick={TS} />
+                <YAxis tick={TS} domain={[0, dataMax => Math.max(dataMax * 1.1, 1)]} unit="m" />
+                <Tooltip contentStyle={TT} content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const d = payload[0].payload;
+                  return <div style={{ ...TT, padding: '8px 10px' }}><p style={{ margin: '0 0 3px', fontWeight: 600 }}>{d.title}</p><p style={{ margin: 0 }}>{fmtDuration(d.durationRaw)}</p></div>;
+                }} />
+                <Line type="monotone" dataKey="duration" name="Duration (min)" stroke="var(--color-primary)" strokeWidth={2} dot={{ r: 3 }} />
+              </LineChart>
+            ) : (
+              <BarChart data={durationData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                <XAxis dataKey="date" tick={TS} />
+                <YAxis tick={TS} domain={[0, dataMax => Math.max(dataMax * 1.1, 1)]} unit="m" />
+                <Tooltip contentStyle={TT} content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const d = payload[0].payload;
+                  return <div style={{ ...TT, padding: '8px 10px' }}><p style={{ margin: '0 0 3px', fontWeight: 600 }}>{d.title}</p><p style={{ margin: 0 }}>{fmtDuration(d.durationRaw)}</p></div>;
+                }} />
+                <Bar dataKey="duration" name="Duration (min)" fill="var(--color-primary)" radius={[3,3,0,0]} />
+              </BarChart>
+            )}
           </ResponsiveContainer>
         </Section>
       )}
@@ -1794,6 +1899,7 @@ export default function StatsCenter() {
   const [tab, setTab] = useState('Overview');
   const [selectedHistoryId, setSelectedHistoryId] = useState(null);
   const [detailWorkout, setDetailWorkout] = useState(null); // { id, type }
+  const [cardioDrillType, setCardioDrillType] = useState(null); // restored after back from detail
 
   const handleSelectWorkout = (session) => {
     const id = session.workout_id ?? session.id;
@@ -1830,7 +1936,7 @@ export default function StatsCenter() {
       <div className="sc-content">
         {tab === 'Overview'  && <OverviewTab onSelectWorkout={handleSelectWorkout} />}
         {tab === 'Strength'  && <StrengthTab />}
-        {tab === 'Cardio'    && <CardioTab onSelectWorkout={handleSelectWorkout} />}
+        {tab === 'Cardio'    && <CardioTab onSelectWorkout={handleSelectWorkout} initialDrillType={cardioDrillType} onDrillChange={setCardioDrillType} />}
         {tab === 'Records'   && <RecordsTab />}
         {tab === 'Combined'  && <CombinedTab onSelectWorkout={handleSelectWorkout} />}
         {tab === 'History'   && <HistoryTab initialWorkoutId={selectedHistoryId} onClearSelected={() => setSelectedHistoryId(null)} onSelectWorkout={handleSelectWorkout} />}

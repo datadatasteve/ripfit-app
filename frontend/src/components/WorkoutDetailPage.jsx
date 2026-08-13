@@ -188,13 +188,16 @@ function TargetsChart({ exercises, typeColor }) {
   const m = METRICS.find(x => x.key === metric);
   const data = exercises
     .filter(ex => ex.category !== 'Cardio')
-    .map(ex => ({
-      name: ex.exercise_name,
-      shortName: ex.exercise_name.length > 14 ? ex.exercise_name.slice(0,14)+'…' : ex.exercise_name,
-      target: ex[m.targetKey] != null ? parseFloat(ex[m.targetKey]) : null,
-      logged: m.loggedFn(ex) || null,
-    }))
-    .filter(d => d.target != null || d.logged);
+    .map(ex => {
+      const loggedVal = m.loggedFn(ex);
+      return {
+        name: ex.exercise_name,
+        shortName: ex.exercise_name.length > 14 ? ex.exercise_name.slice(0,14)+'…' : ex.exercise_name,
+        target: ex[m.targetKey] != null ? parseFloat(ex[m.targetKey]) : null,
+        logged: loggedVal != null && loggedVal !== undefined ? loggedVal : null,
+      };
+    })
+    .filter(d => d.logged != null); // show if anything was logged, targets optional
 
   if (data.length === 0) return null;
   const hasTargets = data.some(d => d.target != null);
@@ -218,7 +221,7 @@ function TargetsChart({ exercises, typeColor }) {
         <ChartWrapper type={chartType} data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
           <XAxis dataKey="shortName" tick={AXIS_STYLE} angle={-35} textAnchor="end" interval={0} />
-          <YAxis tick={AXIS_STYLE} allowDecimals={false} />
+          <YAxis tick={AXIS_STYLE} allowDecimals={false} domain={[0, dataMax => Math.max(dataMax * 1.1, 1)]} />
           <Tooltip
             contentStyle={TOOLTIP_STYLE}
             content={({ active, payload, label }) => {
@@ -271,7 +274,7 @@ function VolumeChart({ exercises, typeColor }) {
         <ChartWrapper type={chartType} data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
           <XAxis dataKey="shortName" tick={AXIS_STYLE} angle={-35} textAnchor="end" interval={0} />
-          <YAxis tick={AXIS_STYLE} />
+          <YAxis tick={AXIS_STYLE} domain={[0, dataMax => Math.max(dataMax * 1.1, 1)]} />
           <Tooltip
             contentStyle={TOOLTIP_STYLE}
             content={({ active, payload }) => {
