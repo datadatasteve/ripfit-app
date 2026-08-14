@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import {
   BarChart, Bar, LineChart, Line, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  Cell, ReferenceLine,
 } from 'recharts';
 import './WorkoutDetailPage.css';
 
@@ -122,27 +123,34 @@ function RPEChart({ exercises }) {
 
   if (data.length === 0) return null;
 
+  const rpeBarColor = (rpe) => {
+    if (rpe >= 10) return '#ef4444';  // red
+    if (rpe >= 9)  return '#f97316';  // orange
+    return 'var(--color-warning)';    // amber default
+  };
+
   return (
     <div className="wdp-section">
       <div className="wdp-section-header">
         <h3 className="wdp-section-title">RPE by Set</h3>
         <ChartTypeToggle value={chartType} onChange={setChartType} />
       </div>
-      <p className="wdp-chart-hint">Each point = one set. Hover for avg, min, max across that exercise.</p>
+      <p className="wdp-chart-hint">Each point = one set. Orange = RPE 9, Red = RPE 10. Hover for exercise avg/min/max.</p>
       <ResponsiveContainer width="100%" height={260}>
         <ChartWrapper type={chartType} data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
           <XAxis dataKey="label" tick={AXIS_STYLE} angle={-40} textAnchor="end" interval={0} />
           <YAxis domain={[0, 10]} tick={AXIS_STYLE} />
+          <ReferenceLine y={9} stroke="#f97316" strokeDasharray="4 2" label={{ value: 'RPE 9', position: 'insideTopRight', fontSize: 10, fill: '#f97316' }} />
           <Tooltip
             contentStyle={TOOLTIP_STYLE}
             content={({ active, payload }) => {
               if (!active || !payload?.length) return null;
               const d = payload[0].payload;
               return (
-                <div style={TOOLTIP_STYLE} className="wdp-tooltip">
+                <div style={{ ...TOOLTIP_STYLE, padding: '8px 10px' }} className="wdp-tooltip">
                   <p style={{ margin: '0 0 4px', fontWeight: 600 }}>{d.fullName} — Set {d.setNum}</p>
-                  <p style={{ margin: '2px 0' }}>RPE: <strong>{d.rpe}</strong></p>
+                  <p style={{ margin: '2px 0', color: rpeBarColor(d.rpe) }}>RPE: <strong>{d.rpe}</strong>{d.rpe >= 9 ? ' ⚠' : ''}</p>
                   <p style={{ margin: '2px 0', color: 'var(--text-secondary)', fontSize: 11 }}>
                     Avg: {d.avg} · Min: {d.min} · Max: {d.max}
                   </p>
@@ -150,7 +158,13 @@ function RPEChart({ exercises }) {
               );
             }}
           />
-          <DataSeries type={chartType} dataKey="rpe" name="RPE" color="var(--color-warning)" />
+          {chartType === 'Bar' ? (
+            <Bar dataKey="rpe" name="RPE" radius={[3,3,0,0]}>
+              {data.map((entry, i) => <Cell key={i} fill={rpeBarColor(entry.rpe)} />)}
+            </Bar>
+          ) : (
+            <DataSeries type={chartType} dataKey="rpe" name="RPE" color="var(--color-warning)" />
+          )}
         </ChartWrapper>
       </ResponsiveContainer>
     </div>
@@ -235,14 +249,28 @@ function TargetsChart({ exercises, typeColor }) {
                 <div style={TOOLTIP_STYLE} className="wdp-tooltip">
                   <p style={{ margin: '0 0 4px', fontWeight: 600 }}>{d?.name}</p>
                   {d?.target != null && <p style={{ margin: '2px 0', color: 'var(--text-secondary)' }}>Target: {d.target}</p>}
-                  {d?.logged != null && <p style={{ margin: '2px 0' }}>Logged: <strong>{d.logged}</strong></p>}
+                  {d?.logged != null && (
+                    <p style={{ margin: '2px 0', color: d.target != null ? (d.logged >= d.target ? '#22c55e' : '#ef4444') : 'var(--text-primary)' }}>
+                      Logged: <strong>{d.logged}</strong>
+                      {d.target != null && (d.logged >= d.target ? ' ✓' : ' ✗')}
+                    </p>
+                  )}
                 </div>
               );
             }}
           />
           <Legend verticalAlign="top" height={28} />
           {hasTargets && <DataSeries type={chartType} dataKey="target" name="Target" color="var(--text-secondary)" />}
-          <DataSeries type={chartType} dataKey="logged" name="Logged" color={typeColor} />
+          {chartType === 'Bar' && hasTargets ? (
+            <Bar dataKey="logged" name="Logged" radius={[3,3,0,0]}>
+              {data.map((entry, i) => {
+                const hit = entry.target == null || entry.logged >= entry.target;
+                return <Cell key={i} fill={hit ? '#22c55e' : '#ef4444'} />;
+              })}
+            </Bar>
+          ) : (
+            <DataSeries type={chartType} dataKey="logged" name="Logged" color={typeColor} />
+          )}
         </ChartWrapper>
       </ResponsiveContainer>
     </div>

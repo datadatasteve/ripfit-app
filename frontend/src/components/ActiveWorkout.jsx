@@ -311,7 +311,7 @@ function CardioSegmentForm({ exercise, workoutId, segments, setSegments, userPac
           <>
             <input type="number" placeholder="Laps" value={laps} onChange={e => setLaps(e.target.value)} onBlur={handleAutoDerive} />
             <input type="number" step="0.1" placeholder="Lap distance (m)" value={lapDistance} onChange={e => setLapDistance(e.target.value)} onBlur={handleAutoDerive} />
-            <input type="text" placeholder="Duration (MM:SS, optional)" value={durationInput} onChange={e => setDurationInput(e.target.value)} onBlur={handleAutoDerive} />
+            <input type="text" placeholder="Duration (MM:SS)" value={durationInput} onChange={e => setDurationInput(e.target.value)} onBlur={handleAutoDerive} />
           </>
         ) : (
           <>
@@ -365,7 +365,7 @@ function CardioSegmentForm({ exercise, workoutId, segments, setSegments, userPac
 
       <input
         type="text"
-        placeholder="Notes (optional)"
+        placeholder="Notes"
         value={notes}
         onChange={e => setNotes(e.target.value)}
         style={{ width: '100%', marginTop: '8px', padding: '8px', boxSizing: 'border-box' }}
@@ -377,14 +377,14 @@ function CardioSegmentForm({ exercise, workoutId, segments, setSegments, userPac
           <input
             type="number"
             step="0.1"
-            placeholder="Avg speed (mph, optional)"
+            placeholder="Avg speed"
             value={avgSpeed}
             onChange={e => setAvgSpeed(e.target.value)}
           />
           <input
             type="number"
             step="0.1"
-            placeholder="Max speed (mph, optional)"
+            placeholder="Max speed"
             value={maxSpeed}
             onChange={e => setMaxSpeed(e.target.value)}
           />
@@ -1594,7 +1594,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
                   <textarea
                     value={workoutNotes}
                     onChange={(e) => setWorkoutNotes(e.target.value)}
-                    placeholder="Workout notes (optional)"
+                    placeholder="Workout notes"
                     rows="3"
                     style={{ width: '100%', padding: '10px', marginBottom: '12px', boxSizing: 'border-box' }}
                   />
@@ -1935,7 +1935,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
               onClick={async () => {
                 if (!noteInput.trim()) return;
                 const token = localStorage.getItem('ripfit_token');
-                const setNumber = loggedSets.length > 0 ? loggedSets.length : 1;
+                const setNumber = loggedSets.length + 1;
                 
                 try {
                   const noteWithSet = `Set ${setNumber}: ${noteInput.trim()}`;
@@ -1965,7 +1965,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
               className="save-note-btn"
               disabled={!noteInput.trim()}
             >
-              Add Note (Set {loggedSets.length > 0 ? loggedSets.length : 1})
+              Add Note (Set {loggedSets.length + 1})
             </button>
             <button 
               onClick={async () => {
@@ -2043,7 +2043,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
               />
               <input
                 type="number"
-                placeholder="RPE (optional)"
+                placeholder="RPE"
                 min="1"
                 max="11"
                 value={setForm.rpe}
@@ -2201,7 +2201,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
 
               {/* Notes + Rating on one screen */}
               <div style={{ marginTop: '15px' }}>
-                <h4>Workout Notes (optional)</h4>
+                <h4>Workout Notes</h4>
                 <textarea
                   value={workoutNotes}
                   onChange={(e) => setWorkoutNotes(e.target.value)}
@@ -2657,20 +2657,20 @@ function AddExerciseModal({ onAdd, onClose }) {
                 <>
                   <input
                     type="text"
-                    placeholder="Goal Duration (MM:SS, optional)"
+                    placeholder="Goal Duration (MM:SS)"
                     value={targets.duration}
                     onChange={(e) => setTargets({ ...targets, duration: e.target.value })}
                   />
                   <input
                     type="number"
                     step="0.01"
-                    placeholder="Goal Distance (optional)"
+                    placeholder="Goal Distance"
                     value={targets.distance}
                     onChange={(e) => setTargets({ ...targets, distance: e.target.value })}
                   />
                   <input
                     type="text"
-                    placeholder="Goal Pace (MM:SS per mile, optional)"
+                    placeholder="Goal Pace (MM:SS per mile)"
                     value={targets.pace}
                     onChange={(e) => setTargets({ ...targets, pace: e.target.value })}
                   />
@@ -2678,14 +2678,14 @@ function AddExerciseModal({ onAdd, onClose }) {
                     <>
                       <input
                         type="number"
-                        placeholder="Goal Laps (optional)"
+                        placeholder="Goal Laps"
                         value={targets.laps}
                         onChange={(e) => setTargets({ ...targets, laps: e.target.value })}
                       />
                       <input
                         type="number"
                         step="0.1"
-                        placeholder="Lap distance in metres (optional)"
+                        placeholder="Lap distance (m)"
                         value={targets.lapDistance}
                         onChange={(e) => setTargets({ ...targets, lapDistance: e.target.value })}
                       />
@@ -2696,13 +2696,13 @@ function AddExerciseModal({ onAdd, onClose }) {
                 <>
                   <input
                     type="number"
-                    placeholder="Target Sets (optional)"
+                    placeholder="Target Sets"
                     value={targets.sets}
                     onChange={(e) => setTargets({ ...targets, sets: e.target.value })}
                   />
                   <input
                     type="number"
-                    placeholder="Target Reps (optional)"
+                    placeholder="Target Reps"
                     value={targets.reps}
                     onChange={(e) => setTargets({ ...targets, reps: e.target.value })}
                   />
