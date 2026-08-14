@@ -388,10 +388,12 @@ const startWorkoutFromRoutine = async (req, res) => {
 
       const exerciseResult = await client.query(
         `INSERT INTO workout_exercises (
-          workout_id, exercise_id, order_index, exercise_notes
-        ) VALUES ($1, $2, $3, $4)
+          workout_id, exercise_id, order_index, exercise_notes,
+          target_sets, target_reps, target_weight
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING *`,
-        [workout.id, ex.exercise_id, ex.order_index, ex.notes]
+        [workout.id, ex.exercise_id, ex.order_index, ex.notes,
+         ex.target_sets || null, ex.target_reps || null, ex.target_weight || null]
       );
 
       workoutExercises.push({
