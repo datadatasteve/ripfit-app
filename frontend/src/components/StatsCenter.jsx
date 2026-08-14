@@ -967,6 +967,7 @@ function CardioTab({ onSelectWorkout, initialDrillType, onDrillChange }) {
   const [metric, setMetric] = useState('duration_seconds');
   const [chartType, setChartType] = useState('line');
   const [showAllTypes, setShowAllTypes] = useState(false);
+  const [showAllMix, setShowAllMix] = useState(false);
 
   const setDrill = (type) => {
     setDrillType(type);
@@ -1027,7 +1028,7 @@ function CardioTab({ onSelectWorkout, initialDrillType, onDrillChange }) {
           <BarChart data={drillChartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
             <XAxis dataKey="date" tick={TS} />
-            <YAxis tick={TS} domain={[0, dataMax => Math.max(dataMax * 1.1, 1)]} />
+            <YAxis tick={TS} type="number" domain={[0, "auto"]} />
             <Tooltip contentStyle={TT} />
             <Bar dataKey="value" fill="#3498db" radius={[3,3,0,0]} name={metricLabel} />
           </BarChart>
@@ -1035,7 +1036,7 @@ function CardioTab({ onSelectWorkout, initialDrillType, onDrillChange }) {
           <AreaChart data={drillChartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
             <XAxis dataKey="date" tick={TS} />
-            <YAxis tick={TS} domain={[0, dataMax => Math.max(dataMax * 1.1, 1)]} />
+            <YAxis tick={TS} type="number" domain={[0, "auto"]} />
             <Tooltip contentStyle={TT} />
             <Area type="monotone" dataKey="value" stroke="#3498db" fill="#3498db" fillOpacity={0.15} name={metricLabel} />
           </AreaChart>
@@ -1043,7 +1044,7 @@ function CardioTab({ onSelectWorkout, initialDrillType, onDrillChange }) {
           <ScatterChart>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
             <XAxis dataKey="date" tick={TS} />
-            <YAxis dataKey="value" tick={TS} domain={[0, dataMax => Math.max(dataMax * 1.1, 1)]} />
+            <YAxis dataKey="value" tick={TS} type="number" domain={[0, "auto"]} />
             <Tooltip contentStyle={TT} />
             <Scatter data={drillChartData} fill="#3498db" name={metricLabel} />
           </ScatterChart>
@@ -1051,7 +1052,7 @@ function CardioTab({ onSelectWorkout, initialDrillType, onDrillChange }) {
           <LineChart data={drillChartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
             <XAxis dataKey="date" tick={TS} />
-            <YAxis tick={TS} domain={[0, dataMax => Math.max(dataMax * 1.1, 1)]} />
+            <YAxis tick={TS} type="number" domain={[0, "auto"]} />
             <Tooltip contentStyle={TT} />
             <Line type="monotone" dataKey="value" stroke="#3498db" strokeWidth={2} dot={{ r: 3 }} name={metricLabel} />
           </LineChart>
@@ -1150,7 +1151,6 @@ function CardioTab({ onSelectWorkout, initialDrillType, onDrillChange }) {
     '#e11d48', // rose
   ];
 
-  const [showAllMix, setShowAllMix] = useState(false);
   const visibleMixRows = showAllMix ? sortedSummary : sortedSummary.slice(0, 5);
 
   const pieData = sortedSummary.map((s, i) => ({
@@ -1193,7 +1193,7 @@ function CardioTab({ onSelectWorkout, initialDrillType, onDrillChange }) {
         <BarChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
           <XAxis dataKey="date" tick={TS} />
-          <YAxis tick={TS} domain={[0, dataMax => Math.max(dataMax * 1.1, 1)]} />
+          <YAxis tick={TS} type="number" domain={[0, "auto"]} />
           <Tooltip contentStyle={TT} />
           <Bar dataKey="value" fill={strokeColor} radius={[3,3,0,0]} name={metricLabel} />
         </BarChart>
@@ -1201,7 +1201,7 @@ function CardioTab({ onSelectWorkout, initialDrillType, onDrillChange }) {
         <AreaChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
           <XAxis dataKey="date" tick={TS} />
-          <YAxis tick={TS} domain={[0, dataMax => Math.max(dataMax * 1.1, 1)]} />
+          <YAxis tick={TS} type="number" domain={[0, "auto"]} />
           <Tooltip contentStyle={TT} />
           <Area type="monotone" dataKey="value" stroke={strokeColor} fill={strokeColor} fillOpacity={0.15} name={metricLabel} />
         </AreaChart>
@@ -1209,7 +1209,7 @@ function CardioTab({ onSelectWorkout, initialDrillType, onDrillChange }) {
         <ScatterChart>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
           <XAxis dataKey="date" tick={TS} />
-          <YAxis dataKey="value" tick={TS} domain={[0, dataMax => Math.max(dataMax * 1.1, 1)]} />
+          <YAxis dataKey="value" tick={TS} type="number" domain={[0, "auto"]} />
           <Tooltip contentStyle={TT} />
           <Scatter data={chartData} fill={strokeColor} name={metricLabel} />
         </ScatterChart>
@@ -1217,7 +1217,7 @@ function CardioTab({ onSelectWorkout, initialDrillType, onDrillChange }) {
         <LineChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
           <XAxis dataKey="date" tick={TS} />
-          <YAxis tick={TS} domain={[0, dataMax => Math.max(dataMax * 1.1, 1)]} />
+          <YAxis tick={TS} type="number" domain={[0, "auto"]} />
           <Tooltip contentStyle={TT} />
           <Line type="monotone" dataKey="value" stroke={strokeColor} strokeWidth={2} dot={{ r: 3 }} name={metricLabel} />
         </LineChart>
@@ -1798,7 +1798,7 @@ function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout }) {
               <AreaChart data={durationData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
                 <XAxis dataKey="date" tick={TS} />
-                <YAxis tick={TS} domain={[0, dataMax => Math.max(dataMax * 1.1, 1)]} unit="m" />
+                <YAxis tick={TS} type="number" domain={[0, "auto"]} unit="m" />
                 <Tooltip contentStyle={TT} content={({ active, payload }) => {
                   if (!active || !payload?.length) return null;
                   const d = payload[0].payload;
@@ -1810,7 +1810,7 @@ function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout }) {
               <ScatterChart data={durationData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
                 <XAxis dataKey="date" tick={TS} />
-                <YAxis dataKey="duration" tick={TS} domain={[0, dataMax => Math.max(dataMax * 1.1, 1)]} unit="m" />
+                <YAxis dataKey="duration" tick={TS} type="number" domain={[0, "auto"]} unit="m" />
                 <Tooltip contentStyle={TT} content={({ active, payload }) => {
                   if (!active || !payload?.length) return null;
                   const d = payload[0].payload;
@@ -1822,7 +1822,7 @@ function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout }) {
               <LineChart data={durationData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
                 <XAxis dataKey="date" tick={TS} />
-                <YAxis tick={TS} domain={[0, dataMax => Math.max(dataMax * 1.1, 1)]} unit="m" />
+                <YAxis tick={TS} type="number" domain={[0, "auto"]} unit="m" />
                 <Tooltip contentStyle={TT} content={({ active, payload }) => {
                   if (!active || !payload?.length) return null;
                   const d = payload[0].payload;
@@ -1834,7 +1834,7 @@ function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout }) {
               <BarChart data={durationData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
                 <XAxis dataKey="date" tick={TS} />
-                <YAxis tick={TS} domain={[0, dataMax => Math.max(dataMax * 1.1, 1)]} unit="m" />
+                <YAxis tick={TS} type="number" domain={[0, "auto"]} unit="m" />
                 <Tooltip contentStyle={TT} content={({ active, payload }) => {
                   if (!active || !payload?.length) return null;
                   const d = payload[0].payload;

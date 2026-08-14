@@ -189,7 +189,7 @@ export default function RoutineBuilder({ initialExercises, existingRoutine, onCl
   };
 
   return (
-    <div className="routine-builder-overlay" onClick={onClose}>
+    <div className="routine-builder-overlay">
       <div className="routine-builder" onClick={e => e.stopPropagation()}>
         <div className="routine-builder-header">
           <h2>{isEditing ? 'Edit Routine' : 'Create New Routine'}</h2>

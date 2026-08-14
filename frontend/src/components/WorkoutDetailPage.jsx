@@ -173,15 +173,19 @@ function TargetsChart({ exercises, typeColor }) {
       key: 'reps',
       label: 'Reps',
       targetKey: 'target_reps',
-      // Best set reps logged
-      loggedFn: ex => ex.sets?.length ? Math.max(...ex.sets.map(s => s.reps ?? 0)) : 0,
+      loggedFn: ex => {
+        const vals = (ex.sets || []).map(s => s.reps ?? 0).filter(v => v > 0);
+        return vals.length ? Math.max(...vals) : 0;
+      },
     },
     {
       key: 'weight',
       label: 'Weight',
       targetKey: 'target_weight',
-      // Top weight logged
-      loggedFn: ex => ex.sets?.length ? Math.max(...ex.sets.map(s => s.weight ?? 0)) : 0,
+      loggedFn: ex => {
+        const vals = (ex.sets || []).map(s => s.weight ?? 0).filter(v => v > 0);
+        return vals.length ? Math.max(...vals) : 0;
+      },
     },
   ];
 
@@ -221,7 +225,7 @@ function TargetsChart({ exercises, typeColor }) {
         <ChartWrapper type={chartType} data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
           <XAxis dataKey="shortName" tick={AXIS_STYLE} angle={-35} textAnchor="end" interval={0} />
-          <YAxis tick={AXIS_STYLE} allowDecimals={false} domain={[0, dataMax => Math.max(dataMax * 1.1, 1)]} />
+          <YAxis tick={AXIS_STYLE} allowDecimals={false} type="number" domain={[0, "auto"]} />
           <Tooltip
             contentStyle={TOOLTIP_STYLE}
             content={({ active, payload, label }) => {
@@ -274,7 +278,7 @@ function VolumeChart({ exercises, typeColor }) {
         <ChartWrapper type={chartType} data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
           <XAxis dataKey="shortName" tick={AXIS_STYLE} angle={-35} textAnchor="end" interval={0} />
-          <YAxis tick={AXIS_STYLE} domain={[0, dataMax => Math.max(dataMax * 1.1, 1)]} />
+          <YAxis tick={AXIS_STYLE} type="number" domain={[0, "auto"]} />
           <Tooltip
             contentStyle={TOOLTIP_STYLE}
             content={({ active, payload }) => {
