@@ -584,6 +584,19 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
       }
 
       setActiveWorkout(data);
+
+      // For routine-based workouts, set the correct type immediately based on exercises
+      if (routineId !== null && data.workout?.id && data.exercises?.length > 0) {
+        const cats = data.exercises.map(e => e.category);
+        const hasCardio = cats.some(c => c === 'Cardio');
+        const hasStrength = cats.some(c => c !== 'Cardio');
+        const inferredType = hasCardio && hasStrength ? 'mixed' : hasCardio ? 'cardio' : 'strength';
+        fetch(`${API_BASE}/workouts/${data.workout.id}/type`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ workout_type: inferredType }),
+        }).catch(() => {});
+      }
     } catch (err) {
       console.error('Failed to start workout:', err);
       alert('Failed to start workout');
