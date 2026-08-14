@@ -733,3 +733,12 @@
   border-color: var(--color-primary);
   color: var(--color-primary);
 }
+
+.sc-custom-input {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  padding: 4px 8px;
+  font-size: var(--font-size-sm);
+}

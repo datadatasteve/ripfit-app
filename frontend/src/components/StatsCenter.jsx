@@ -1686,6 +1686,11 @@ function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout }) {
   const [customWeeks, setCustomWeeks] = useState('');
   const [ratingChart, setRatingChart] = useState('line');
   const [durationChart, setDurationChart] = useState('bar');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('date_desc');
+  const [pageSize, setPageSize] = useState(10);
+  const [customPageSize, setCustomPageSize] = useState('');
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     setLoading(true);
@@ -1847,47 +1852,143 @@ function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout }) {
         </Section>
       )}
 
-      {/* Session log */}
-      {data && data.sessions.length > 0 && (
-        <Section title="Session Log">
-          <div className="sc-table-wrapper">
-            <table className="sc-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Type</th>
-                  <th>Title</th>
-                  <th>Duration</th>
-                  <th>Effort & Vibes</th>
-                  <th>Volume / Distance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.sessions.map((s, i) => (
-                  <tr
-                    key={i}
-                    className={onSelectWorkout ? 'sc-clickable-row' : ''}
-                    onClick={() => onSelectWorkout && onSelectWorkout(s)}
-                    title={onSelectWorkout ? 'View workout detail' : undefined}
-                  >
-                    <td>{fmtDate(s.date)}</td>
-                    <td><span className={`history-type-badge ${s.type}`}>{s.type}</span></td>
-                    <td>{s.title}</td>
-                    <td>{fmtDuration(s.duration_seconds)}</td>
-                    <td style={{ color: ratingColor(s.session_rating), fontWeight: s.session_rating != null ? 600 : 400 }}>
-                      {s.session_rating != null ? `${s.session_rating} / 5` : '—'}
-                    </td>
-                    <td>{s.volume ? s.volume.toLocaleString() : s.distance ? `${s.distance}` : '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Section>
-      )}
+      {/* Session log — single unified list, no WorkoutHistory duplicate */}
+      {data && data.sessions.length > 0 && (() => {
+        const TYPE_FILTERS = [
+          { key: 'all', label: 'All' },
+          { key: 'strength', label: 'Strength' },
+          { key: 'mixed', label: 'Mixed' },
+          { key: 'open', label: 'Open' },
+          { key: 'cardio', label: 'Cardio' },
+        ];
+        const SORT_OPTIONS = [
+          { value: 'date_desc', label: 'Newest first' },
+          { value: 'date_asc', label: 'Oldest first' },
+          { value: 'duration_desc', label: 'Longest first' },
+          { value: 'duration_asc', label: 'Shortest first' },
+          { value: 'rating_desc', label: 'Highest rated' },
+          { value: 'rating_asc', label: 'Lowest rated' },
+        ];
+        const PAGE_SIZES = [5, 10, 15];
 
-      {/* Full workout history list */}
-      <WorkoutHistory initialWorkoutId={initialWorkoutId} onClearSelected={onClearSelected} />
+        const filtered = data.sessions.filter(s => {
+          if (typeFilter === 'all') return true;
+          return s.type === typeFilter;
+        });
+
+        const sorted = [...filtered].sort((a, b) => {
+          if (sortBy === 'date_asc') return new Date(a.date) - new Date(b.date);
+          if (sortBy === 'duration_desc') return (b.duration_seconds || 0) - (a.duration_seconds || 0);
+          if (sortBy === 'duration_asc') return (a.duration_seconds || 0) - (b.duration_seconds || 0);
+          if (sortBy === 'rating_desc') return (b.session_rating || 0) - (a.session_rating || 0);
+          if (sortBy === 'rating_asc') return (a.session_rating || 0) - (b.session_rating || 0);
+          return new Date(b.date) - new Date(a.date); // date_desc default
+        });
+
+        const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
+        const safePage = Math.min(page, totalPages);
+        const pageRows = sorted.slice((safePage - 1) * pageSize, safePage * pageSize);
+
+        return (
+          <Section title="Session Log">
+            {/* Filters + sort row */}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {TYPE_FILTERS.map(f => (
+                  <button
+                    key={f.key}
+                    className={`sc-window-btn ${typeFilter === f.key ? 'active' : ''}`}
+                    onClick={() => { setTypeFilter(f.key); setPage(1); }}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+              <select
+                className="sc-select"
+                value={sortBy}
+                onChange={e => { setSortBy(e.target.value); setPage(1); }}
+                style={{ marginLeft: 'auto' }}
+              >
+                {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+
+            {/* Table */}
+            <div className="sc-table-wrapper">
+              <table className="sc-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Title</th>
+                    <th>Duration</th>
+                    <th>Effort & Vibes</th>
+                    <th>Volume / Distance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageRows.length === 0 ? (
+                    <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '16px' }}>No sessions match this filter.</td></tr>
+                  ) : pageRows.map((s, i) => (
+                    <tr
+                      key={i}
+                      className={onSelectWorkout ? 'sc-clickable-row' : ''}
+                      onClick={() => onSelectWorkout && onSelectWorkout(s)}
+                    >
+                      <td>{fmtDate(s.date)}</td>
+                      <td><span className={`history-type-badge ${s.type}`}>{s.type}</span></td>
+                      <td>{s.title}</td>
+                      <td>{fmtDuration(s.duration_seconds)}</td>
+                      <td style={{ color: ratingColor(s.session_rating), fontWeight: s.session_rating != null ? 600 : 400 }}>
+                        {s.session_rating != null ? `${s.session_rating} / 5` : '—'}
+                      </td>
+                      <td>{s.volume ? s.volume.toLocaleString() : s.distance ? `${s.distance}` : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                {filtered.length} session{filtered.length !== 1 ? 's' : ''}
+              </span>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginLeft: 'auto' }}>
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Per page:</span>
+                {PAGE_SIZES.map(n => (
+                  <button
+                    key={n}
+                    className={`sc-window-btn ${pageSize === n && !customPageSize ? 'active' : ''}`}
+                    onClick={() => { setPageSize(n); setCustomPageSize(''); setPage(1); }}
+                  >
+                    {n}
+                  </button>
+                ))}
+                <input
+                  type="number"
+                  min={1}
+                  placeholder="Custom"
+                  value={customPageSize}
+                  className="sc-custom-input"
+                  style={{ width: 60 }}
+                  onChange={e => {
+                    const v = parseInt(e.target.value);
+                    setCustomPageSize(e.target.value);
+                    if (v > 0) { setPageSize(v); setPage(1); }
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <button className="sc-window-btn" disabled={safePage <= 1} onClick={() => setPage(p => p - 1)}>‹</button>
+                <span style={{ fontSize: 12 }}>{safePage} / {totalPages}</span>
+                <button className="sc-window-btn" disabled={safePage >= totalPages} onClick={() => setPage(p => p + 1)}>›</button>
+              </div>
+            </div>
+          </Section>
+        );
+      })()}
     </div>
   );
 }
