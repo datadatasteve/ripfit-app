@@ -167,7 +167,7 @@ function TargetsChart({ exercises, typeColor }) {
       key: 'sets',
       label: 'Sets',
       targetKey: 'target_sets',
-      loggedFn: ex => ex.sets?.length ?? 0,
+      loggedFn: ex => Array.isArray(ex.sets) ? ex.sets.length : 0,
     },
     {
       key: 'reps',
@@ -201,7 +201,7 @@ function TargetsChart({ exercises, typeColor }) {
         logged: loggedVal != null && loggedVal !== undefined ? loggedVal : null,
       };
     })
-    .filter(d => d.logged != null); // show if anything was logged, targets optional
+    .filter(d => d.target != null || (d.logged != null && d.logged > 0));
 
   if (data.length === 0) return null;
   const hasTargets = data.some(d => d.target != null);
