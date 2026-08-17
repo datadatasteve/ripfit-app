@@ -124,9 +124,9 @@ function RPEChart({ exercises }) {
   if (data.length === 0) return null;
 
   const rpeBarColor = (rpe) => {
-    if (rpe >= 10) return '#ef4444';  // red
-    if (rpe >= 9)  return '#f97316';  // orange
-    return 'var(--color-warning)';    // amber default
+    if (rpe >= 10) return '#ef4444';  // red — max effort
+    if (rpe >= 9)  return '#f97316';  // orange — near max
+    return '#3498db';                 // blue — normal range
   };
 
   return (
@@ -163,7 +163,7 @@ function RPEChart({ exercises }) {
               {data.map((entry, i) => <Cell key={i} fill={rpeBarColor(entry.rpe)} />)}
             </Bar>
           ) : (
-            <DataSeries type={chartType} dataKey="rpe" name="RPE" color="var(--color-warning)" />
+            <DataSeries type={chartType} dataKey="rpe" name="RPE" color="#3498db" />
           )}
         </ChartWrapper>
       </ResponsiveContainer>
@@ -261,15 +261,32 @@ function TargetsChart({ exercises, typeColor }) {
           />
           <Legend verticalAlign="top" height={28} />
           {hasTargets && <DataSeries type={chartType} dataKey="target" name="Target" color="var(--text-secondary)" />}
-          {chartType === 'Bar' && hasTargets ? (
+          {chartType === 'Bar' ? (
             <Bar dataKey="logged" name="Logged" radius={[3,3,0,0]}>
               {data.map((entry, i) => {
-                const hit = entry.target == null || entry.logged >= entry.target;
-                return <Cell key={i} fill={hit ? '#22c55e' : '#ef4444'} />;
+                const missed = entry.target != null && entry.logged < entry.target;
+                return <Cell key={i} fill={missed ? '#ef4444' : '#3498db'} />;
               })}
             </Bar>
           ) : (
-            <DataSeries type={chartType} dataKey="logged" name="Logged" color={typeColor} />
+            // Line/Area: blue series, with red dots on missed points when targets exist
+            <>
+              <DataSeries type={chartType} dataKey="logged" name="Logged" color="#3498db" />
+              {hasTargets && chartType === 'Line' && (
+                <Line
+                  type="monotone"
+                  dataKey="logged"
+                  stroke="transparent"
+                  dot={(props) => {
+                    const { cx, cy, payload } = props;
+                    const missed = payload.target != null && payload.logged < payload.target;
+                    return <circle key={props.index} cx={cx} cy={cy} r={5} fill={missed ? '#ef4444' : '#3498db'} stroke="none" />;
+                  }}
+                  name=""
+                  legendType="none"
+                />
+              )}
+            </>
           )}
         </ChartWrapper>
       </ResponsiveContainer>
