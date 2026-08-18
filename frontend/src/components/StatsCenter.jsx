@@ -1104,7 +1104,11 @@ function CardioTab({ onSelectWorkout, initialDrillType, onDrillChange }) {
                   <tr
                     key={i}
                     className="sc-clickable-row"
-                    onClick={() => onSelectWorkout && onSelectWorkout({ workout_id: s.session_id, id: s.session_id, type: 'cardio' })}
+                    onClick={() => onSelectWorkout && onSelectWorkout({
+                      workout_id: s.session_id,
+                      id: s.session_id,
+                      type: s.source === 'cardio_session' ? 'cardio' : (s.source || 'strength'),
+                    })}
                   >
                     <td>{fmtDate(s.session_date)}</td>
                     <td>{fmtDuration(s.duration_seconds)}</td>
