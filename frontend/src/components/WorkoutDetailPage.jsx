@@ -259,34 +259,57 @@ function TargetsChart({ exercises, typeColor }) {
               );
             }}
           />
-          <Legend verticalAlign="top" height={28} />
-          {hasTargets && <DataSeries type={chartType} dataKey="target" name="Target" color="var(--text-secondary)" />}
+          {/* Custom legend — bypasses recharts' Cell color inference issue */}
+          <Legend
+            verticalAlign="top"
+            height={28}
+            content={() => (
+              <div style={{ display: 'flex', gap: 16, fontSize: 12, paddingBottom: 4 }}>
+                {hasTargets && (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ width: 12, height: 12, borderRadius: 2, background: '#94a3b8', display: 'inline-block' }} />
+                    Target
+                  </span>
+                )}
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ width: 12, height: 12, borderRadius: 2, background: '#22c55e', display: 'inline-block' }} />
+                  {hasTargets ? 'Hit / Exceeded' : 'Logged'}
+                </span>
+                {hasTargets && (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ width: 12, height: 12, borderRadius: 2, background: '#ef4444', display: 'inline-block' }} />
+                    Missed
+                  </span>
+                )}
+              </div>
+            )}
+          />
+          {hasTargets && <DataSeries type={chartType} dataKey="target" name="Target" color="#94a3b8" />}
           {chartType === 'Bar' ? (
-            <Bar dataKey="logged" name="Logged" radius={[3,3,0,0]}>
+            <Bar dataKey="logged" name="Logged" radius={[3,3,0,0]} fill="#22c55e">
               {data.map((entry, i) => {
-                const missed = entry.target != null && entry.logged < entry.target;
-                return <Cell key={i} fill={missed ? '#ef4444' : '#3498db'} />;
+                const missed = hasTargets && entry.target != null && entry.logged < entry.target;
+                return <Cell key={i} fill={missed ? '#ef4444' : '#22c55e'} />;
               })}
             </Bar>
-          ) : (
-            // Line/Area: blue series, with red dots on missed points when targets exist
+          ) : chartType === 'Line' ? (
             <>
-              <DataSeries type={chartType} dataKey="logged" name="Logged" color="#3498db" />
-              {hasTargets && chartType === 'Line' && (
-                <Line
-                  type="monotone"
-                  dataKey="logged"
-                  stroke="transparent"
-                  dot={(props) => {
-                    const { cx, cy, payload } = props;
-                    const missed = payload.target != null && payload.logged < payload.target;
-                    return <circle key={props.index} cx={cx} cy={cy} r={5} fill={missed ? '#ef4444' : '#3498db'} stroke="none" />;
-                  }}
-                  name=""
-                  legendType="none"
-                />
-              )}
+              <Line
+                type="monotone"
+                dataKey="logged"
+                name="Logged"
+                stroke="#22c55e"
+                strokeWidth={2}
+                dot={(props) => {
+                  const { cx, cy, payload } = props;
+                  const missed = hasTargets && payload.target != null && payload.logged < payload.target;
+                  return <circle key={props.index} cx={cx} cy={cy} r={4} fill={missed ? '#ef4444' : '#22c55e'} stroke="none" />;
+                }}
+              />
             </>
+          ) : (
+            // Area — green fill, no per-point override (backlogged)
+            <Area type="monotone" dataKey="logged" name="Logged" stroke="#22c55e" fill="#22c55e" fillOpacity={0.2} />
           )}
         </ChartWrapper>
       </ResponsiveContainer>
