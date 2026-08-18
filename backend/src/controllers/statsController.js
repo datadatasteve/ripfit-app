@@ -324,7 +324,8 @@ async function getCardioStats(req, res) {
         id AS session_id, session_date, start_time, cardio_type,
         duration_seconds, distance, distance_unit,
         avg_speed, max_speed, avg_heart_rate, max_heart_rate,
-        calories_burned, elevation_gain, session_rating
+        calories_burned, elevation_gain, session_rating,
+        'cardio_session' AS source
       FROM cardio_sessions
       WHERE ${csWhere}
       ORDER BY COALESCE(start_time, session_date::timestamptz) ASC
@@ -346,13 +347,14 @@ async function getCardioStats(req, res) {
         NULL::INTEGER AS max_heart_rate,
         NULL::INTEGER AS calories_burned,
         NULL::NUMERIC AS elevation_gain,
-        w.session_rating
+        w.session_rating,
+        w.workout_type AS source
       FROM workouts w
       JOIN workout_exercises we ON we.workout_id = w.id
       JOIN exercises e ON e.id = we.exercise_id AND e.category = 'Cardio'
       LEFT JOIN workout_cardio_segments wcs ON wcs.workout_exercise_id = we.id
       WHERE ${wWhere}
-      GROUP BY w.id, w.workout_date, w.start_time, w.end_time, w.session_rating, e.name
+      GROUP BY w.id, w.workout_date, w.start_time, w.end_time, w.session_rating, w.workout_type, e.name
       ORDER BY COALESCE(w.start_time, w.workout_date::timestamptz) ASC
     `, wParams);
 
