@@ -2388,8 +2388,8 @@ function mapMuscleFilterToCategory(value) {
     'back':      { category: 'Back',       subcategory: '' },
     'shoulders': { category: 'Shoulders',  subcategory: '' },
     'legs':      { category: 'Legs',       subcategory: '' },
-    'abs':       { category: 'Core',       subcategory: '' },
-    'core':      { category: 'Core',       subcategory: '' },
+    'abs':       { category: 'Abs',        subcategory: '' },
+    'core':      { category: 'Abs',        subcategory: '' },
     'cardio':    { category: 'Cardio',     subcategory: '' },
   };
   return map[value.toLowerCase()] || { category: value.charAt(0).toUpperCase() + value.slice(1), subcategory: '' };

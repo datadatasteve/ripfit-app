@@ -249,22 +249,30 @@ function TargetsChart({ exercises, typeColor }) {
                 <div style={TOOLTIP_STYLE} className="wdp-tooltip">
                   <p style={{ margin: '0 0 4px', fontWeight: 600 }}>{d?.name}</p>
                   {d?.target != null && <p style={{ margin: '2px 0', color: 'var(--text-secondary)' }}>Target: {d.target}</p>}
-                  {d?.logged != null && (
-                    <p style={{ margin: '2px 0', color: d.target != null ? (d.logged >= d.target ? '#22c55e' : '#ef4444') : 'var(--text-primary)' }}>
-                      Logged: <strong>{d.logged}</strong>
-                      {d.target != null && (d.logged >= d.target ? ' ✓' : ' ✗')}
-                    </p>
-                  )}
+                  {d?.logged != null && (() => {
+                    let loggedColor = 'var(--text-primary)';
+                    let loggedSuffix = '';
+                    if (hasTargets && d.target != null) {
+                      if (d.logged < d.target) { loggedColor = '#ef4444'; loggedSuffix = ' ✗ missed'; }
+                      else if (d.logged === d.target) { loggedColor = '#3498db'; loggedSuffix = ' ✓ hit'; }
+                      else { loggedColor = '#22c55e'; loggedSuffix = ' ↑ exceeded'; }
+                    }
+                    return (
+                      <p style={{ margin: '2px 0', color: loggedColor }}>
+                        Logged: <strong>{d.logged}</strong>{loggedSuffix}
+                      </p>
+                    );
+                  })()}
                 </div>
               );
             }}
           />
-          {/* Custom legend — bypasses recharts' Cell color inference issue */}
+          {/* Custom legend */}
           <Legend
             verticalAlign="top"
             height={28}
             content={() => (
-              <div style={{ display: 'flex', gap: 16, fontSize: 12, paddingBottom: 4 }}>
+              <div style={{ display: 'flex', gap: 16, fontSize: 12, paddingBottom: 4, flexWrap: 'wrap' }}>
                 {hasTargets && (
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span style={{ width: 12, height: 12, borderRadius: 2, background: '#94a3b8', display: 'inline-block' }} />
@@ -273,13 +281,19 @@ function TargetsChart({ exercises, typeColor }) {
                 )}
                 <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   <span style={{ width: 12, height: 12, borderRadius: 2, background: '#22c55e', display: 'inline-block' }} />
-                  {hasTargets ? 'Hit / Exceeded' : 'Logged'}
+                  {hasTargets ? 'Exceeded' : 'Logged'}
                 </span>
                 {hasTargets && (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ width: 12, height: 12, borderRadius: 2, background: '#ef4444', display: 'inline-block' }} />
-                    Missed
-                  </span>
+                  <>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ width: 12, height: 12, borderRadius: 2, background: '#3498db', display: 'inline-block' }} />
+                      Hit target
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ width: 12, height: 12, borderRadius: 2, background: '#ef4444', display: 'inline-block' }} />
+                      Missed
+                    </span>
+                  </>
                 )}
               </div>
             )}
@@ -288,28 +302,31 @@ function TargetsChart({ exercises, typeColor }) {
           {chartType === 'Bar' ? (
             <Bar dataKey="logged" name="Logged" radius={[3,3,0,0]} fill="#22c55e">
               {data.map((entry, i) => {
-                const missed = hasTargets && entry.target != null && entry.logged < entry.target;
-                return <Cell key={i} fill={missed ? '#ef4444' : '#22c55e'} />;
+                if (!hasTargets || entry.target == null) return <Cell key={i} fill="#22c55e" />;
+                if (entry.logged < entry.target)  return <Cell key={i} fill="#ef4444" />;
+                if (entry.logged === entry.target) return <Cell key={i} fill="#3498db" />;
+                return <Cell key={i} fill="#22c55e" />;
               })}
             </Bar>
           ) : chartType === 'Line' ? (
-            <>
-              <Line
-                type="monotone"
-                dataKey="logged"
-                name="Logged"
-                stroke="#22c55e"
-                strokeWidth={2}
-                dot={(props) => {
-                  const { cx, cy, payload } = props;
-                  const missed = hasTargets && payload.target != null && payload.logged < payload.target;
-                  return <circle key={props.index} cx={cx} cy={cy} r={4} fill={missed ? '#ef4444' : '#22c55e'} stroke="none" />;
-                }}
-              />
-            </>
+            <Line
+              type="monotone"
+              dataKey="logged"
+              name="Logged"
+              stroke="#3498db"
+              strokeWidth={2}
+              dot={(props) => {
+                const { cx, cy, payload } = props;
+                let fill = '#22c55e';
+                if (hasTargets && payload.target != null) {
+                  if (payload.logged < payload.target) fill = '#ef4444';
+                  else if (payload.logged === payload.target) fill = '#3498db';
+                }
+                return <circle key={props.index} cx={cx} cy={cy} r={5} fill={fill} stroke="none" />;
+              }}
+            />
           ) : (
-            // Area — green fill, no per-point override (backlogged)
-            <Area type="monotone" dataKey="logged" name="Logged" stroke="#22c55e" fill="#22c55e" fillOpacity={0.2} />
+            <Area type="monotone" dataKey="logged" name="Logged" stroke="#3498db" fill="#3498db" fillOpacity={0.2} />
           )}
         </ChartWrapper>
       </ResponsiveContainer>
