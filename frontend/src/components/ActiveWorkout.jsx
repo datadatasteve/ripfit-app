@@ -454,6 +454,9 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
   const [editingRoutine, setEditingRoutine] = useState(null);
   const [showCardio, setShowCardio] = useState(false);
   const [showFreeLiftModal, setShowFreeLiftModal] = useState(false);
+  const [activePrograms, setActivePrograms] = useState([]);
+  const [waterToday, setWaterToday] = useState(0); // oz logged today
+  const [waterGoal, setWaterGoal] = useState(64);  // default 64oz
 
   const openEditRoutine = async (routineId) => {
     try {
@@ -469,8 +472,83 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
   };
 
   useEffect(() => {
-    if (token) fetchRoutines();
+    if (token) {
+      fetchRoutines();
+      fetchActivePrograms();
+      fetchWaterToday();
+    }
   }, [token]);
+
+  const fetchActivePrograms = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/programs/active`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      setActivePrograms(data.programs || []);
+    } catch (err) {
+      console.error('Failed to fetch active programs:', err);
+    }
+  };
+
+  const fetchWaterToday = async () => {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const res = await fetch(`${API_BASE}/nutrition/water?date=${today}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      setWaterToday(data.total_oz || 0);
+      if (data.goal_oz) setWaterGoal(data.goal_oz);
+    } catch (err) {
+      // Silently fail — water is supplementary
+    }
+  };
+
+  const logWater = async (oz) => {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      await fetch(`${API_BASE}/nutrition/water`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: today, amount_oz: oz }),
+      });
+      setWaterToday(prev => Math.max(0, prev + oz));
+    } catch (err) {
+      console.error('Failed to log water:', err);
+    }
+  };
+
+  const startProgramWorkout = async (programId, day) => {
+    const today = new Date();
+    const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    try {
+      const res = await fetch(`${API_BASE}/programs/${programId}/days/${day.program_routine_id || day.id}/start`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workout_date: dateStr }),
+      });
+      const data = await res.json();
+      if (data.workout) {
+        setActiveWorkout(data);
+        // Infer workout type from exercises
+        if (data.exercises?.length > 0) {
+          const cats = data.exercises.map(e => e.category);
+          const hasCardio = cats.some(c => c === 'Cardio');
+          const hasStrength = cats.some(c => c !== 'Cardio');
+          const inferredType = hasCardio && hasStrength ? 'mixed' : hasCardio ? 'cardio' : 'strength';
+          fetch(`${API_BASE}/workouts/${data.workout.id}/type`, {
+            method: 'PUT',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ workout_type: inferredType }),
+          }).catch(() => {});
+        }
+      }
+    } catch (err) {
+      console.error('Failed to start program workout:', err);
+      alert('Failed to start workout');
+    }
+  };
 
   const fetchRoutines = async () => {
     try {
@@ -885,6 +963,46 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
   return (
     <div className="workout-container">
 
+      {/* ── Continue Active Program(s) ── */}
+      {activePrograms.length > 0 && (
+        <div className="aw-programs-section">
+          <h3 className="aw-programs-title">Continue Program</h3>
+          <div className="aw-program-cards">
+            {activePrograms.map(prog => {
+              const nextDay = prog.next_day;
+              const done = parseInt(prog.completed_workouts) || 0;
+              const total = parseInt(prog.total_workout_days) || 0;
+              const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+              return (
+                <div key={prog.id} className="aw-program-card">
+                  <div className="aw-program-card-header">
+                    <span className="aw-program-name">{prog.name}</span>
+                    <span className="aw-program-pct">{pct}%</span>
+                  </div>
+                  <div className="aw-program-progress">
+                    <div className="aw-program-progress-fill" style={{ width: `${pct}%` }} />
+                  </div>
+                  {nextDay ? (
+                    <div className="aw-program-next">
+                      <span className="aw-program-next-label">Next: {nextDay.routine_name || 'Workout'}</span>
+                      <button
+                        className="aw-program-start-btn"
+                        onClick={() => startProgramWorkout(prog.id, nextDay)}
+                        disabled={loading}
+                      >
+                        Start
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="aw-program-complete">All workouts complete ✓</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* ── Log a Workout ── */}
       <div className="log-workout-section">
         <h2 className="log-workout-title">Log a Workout</h2>
@@ -908,6 +1026,23 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
           >
             Quick Cardio
           </button>
+        </div>
+      </div>
+
+      {/* ── Water Logging ── */}
+      <div className="aw-water-section">
+        <div className="aw-water-header">
+          <span className="aw-water-label">💧 Water Today</span>
+          <span className="aw-water-count">{waterToday} / {waterGoal} oz</span>
+        </div>
+        <div className="aw-water-track">
+          <div className="aw-water-fill" style={{ width: `${Math.min((waterToday / waterGoal) * 100, 100)}%` }} />
+        </div>
+        <div className="aw-water-btns">
+          {[8, 12, 16, 20].map(oz => (
+            <button key={oz} className="aw-water-btn" onClick={() => logWater(oz)}>+{oz}oz</button>
+          ))}
+          <button className="aw-water-btn aw-water-undo" onClick={() => logWater(-8)} disabled={waterToday <= 0}>−8oz</button>
         </div>
       </div>
 

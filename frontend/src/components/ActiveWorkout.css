@@ -946,3 +946,31 @@
   transition: width 0.3s ease;
 }
  
+/* ── Continue Program ── */
+.aw-programs-section { margin-bottom: 24px; }
+.aw-programs-title { font-size: 0.9rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 10px; }
+.aw-program-cards { display: flex; flex-direction: column; gap: 10px; }
+.aw-program-card { border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 14px; }
+.aw-program-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.aw-program-name { font-weight: 600; font-size: 0.95rem; }
+.aw-program-pct { font-size: 0.8rem; color: var(--text-secondary); }
+.aw-program-progress { height: 5px; background: var(--border-color); border-radius: 3px; overflow: hidden; margin-bottom: 10px; }
+.aw-program-progress-fill { height: 100%; background: var(--color-primary); border-radius: 3px; transition: width 0.4s; }
+.aw-program-next { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.aw-program-next-label { font-size: 0.85rem; color: var(--text-secondary); }
+.aw-program-start-btn { background: var(--color-primary); color: #fff; border: none; border-radius: 6px; padding: 6px 14px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+.aw-program-start-btn:hover { opacity: 0.88; }
+.aw-program-complete { font-size: 0.85rem; color: #22c55e; margin: 0; }
+
+/* ── Water Logging ── */
+.aw-water-section { background: var(--bg-secondary); border-radius: 10px; padding: 12px 14px; margin-bottom: 20px; }
+.aw-water-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.aw-water-label { font-size: 0.85rem; font-weight: 600; }
+.aw-water-count { font-size: 0.82rem; color: var(--text-secondary); }
+.aw-water-track { height: 6px; background: var(--border-color); border-radius: 3px; overflow: hidden; margin-bottom: 10px; }
+.aw-water-fill { height: 100%; background: #3498db; border-radius: 3px; transition: width 0.3s; }
+.aw-water-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.aw-water-btn { background: none; border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; padding: 5px 10px; font-size: 0.8rem; cursor: pointer; }
+.aw-water-btn:hover { border-color: #3498db; color: #3498db; }
+.aw-water-undo { color: var(--text-secondary); }
+.aw-water-undo:hover { border-color: #ef4444; color: #ef4444; }
