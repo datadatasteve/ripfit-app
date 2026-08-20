@@ -477,18 +477,22 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
     }
   };
 
-  useEffect(() => {
-    if (token) {
-      fetchRoutines();
-      fetchActivePrograms();
-      fetchProgramMap();
-    }
-  }, [token]);
-
   // Persist routine sort preference
   useEffect(() => {
     localStorage.setItem('ripfit_routine_sort', routineSort);
   }, [routineSort]);
+
+  const fetchActivePrograms = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/programs/active`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      setActivePrograms(data.programs || []);
+    } catch (err) {
+      console.error('Failed to fetch active programs:', err);
+    }
+  };
 
   const fetchProgramMap = async () => {
     try {
@@ -560,6 +564,15 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
       console.error('Failed to fetch routines:', err);
     }
   };
+
+  // All fetch calls after functions are defined
+  useEffect(() => {
+    if (token) {
+      fetchRoutines();
+      fetchActivePrograms();
+      fetchProgramMap();
+    }
+  }, [token]);
 
   const startWorkout = async (routineId, workout_title = null, preloadCardio = null) => {
     try {
