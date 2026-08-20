@@ -230,3 +230,58 @@
   font-size: 0.95rem;
   cursor: pointer;
 }
+
+/* Palette header */
+.pb-palette-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.pb-palette-header h4 { margin: 0; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
+
+.pb-new-routine-btn {
+  background: none;
+  border: 1px solid var(--color-primary);
+  color: var(--color-primary);
+  border-radius: 5px;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.pb-new-routine-btn:hover { background: rgba(224,92,42,0.08); }
+
+.pb-rest-label { font-size: 0.72rem; color: var(--text-secondary); }
+
+/* Row repeat button */
+.pb-cal-actions-header { width: 70px; }
+.pb-row-actions { width: 70px; display: flex; align-items: center; }
+.pb-repeat-btn {
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  border-radius: 5px;
+  padding: 3px 6px;
+  font-size: 0.7rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pb-repeat-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+.pb-repeat-all-btn {
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  margin-top: 12px;
+  display: block;
+}
+.pb-repeat-all-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+/* Update grid to include actions column */
+.pb-cal-row {
+  grid-template-columns: 36px repeat(7, 1fr) 70px;
+}

@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import RoutineBuilder from './RoutineBuilder';
 import CardioWorkout from './CardioWorkout';
+import ProgramsHub from './ProgramsHub';
+import WaterWidget from './WaterWidget';
 import './ActiveWorkout.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
@@ -455,8 +457,12 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
   const [showCardio, setShowCardio] = useState(false);
   const [showFreeLiftModal, setShowFreeLiftModal] = useState(false);
   const [activePrograms, setActivePrograms] = useState([]);
-  const [waterToday, setWaterToday] = useState(0); // oz logged today
-  const [waterGoal, setWaterGoal] = useState(64);  // default 64oz
+  const [hubView, setHubView] = useState('home'); // 'home' | 'programs'
+  // Routine sort/filter — persisted in localStorage
+  const [routineSort, setRoutineSort] = useState(() => localStorage.getItem('ripfit_routine_sort') || 'name');
+  const [routineFilter, setRoutineFilter] = useState('');
+  const [routineFilterOpen, setRoutineFilterOpen] = useState(false);
+  const [routineProgramMap, setRoutineProgramMap] = useState({}); // routineId → [programNames]
 
   const openEditRoutine = async (routineId) => {
     try {
@@ -475,47 +481,40 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
     if (token) {
       fetchRoutines();
       fetchActivePrograms();
-      fetchWaterToday();
+      fetchProgramMap();
     }
   }, [token]);
 
-  const fetchActivePrograms = async () => {
+  // Persist routine sort preference
+  useEffect(() => {
+    localStorage.setItem('ripfit_routine_sort', routineSort);
+  }, [routineSort]);
+
+  const fetchProgramMap = async () => {
     try {
-      const res = await fetch(`${API_BASE}/programs/active`, {
+      const res = await fetch(`${API_BASE}/programs`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-      setActivePrograms(data.programs || []);
+      const map = {};
+      for (const prog of (data.programs || [])) {
+        // Fetch each program's routines to build the map
+        const pr = await fetch(`${API_BASE}/programs/${prog.id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const pd = await pr.json();
+        for (const day of (pd.days || [])) {
+          if (day.routine_id) {
+            if (!map[day.routine_id]) map[day.routine_id] = [];
+            if (!map[day.routine_id].includes(prog.name)) {
+              map[day.routine_id].push(prog.name);
+            }
+          }
+        }
+      }
+      setRoutineProgramMap(map);
     } catch (err) {
-      console.error('Failed to fetch active programs:', err);
-    }
-  };
-
-  const fetchWaterToday = async () => {
-    try {
-      const today = new Date().toISOString().slice(0, 10);
-      const res = await fetch(`${API_BASE}/nutrition/water?date=${today}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      setWaterToday(data.total_oz || 0);
-      if (data.goal_oz) setWaterGoal(data.goal_oz);
-    } catch (err) {
-      // Silently fail — water is supplementary
-    }
-  };
-
-  const logWater = async (oz) => {
-    try {
-      const today = new Date().toISOString().slice(0, 10);
-      await fetch(`${API_BASE}/nutrition/water`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: today, amount_oz: oz }),
-      });
-      setWaterToday(prev => Math.max(0, prev + oz));
-    } catch (err) {
-      console.error('Failed to log water:', err);
+      // Non-critical, silently fail
     }
   };
 
@@ -960,13 +959,56 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
     />;
   }
 
+  // Sort and filter routines
+  const getFilteredSortedRoutines = () => {
+    let list = [...routines];
+    if (routineFilter) {
+      list = list.filter(r =>
+        r.name.toLowerCase().includes(routineFilter.toLowerCase()) ||
+        r.description?.toLowerCase().includes(routineFilter.toLowerCase())
+      );
+    }
+    switch (routineSort) {
+      case 'name':         return list.sort((a,b) => a.name.localeCompare(b.name));
+      case 'name_desc':    return list.sort((a,b) => b.name.localeCompare(a.name));
+      case 'size':         return list.sort((a,b) => (b.exercise_count||0) - (a.exercise_count||0));
+      case 'size_asc':     return list.sort((a,b) => (a.exercise_count||0) - (b.exercise_count||0));
+      case 'created':      return list.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+      case 'created_asc':  return list.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+      default:             return list;
+    }
+  };
+
+  if (hubView === 'programs') {
+    return (
+      <div className="workout-container">
+        <div className="aw-hub-back-bar">
+          <button className="aw-hub-back-btn" onClick={() => setHubView('home')}>← Workouts</button>
+          <WaterWidget />
+        </div>
+        <ProgramsHub
+          onStartProgramWorkout={(programId, day) => {
+            setHubView('home');
+            startProgramWorkout(programId, day);
+          }}
+          onViewProgramStats={() => {}}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="workout-container">
+
+      {/* Top bar with water widget */}
+      <div className="aw-topbar">
+        <WaterWidget />
+      </div>
 
       {/* ── Continue Active Program(s) ── */}
       {activePrograms.length > 0 && (
         <div className="aw-programs-section">
-          <h3 className="aw-programs-title">Continue Program</h3>
+          <h3 className="aw-section-label">Continue Program</h3>
           <div className="aw-program-cards">
             {activePrograms.map(prog => {
               const nextDay = prog.next_day;
@@ -1006,43 +1048,19 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
       {/* ── Log a Workout ── */}
       <div className="log-workout-section">
         <h2 className="log-workout-title">Log a Workout</h2>
-        <button
-          className="free-lift-btn"
-          onClick={() => setShowFreeLiftModal(true)}
-          disabled={loading}
-        >
+        <button className="free-lift-btn" onClick={() => setShowFreeLiftModal(true)} disabled={loading}>
           Open Session
         </button>
         <div className="workout-type-row">
-          <button
-            className="workout-type-btn"
-            onClick={() => document.getElementById('routines-section')?.scrollIntoView({ behavior: 'smooth' })}
-          >
+          <button className="workout-type-btn" onClick={() => document.getElementById('routines-section')?.scrollIntoView({ behavior: 'smooth' })}>
             Routines
           </button>
-          <button
-            className="workout-type-btn"
-            onClick={() => setShowCardio(true)}
-          >
+          <button className="workout-type-btn" onClick={() => setShowCardio(true)}>
             Quick Cardio
           </button>
-        </div>
-      </div>
-
-      {/* ── Water Logging ── */}
-      <div className="aw-water-section">
-        <div className="aw-water-header">
-          <span className="aw-water-label">💧 Water Today</span>
-          <span className="aw-water-count">{waterToday} / {waterGoal} oz</span>
-        </div>
-        <div className="aw-water-track">
-          <div className="aw-water-fill" style={{ width: `${Math.min((waterToday / waterGoal) * 100, 100)}%` }} />
-        </div>
-        <div className="aw-water-btns">
-          {[8, 12, 16, 20].map(oz => (
-            <button key={oz} className="aw-water-btn" onClick={() => logWater(oz)}>+{oz}oz</button>
-          ))}
-          <button className="aw-water-btn aw-water-undo" onClick={() => logWater(-8)} disabled={waterToday <= 0}>−8oz</button>
+          <button className="workout-type-btn" onClick={() => setHubView('programs')}>
+            Programs
+          </button>
         </div>
       </div>
 
@@ -1055,31 +1073,60 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
           </button>
         </div>
 
+        {/* Sort + Filter */}
+        <div className="aw-routine-controls">
+          <input
+            className="aw-routine-search"
+            placeholder="Search routines…"
+            value={routineFilter}
+            onChange={e => setRoutineFilter(e.target.value)}
+          />
+          <select
+            className="aw-routine-sort"
+            value={routineSort}
+            onChange={e => setRoutineSort(e.target.value)}
+          >
+            <option value="name">Name A–Z</option>
+            <option value="name_desc">Name Z–A</option>
+            <option value="size">Most exercises</option>
+            <option value="size_asc">Fewest exercises</option>
+            <option value="created">Newest first</option>
+            <option value="created_asc">Oldest first</option>
+          </select>
+        </div>
+
         <div className="routines-list">
-          {routines.length === 0 ? (
-            <p>No routines yet. Create one above.</p>
+          {getFilteredSortedRoutines().length === 0 ? (
+            <p>{routines.length === 0 ? 'No routines yet. Create one above.' : 'No routines match your search.'}</p>
           ) : (
-            routines.map(routine => (
-              <div key={routine.id} className="routine-card">
-                <h3>{routine.name}</h3>
-                {routine.description && <p className="routine-card-description">{routine.description}</p>}
-                <p>{routine.exercise_count} exercises</p>
-                <div className="routine-card-actions">
-                  <button
-                    onClick={() => startWorkout(routine.id)}
-                    disabled={loading}
-                  >
-                    Start Workout
-                  </button>
-                  <button
-                    className="routine-card-edit-btn"
-                    onClick={() => openEditRoutine(routine.id)}
-                  >
-                    Edit
-                  </button>
+            getFilteredSortedRoutines().map(routine => {
+              const programs = routineProgramMap[routine.id] || [];
+              return (
+                <div key={routine.id} className="routine-card">
+                  <div className="routine-card-top">
+                    <h3>{routine.name}</h3>
+                    {programs.length > 0 && (
+                      <span
+                        className="routine-program-badge"
+                        title={programs.join(', ')}
+                      >
+                        {programs.length === 1 ? '1 program' : `${programs.length} programs`}
+                      </span>
+                    )}
+                  </div>
+                  {routine.description && <p className="routine-card-description">{routine.description}</p>}
+                  <p>{routine.exercise_count} exercises</p>
+                  <div className="routine-card-actions">
+                    <button onClick={() => startWorkout(routine.id)} disabled={loading}>
+                      Start Workout
+                    </button>
+                    <button className="routine-card-edit-btn" onClick={() => openEditRoutine(routine.id)}>
+                      Edit
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
@@ -1680,6 +1727,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
                 )}
               </>
             )}
+            <WaterWidget />
             <button onClick={togglePause} className={`pause-resume-btn ${isPaused ? 'is-paused' : ''}`}>
               {isPaused ? '▶ Resume' : '⏸ Pause'}
             </button>

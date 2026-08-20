@@ -7,7 +7,6 @@ import UserPreferencesPage from './components/UserPreferencesPage'
 import AdminPanel from './components/AdminPanel'
 import ErrorBoundary from './components/ErrorBoundary'
 import NutritionPage from './components/NutritionPage'
-import ProgramsHub from './components/ProgramsHub'
 import Login from './components/Login'
 import './styles/App.css'
 
@@ -53,7 +52,7 @@ function App() {
   const [showNavClock, setShowNavClock] = useState(true);
   const [verifiedToast, setVerifiedToast] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [programStatsId, setProgramStatsId] = useState(null); // for stats silo
+  const [programStatsId, setProgramStatsId] = useState(null);
 
   // Handle ?verified=true redirect from email verification link
   useEffect(() => {
@@ -118,7 +117,6 @@ function App() {
               <li><a href="#" onClick={() => setCurrentView('exercises')}>Exercises</a></li>
               <li><a href="#" onClick={() => setCurrentView('stats')}>Stats</a></li>
               <li><a href="#" onClick={() => setCurrentView('nutrition')}>Nutrition</a></li>
-              <li><a href="#" onClick={() => setCurrentView('programs')}>Programs</a></li>
             </ul>
 
             <div className="nav-actions">
@@ -159,19 +157,6 @@ function App() {
               <AdminPanel onBack={() => setCurrentView('workout')} />
             ) : currentView === 'nutrition' ? (
               <NutritionPage />
-            ) : currentView === 'programs' ? (
-              <ProgramsHub
-                onStartProgramWorkout={(programId, day) => {
-                  setCurrentView('workout');
-                  // Pass program context to ActiveWorkout via a ref or state
-                  // ActiveWorkout will receive this via pendingProgramDay prop
-                  setProgramStatsId(null);
-                }}
-                onViewProgramStats={(programId) => {
-                  setProgramStatsId(programId);
-                  setCurrentView('stats');
-                }}
-              />
             ) : (
               <section className="hero">
                 <div className="container">

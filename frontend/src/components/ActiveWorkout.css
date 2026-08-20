@@ -974,3 +974,34 @@
 .aw-water-btn:hover { border-color: #3498db; color: #3498db; }
 .aw-water-undo { color: var(--text-secondary); }
 .aw-water-undo:hover { border-color: #ef4444; color: #ef4444; }
+
+/* ── Hub top bar ── */
+.aw-topbar { display: flex; justify-content: flex-end; padding: 4px 0 12px; }
+.aw-hub-back-bar { display: flex; align-items: center; justify-content: space-between; padding: 4px 0 12px; }
+.aw-hub-back-btn { background: none; border: none; color: var(--color-primary); font-size: 0.9rem; cursor: pointer; padding: 0; }
+.aw-section-label { font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 10px; }
+
+/* ── Routine controls ── */
+.aw-routine-controls { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.aw-routine-search { flex: 1; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); padding: 8px 12px; font-size: 0.85rem; min-width: 120px; }
+.aw-routine-sort { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); padding: 7px 10px; font-size: 0.85rem; }
+
+/* ── Program badge on routine card ── */
+.routine-card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.routine-card-top h3 { margin: 0; }
+.routine-program-badge { font-size: 0.7rem; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: rgba(168,85,247,0.15); color: #a855f7; cursor: help; white-space: nowrap; }
+
+/* ── Continue Program section ── */
+.aw-programs-section { margin-bottom: 20px; }
+.aw-program-cards { display: flex; flex-direction: column; gap: 10px; }
+.aw-program-card { border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 14px; }
+.aw-program-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.aw-program-name { font-weight: 600; font-size: 0.95rem; }
+.aw-program-pct { font-size: 0.8rem; color: var(--text-secondary); }
+.aw-program-progress { height: 5px; background: var(--border-color); border-radius: 3px; overflow: hidden; margin-bottom: 10px; }
+.aw-program-progress-fill { height: 100%; background: var(--color-primary); border-radius: 3px; transition: width 0.4s; }
+.aw-program-next { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.aw-program-next-label { font-size: 0.85rem; color: var(--text-secondary); }
+.aw-program-start-btn { background: var(--color-primary); color: #fff; border: none; border-radius: 6px; padding: 6px 14px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+.aw-program-start-btn:hover { opacity: 0.88; }
+.aw-program-complete { font-size: 0.85rem; color: #22c55e; margin: 0; }

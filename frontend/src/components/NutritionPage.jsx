@@ -1,5 +1,6 @@
 // frontend/src/components/NutritionPage.jsx
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { GlassSVG, BottleSVG, WATER_PRESETS_ALL, waterStorageKey, WATER_GOAL_KEY, WATER_PRESET_KEY, readWater, writeWater, readGoal, writeGoal, readPreset } from './WaterWidget';
 import './NutritionPage.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
@@ -130,102 +131,38 @@ function MealMacroBar({ label, current, target, color }) {
   );
 }
 
-// ── Water SVG components ──────────────────────────────────────────────────
-function GlassSVG({ oz, fillPct }) {
-  const fill = Math.min(1, fillPct);
-  // Glass: wide at top (x=8..40), narrow at bottom (x=14..34), height 52
-  const topY = 8, botY = 62;
-  const glassH = botY - topY;
-  const waterH = glassH * fill;
-  const waterY = botY - waterH;
-  const clipId = `glass-clip-${oz}`;
-  return (
-    <svg width="48" height="72" viewBox="0 0 48 72" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <clipPath id={clipId}>
-          <polygon points={`8,${topY} 40,${topY} 34,${botY} 14,${botY}`} />
-        </clipPath>
-      </defs>
-      {/* Glass outline */}
-      <polygon points={`8,${topY} 40,${topY} 34,${botY} 14,${botY}`}
-        fill="none" stroke="var(--border-color)" strokeWidth="1.5" />
-      {/* Water fill */}
-      {fill > 0 && (
-        <rect x="0" y={waterY} width="48" height={waterH + 2}
-          fill="#3b82f6" opacity="0.35" clipPath={`url(#${clipId})`} />
-      )}
-      <text x="24" y="38" textAnchor="middle" fontSize="11" fontWeight="700"
-        fill="var(--text-primary)">{oz}</text>
-      <text x="24" y="50" textAnchor="middle" fontSize="8"
-        fill="var(--text-secondary)">oz</text>
-    </svg>
-  );
-}
-
-function BottleSVG({ oz, fillPct }) {
-  const fill = Math.min(1, fillPct);
-  const bodyH = 44;
-  const waterH = bodyH * fill;
-  const waterY = 20 + bodyH - waterH;
-  return (
-    <svg width="48" height="72" viewBox="0 0 48 72" xmlns="http://www.w3.org/2000/svg">
-      {/* Bottle cap */}
-      <rect x="18" y="4" width="12" height="8" rx="2"
-        fill="none" stroke="var(--border-color)" strokeWidth="1.5" />
-      {/* Bottle neck */}
-      <path d="M16 12 L14 20 L34 20 L32 12 Z"
-        fill="none" stroke="var(--border-color)" strokeWidth="1.5" />
-      {/* Bottle body */}
-      <rect x="10" y="20" width="28" height={bodyH} rx="4"
-        fill="none" stroke="var(--border-color)" strokeWidth="1.5" />
-      {/* Water fill */}
-      {fill > 0 && (
-        <>
-          <clipPath id="bottle-clip">
-            <rect x="10" y="20" width="28" height={bodyH} rx="4" />
-          </clipPath>
-          <rect x="10" y={waterY} width="28" height={waterH + 4}
-            fill="#3b82f6" opacity="0.35" clipPath="url(#bottle-clip)" />
-        </>
-      )}
-      {/* Oz label */}
-      <text x="24" y="46" textAnchor="middle" fontSize="11" fontWeight="700"
-        fill="var(--text-primary)">{oz}</text>
-      <text x="24" y="57" textAnchor="middle" fontSize="8"
-        fill="var(--text-secondary)">oz</text>
-    </svg>
-  );
-}
-
-// ── Water tracker ─────────────────────────────────────────────────────────
-const WATER_PRESETS_ALL = [4, 8, 12, 16, 24, 32, 48]; // oz
 
 function WaterTracker({ date }) {
-  const [consumed, setConsumed] = useState(0);
-  const [history, setHistory] = useState([]); // undo stack
-  const [goal, setGoal] = useState(64);
+  const [consumed, setConsumed] = useState(() => readWater(date));
+  const [history, setHistory] = useState([]);
+  const [goal, setGoal] = useState(() => readGoal());
   const [editingGoal, setEditingGoal] = useState(false);
-  const [goalInput, setGoalInput] = useState('64');
-  const [selectedPreset, setSelectedPreset] = useState(8);
+  const [goalInput, setGoalInput] = useState(() => String(readGoal()));
+  const [selectedPreset, setSelectedPreset] = useState(() => readPreset());
   const [presetsOpen, setPresetsOpen] = useState(false);
-  const storageKey = `ripfit_water_${date}`;
-  const goalKey = 'ripfit_water_goal';
-  const presetKey = 'ripfit_water_preset';
 
   useEffect(() => {
-    const saved = localStorage.getItem(storageKey);
-    const savedGoal = localStorage.getItem(goalKey);
-    const savedPreset = localStorage.getItem(presetKey);
-    if (saved) setConsumed(parseFloat(saved) || 0);
-    if (savedGoal) { setGoal(parseFloat(savedGoal) || 64); setGoalInput(savedGoal); }
-    if (savedPreset) setSelectedPreset(parseFloat(savedPreset) || 8);
+    setConsumed(readWater(date));
+    setGoal(readGoal());
+    setGoalInput(String(readGoal()));
+    setSelectedPreset(readPreset());
+  }, [date]);
+
+  // Sync with WaterWidget on other pages
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key === waterStorageKey(date)) setConsumed(parseFloat(e.newValue || '0') || 0);
+      if (e.key === WATER_GOAL_KEY) { const g = parseFloat(e.newValue || '64') || 64; setGoal(g); setGoalInput(String(g)); }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, [date]);
 
   function addWater(oz) {
     setHistory(h => [...h, consumed]);
     const newVal = consumed + oz;
     setConsumed(newVal);
-    localStorage.setItem(storageKey, String(newVal));
+    writeWater(date, newVal);
   }
 
   function undo() {
@@ -233,19 +170,19 @@ function WaterTracker({ date }) {
     const prev = history[history.length - 1];
     setHistory(h => h.slice(0, -1));
     setConsumed(prev);
-    localStorage.setItem(storageKey, String(prev));
+    writeWater(date, prev);
   }
 
   function selectPreset(oz) {
     setSelectedPreset(oz);
     setPresetsOpen(false);
-    localStorage.setItem(presetKey, String(oz));
+    localStorage.setItem(WATER_PRESET_KEY, String(oz));
   }
 
   function saveGoal() {
     const val = parseFloat(goalInput) || 64;
     setGoal(val);
-    localStorage.setItem(goalKey, String(val));
+    writeGoal(val);
     setEditingGoal(false);
   }
 
