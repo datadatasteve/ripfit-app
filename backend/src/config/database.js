@@ -64,15 +64,15 @@ const transaction = async (callback) => {
   }
 };
 
-// Graceful shutdown
+// Graceful shutdown — called by app.js signal handlers only
 const shutdown = async () => {
   console.log('\nShutting down database connections...');
   await pool.end();
   console.log('✓ Database connections closed');
 };
 
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
+// Do NOT register SIGINT/SIGTERM here — app.js handles signals
+// and calls db.shutdown() directly, avoiding double pool.end()
 
 module.exports = {
   pool,
