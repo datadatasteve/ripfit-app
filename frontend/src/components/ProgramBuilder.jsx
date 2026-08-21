@@ -141,10 +141,13 @@ export default function ProgramBuilder({ existingProgram, onSaved, onClose }) {
     setWeeks(prev => prev.map((w, i) => i === 0 ? w : { ...w, slots: template.map(s => s ? { ...s } : null) }));
   };
 
-  // Copy a specific week to all subsequent weeks
-  const repeatWeekToAll = (sourceWi) => {
+  // Copy a specific week to the immediately following week only
+  const repeatWeekToNext = (sourceWi) => {
+    if (sourceWi >= weeks.length - 1) return;
     const template = weeks[sourceWi].slots;
-    setWeeks(prev => prev.map((w, i) => i <= sourceWi ? w : { ...w, slots: template.map(s => s ? { ...s } : null) }));
+    setWeeks(prev => prev.map((w, i) =>
+      i === sourceWi + 1 ? { ...w, slots: template.map(s => s ? { ...s } : null) } : w
+    ));
   };
 
   const handleSave = async () => {
@@ -290,13 +293,14 @@ export default function ProgramBuilder({ existingProgram, onSaved, onClose }) {
                     )}
                   </div>
                 ))}
-                {/* Per-row repeat action */}
                 <div className="pb-row-actions">
-                  <button
-                    className="pb-repeat-btn"
-                    title="Copy this week to all following weeks"
-                    onClick={() => repeatWeekToAll(wi)}
-                  >↓ Repeat</button>
+                  {wi < weeks.length - 1 && (
+                    <button
+                      className="pb-repeat-btn"
+                      title="Copy this week to next week"
+                      onClick={() => repeatWeekToNext(wi)}
+                    >↓ Next</button>
+                  )}
                 </div>
               </div>
             ))}
