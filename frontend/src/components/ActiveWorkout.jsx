@@ -1862,6 +1862,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
               )}
             </>
           )}
+          <WaterWidget />
           <button onClick={togglePause} className={`pause-resume-btn ${isPaused ? 'is-paused' : ''}`}>
             {isPaused ? '▶ Resume' : '⏸ Pause'}
           </button>
