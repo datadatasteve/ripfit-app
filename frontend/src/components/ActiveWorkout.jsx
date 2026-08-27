@@ -458,6 +458,7 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
   const [showFreeLiftModal, setShowFreeLiftModal] = useState(false);
   const [activePrograms, setActivePrograms] = useState([]);
   const [hubView, setHubView] = useState('home'); // 'home' | 'programs'
+  const [selectedProgramId, setSelectedProgramId] = useState(null);
   // Routine sort/filter — persisted in localStorage
   const [routineSort, setRoutineSort] = useState(() => localStorage.getItem('ripfit_routine_sort') || 'name');
   const [routineFilter, setRoutineFilter] = useState('');
@@ -996,12 +997,14 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
     return (
       <div className="workout-container">
         <div className="aw-hub-back-bar">
-          <button className="aw-hub-back-btn" onClick={() => setHubView('home')}>← Workouts</button>
+          <button className="aw-hub-back-btn" onClick={() => { setHubView('home'); setSelectedProgramId(null); }}>← Workouts</button>
           <WaterWidget />
         </div>
         <ProgramsHub
+          initialProgramId={selectedProgramId}
           onStartProgramWorkout={(programId, day) => {
             setHubView('home');
+            setSelectedProgramId(null);
             startProgramWorkout(programId, day);
           }}
           onViewProgramStats={() => {}}
@@ -1029,7 +1032,12 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
               const total = parseInt(prog.total_workout_days) || 0;
               const pct = total > 0 ? Math.round((done / total) * 100) : 0;
               return (
-                <div key={prog.id} className="aw-program-card">
+                <div
+                  key={prog.id}
+                  className="aw-program-card"
+                  onClick={() => { setSelectedProgramId(prog.id); setHubView('programs'); }}
+                  style={{ cursor: 'pointer' }}
+                >
                   <div className="aw-program-card-header">
                     <span className="aw-program-name">{prog.name}</span>
                     <span className="aw-program-pct">{pct}%</span>
@@ -1042,7 +1050,7 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
                       <span className="aw-program-next-label">Next: {nextDay.routine_name || 'Workout'}</span>
                       <button
                         className="aw-program-start-btn"
-                        onClick={() => startProgramWorkout(prog.id, nextDay)}
+                        onClick={e => { e.stopPropagation(); startProgramWorkout(prog.id, nextDay); }}
                         disabled={loading}
                       >
                         Start
@@ -1862,7 +1870,6 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
               )}
             </>
           )}
-          <WaterWidget />
           <button onClick={togglePause} className={`pause-resume-btn ${isPaused ? 'is-paused' : ''}`}>
             {isPaused ? '▶ Resume' : '⏸ Pause'}
           </button>

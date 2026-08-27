@@ -47,7 +47,7 @@ function ProgramCard({ program, onClick }) {
   );
 }
 
-export default function ProgramsHub({ onStartProgramWorkout, onViewProgramStats }) {
+export default function ProgramsHub({ onStartProgramWorkout, onViewProgramStats, initialProgramId }) {
   const [programs, setPrograms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState('list'); // list | detail | builder
@@ -55,6 +55,13 @@ export default function ProgramsHub({ onStartProgramWorkout, onViewProgramStats 
   const [editingProgram, setEditingProgram] = useState(null);
 
   useEffect(() => { fetchPrograms(); }, []);
+
+  useEffect(() => {
+    if (initialProgramId && programs.length > 0) {
+      const prog = programs.find(p => p.id === initialProgramId);
+      if (prog) { setSelectedProgram(prog); setView('detail'); }
+    }
+  }, [initialProgramId, programs]);
 
   const fetchPrograms = async () => {
     setLoading(true);

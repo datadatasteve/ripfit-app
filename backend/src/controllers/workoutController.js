@@ -568,7 +568,19 @@ const finishWorkout = async (req, res) => {
       return res.status(404).json({ error: 'Workout not found' });
     }
 
-    res.json(result.rows[0]);
+    const workout = result.rows[0];
+
+    // If this workout belongs to a program, record completion
+    if (workout.program_id && workout.program_routine_id) {
+      await pool.query(
+        `INSERT INTO program_workouts (program_id, program_routine_id, workout_id, completed_date)
+         VALUES ($1, $2, $3, CURRENT_DATE)
+         ON CONFLICT DO NOTHING`,
+        [workout.program_id, workout.program_routine_id, workoutId]
+      );
+    }
+
+    res.json(workout);
   } catch (error) {
     console.error('Finish workout error:', error);
     res.status(500).json({ error: 'Failed to finish workout' });
