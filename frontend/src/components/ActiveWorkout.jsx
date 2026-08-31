@@ -1009,6 +1009,7 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
           }}
           onViewProgramStats={() => {}}
           onViewWorkout={onViewWorkout}
+          onProgramOpened={setSelectedProgramId}
         />
       </div>
     );

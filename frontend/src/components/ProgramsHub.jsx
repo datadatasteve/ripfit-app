@@ -47,7 +47,7 @@ function ProgramCard({ program, onClick }) {
   );
 }
 
-export default function ProgramsHub({ onStartProgramWorkout, onViewProgramStats, onViewWorkout, initialProgramId }) {
+export default function ProgramsHub({ onStartProgramWorkout, onViewProgramStats, onViewWorkout, onProgramOpened, initialProgramId }) {
   const [programs, setPrograms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState('list'); // list | detail | builder
@@ -79,6 +79,7 @@ export default function ProgramsHub({ onStartProgramWorkout, onViewProgramStats,
   const openDetail = (program) => {
     setSelectedProgram(program);
     setView('detail');
+    onProgramOpened?.(program.id);
   };
 
   const openBuilder = (program = null) => {
@@ -97,6 +98,7 @@ export default function ProgramsHub({ onStartProgramWorkout, onViewProgramStats,
     fetchPrograms();
     setView('list');
     setSelectedProgram(null);
+    onProgramOpened?.(null);
   };
 
   if (view === 'builder') {
@@ -114,7 +116,7 @@ export default function ProgramsHub({ onStartProgramWorkout, onViewProgramStats,
     return (
       <ProgramDetail
         programId={selectedProgram.id}
-        onBack={() => setView('list')}
+        onBack={() => { setView('list'); onProgramOpened?.(null); }}
         onEdit={() => openBuilder(selectedProgram)}
         onStartWorkout={onStartProgramWorkout}
         onViewStats={onViewProgramStats}
