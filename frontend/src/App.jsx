@@ -55,8 +55,6 @@ function App() {
   const [verifiedToast, setVerifiedToast] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [programStatsId, setProgramStatsId] = useState(null);
-  const [hubView, setHubView] = useState('home');
-  const [selectedProgramId, setSelectedProgramId] = useState(null);
 
   // Handle ?verified=true redirect from email verification link
   useEffect(() => {
