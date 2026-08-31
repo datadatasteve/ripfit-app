@@ -447,7 +447,7 @@ function FreeLiftTitleModal({ onStart, onClose }) {
   );
 }
 
-export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workoutSummary, setWorkoutSummary, showNavClock, setShowNavClock }) {
+export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workoutSummary, setWorkoutSummary, showNavClock, setShowNavClock, hubView, setHubView, selectedProgramId, setSelectedProgramId }) {
   const [token, setToken] = useState(localStorage.getItem('ripfit_token'));
   const [routines, setRoutines] = useState([]);
   const [selectedRoutine, setSelectedRoutine] = useState(null);
@@ -457,8 +457,6 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
   const [showCardio, setShowCardio] = useState(false);
   const [showFreeLiftModal, setShowFreeLiftModal] = useState(false);
   const [activePrograms, setActivePrograms] = useState([]);
-  const [hubView, setHubView] = useState('home'); // 'home' | 'programs'
-  const [selectedProgramId, setSelectedProgramId] = useState(null);
   // Routine sort/filter — persisted in localStorage
   const [routineSort, setRoutineSort] = useState(() => localStorage.getItem('ripfit_routine_sort') || 'name');
   const [routineFilter, setRoutineFilter] = useState('');
@@ -769,6 +767,8 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
           'Authorization': `Bearer ${token}`
         }
       });
+
+      fetchActivePrograms(); // refresh Continue Program cards with post-finish progress
 
       // Save rating immediately if one was set in the finish modal
       if (sessionRating) {

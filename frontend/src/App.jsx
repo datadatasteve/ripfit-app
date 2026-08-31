@@ -46,6 +46,8 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(
     () => !!localStorage.getItem('ripfit_token')
   );
+  const [hubView, setHubView] = useState('home');
+  const [selectedProgramId, setSelectedProgramId] = useState(null);
   const [currentView, setCurrentView] = useState('workout');
   const [activeWorkout, setActiveWorkout] = useState(null);
   const [workoutSummary, setWorkoutSummary] = useState(null);
@@ -53,6 +55,8 @@ function App() {
   const [verifiedToast, setVerifiedToast] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [programStatsId, setProgramStatsId] = useState(null);
+  const [hubView, setHubView] = useState('home');
+  const [selectedProgramId, setSelectedProgramId] = useState(null);
 
   // Handle ?verified=true redirect from email verification link
   useEffect(() => {
@@ -91,6 +95,8 @@ function App() {
 
   const goToWorkouts = () => {
     if (workoutSummary) setWorkoutSummary(null);
+    setHubView('home');
+    setSelectedProgramId(null);
     setCurrentView('workout');
   };
 
@@ -146,6 +152,10 @@ function App() {
                 setWorkoutSummary={setWorkoutSummary}
                 showNavClock={showNavClock}
                 setShowNavClock={setShowNavClock}
+                hubView={hubView}
+                setHubView={setHubView}
+                selectedProgramId={selectedProgramId}
+                setSelectedProgramId={setSelectedProgramId}
               />
             ) : currentView === 'exercises' ? (
               <ExerciseBrowser activeWorkout={activeWorkout} setActiveWorkout={setActiveWorkout} />
