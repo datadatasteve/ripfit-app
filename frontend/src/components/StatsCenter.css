@@ -742,3 +742,90 @@
   padding: 4px 8px;
   font-size: var(--font-size-sm);
 }
+/* ── Programs tab ─────────────────────────────────────────── */
+.sc-programs-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sc-subtab-bar {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 8px;
+}
+
+.sc-subtab-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sc-subtab-btn.active {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+
+.sc-program-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 0 4px;
+}
+
+.sc-program-pill {
+  padding: 5px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.sc-program-pill.active {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+
+.sc-program-pill-clear {
+  border-color: var(--color-danger, #ef4444);
+  color: var(--color-danger, #ef4444);
+}
+
+.sc-program-pill-clear:hover {
+  background: var(--color-danger, #ef4444);
+  color: #fff;
+}
+
+.sc-program-section {
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 16px;
+  background: var(--bg-card);
+}
+
+.sc-program-section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sc-program-selector-loading,
+.sc-program-selector-empty {
+  font-size: 13px;
+  color: var(--text-secondary);
+}

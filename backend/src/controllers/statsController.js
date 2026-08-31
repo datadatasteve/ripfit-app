@@ -23,7 +23,13 @@ function resolveUserId(req) {
 //   - total workout count, total time
 async function getOverview(req, res) {
   const userId = resolveUserId(req);
-  const { weeks = 12 } = req.query;
+  const { weeks = 12, programId } = req.query;
+  const isAllPrograms = programId === 'all';
+  const pid = (!isAllPrograms && programId) ? parseInt(programId) : null;
+  const params = pid ? [userId, pid] : [userId];
+  const programCond = pid ? 'AND program_id = $2' : (isAllPrograms ? 'AND program_id IS NOT NULL' : '');
+  // cardio_sessions has no program_id column — any program-scoped view (single or 'all') excludes it
+  const includeCardio = !pid && !isAllPrograms;
 
   try {
     // Weekly frequency (strength + cardio combined)
@@ -41,15 +47,15 @@ async function getOverview(req, res) {
         COUNT(*) AS count
       FROM (
         SELECT COALESCE(start_time, workout_date::timestamptz) AS d FROM workouts
-        WHERE user_id = $1 AND (status = 'completed' OR (status IS NULL AND end_time IS NOT NULL)) ${weeksCond}
-        UNION ALL
+        WHERE user_id = $1 AND (status = 'completed' OR (status IS NULL AND end_time IS NOT NULL)) ${weeksCond} ${programCond}
+        ${includeCardio ? `UNION ALL
         SELECT COALESCE(start_time, session_date::timestamptz) AS d FROM cardio_sessions
-        WHERE user_id = $1 AND status = 'completed' ${weeksCond2}
+        WHERE user_id = $1 AND status = 'completed' ${weeksCond2}` : ''}
       ) combined
       WHERE d IS NOT NULL
       GROUP BY week_start
       ORDER BY week_start
-    `, [userId]);
+    `, params);
 
     // Time-of-day distribution (0-23 hour buckets)
     const timeOfDay = await pool.query(`
@@ -58,14 +64,14 @@ async function getOverview(req, res) {
         COUNT(*) AS count
       FROM (
         SELECT start_time AS d FROM workouts
-        WHERE user_id = $1 AND (status = 'completed' OR (status IS NULL AND end_time IS NOT NULL)) AND start_time IS NOT NULL
-        UNION ALL
+        WHERE user_id = $1 AND (status = 'completed' OR (status IS NULL AND end_time IS NOT NULL)) AND start_time IS NOT NULL ${programCond}
+        ${includeCardio ? `UNION ALL
         SELECT start_time AS d FROM cardio_sessions
-        WHERE user_id = $1 AND status = 'completed' AND start_time IS NOT NULL
+        WHERE user_id = $1 AND status = 'completed' AND start_time IS NOT NULL` : ''}
       ) combined
       GROUP BY hour
       ORDER BY hour
-    `, [userId]);
+    `, params);
 
     // Day-of-week — fall back to workout_date when start_time is missing
     const dayOfWeek = await pool.query(`
@@ -74,15 +80,15 @@ async function getOverview(req, res) {
         COUNT(*) AS count
       FROM (
         SELECT COALESCE(start_time, workout_date::timestamptz) AS d FROM workouts
-        WHERE user_id = $1 AND (status = 'completed' OR (status IS NULL AND end_time IS NOT NULL))
-        UNION ALL
+        WHERE user_id = $1 AND (status = 'completed' OR (status IS NULL AND end_time IS NOT NULL)) ${programCond}
+        ${includeCardio ? `UNION ALL
         SELECT COALESCE(start_time, session_date::timestamptz) AS d FROM cardio_sessions
-        WHERE user_id = $1 AND status = 'completed'
+        WHERE user_id = $1 AND status = 'completed'` : ''}
       ) combined
       WHERE d IS NOT NULL
       GROUP BY dow
       ORDER BY dow
-    `, [userId]);
+    `, params);
 
     // Duration distribution — strength uses end_time-start_time, cardio has its own column
     const durations = await pool.query(`
@@ -93,14 +99,14 @@ async function getOverview(req, res) {
       FROM workouts
       WHERE user_id = $1 AND (status = 'completed' OR status IS NULL)
         AND end_time IS NOT NULL AND start_time IS NOT NULL
-        AND end_time > start_time
-      UNION ALL
+        AND end_time > start_time ${programCond}
+      ${includeCardio ? `UNION ALL
       SELECT duration_seconds, 'cardio' AS type, start_time
       FROM cardio_sessions
       WHERE user_id = $1 AND status = 'completed'
-        AND duration_seconds IS NOT NULL AND duration_seconds > 0
+        AND duration_seconds IS NOT NULL AND duration_seconds > 0` : ''}
       ORDER BY start_time
-    `, [userId]);
+    `, params);
 
     // Session rating over time
     const ratings = await pool.query(`
@@ -110,17 +116,17 @@ async function getOverview(req, res) {
         'strength' AS type,
         start_time
       FROM workouts
-      WHERE user_id = $1 AND session_rating IS NOT NULL AND (status = 'completed' OR status IS NULL)
-      UNION ALL
+      WHERE user_id = $1 AND session_rating IS NOT NULL AND (status = 'completed' OR status IS NULL) ${programCond}
+      ${includeCardio ? `UNION ALL
       SELECT
         session_date AS date,
         session_rating AS rating,
         'cardio' AS type,
         start_time
       FROM cardio_sessions
-      WHERE user_id = $1 AND session_rating IS NOT NULL AND status = 'completed'
+      WHERE user_id = $1 AND session_rating IS NOT NULL AND status = 'completed'` : ''}
       ORDER BY start_time
-    `, [userId]);
+    `, params);
 
     // Totals
     const totals = await pool.query(`
@@ -133,12 +139,12 @@ async function getOverview(req, res) {
           EXTRACT(EPOCH FROM (end_time - start_time))::INTEGER AS dur,
           session_rating
         FROM workouts
-        WHERE user_id = $1 AND (status = 'completed' OR (status IS NULL AND end_time IS NOT NULL))
-        UNION ALL
+        WHERE user_id = $1 AND (status = 'completed' OR (status IS NULL AND end_time IS NOT NULL)) ${programCond}
+        ${includeCardio ? `UNION ALL
         SELECT duration_seconds AS dur, session_rating FROM cardio_sessions
-        WHERE user_id = $1 AND status = 'completed'
+        WHERE user_id = $1 AND status = 'completed'` : ''}
       ) all_sessions
-    `, [userId]);
+    `, params);
 
     res.json({
       weekly_frequency: weeklyFreq.rows,
@@ -162,7 +168,7 @@ async function getOverview(req, res) {
 // Returns per-exercise aggregates + per-session volume/weight series
 async function getStrengthStats(req, res) {
   const userId = resolveUserId(req);
-  const { exerciseId, muscleGroup, weeks } = req.query;
+  const { exerciseId, muscleGroup, weeks, programId } = req.query;
 
   try {
     let whereClause = 'w.user_id = $1 AND w.status = \'completed\'';
@@ -182,6 +188,13 @@ async function getStrengthStats(req, res) {
     if (muscleGroup) {
       whereClause += ` AND e.muscles_primary ILIKE $${paramIdx}`;
       params.push(`%${muscleGroup}%`);
+      paramIdx++;
+    }
+    if (programId === 'all') {
+      whereClause += ' AND w.program_id IS NOT NULL';
+    } else if (programId) {
+      whereClause += ` AND w.program_id = $${paramIdx}`;
+      params.push(parseInt(programId));
       paramIdx++;
     }
 
@@ -262,10 +275,11 @@ async function getStrengthStats(req, res) {
       LEFT JOIN workout_routines wr ON w.routine_id = wr.id
       WHERE w.user_id = $1 AND w.status = 'completed'
         AND (we.target_weight IS NOT NULL OR we.target_reps IS NOT NULL OR we.target_sets IS NOT NULL)
+        ${programId === 'all' ? 'AND w.program_id IS NOT NULL' : programId ? 'AND w.program_id = $2' : ''}
       GROUP BY w.id, w.workout_date, wr.name
       HAVING COUNT(ws.id) > 0
       ORDER BY w.workout_date DESC
-    `, [userId]);
+    `, (programId && programId !== 'all') ? [userId, parseInt(programId)] : [userId]);
 
     // Flag each workout
     const flagged = problemWorkouts.rows.map(row => {
@@ -302,7 +316,9 @@ async function getStrengthStats(req, res) {
 // workouts (Open/Mixed sessions with cardio exercises logged via segments)
 async function getCardioStats(req, res) {
   const userId = resolveUserId(req);
-  const { cardioType, weeks } = req.query;
+  const { cardioType, weeks, programId } = req.query;
+  const isAllPrograms = programId === 'all';
+  const pid = (!isAllPrograms && programId) ? parseInt(programId) : null;
 
   try {
     // Simpler approach — run two separate queries and merge in JS
@@ -317,9 +333,13 @@ async function getCardioStats(req, res) {
     let wIdx = 2;
     if (weeks) { wWhere += ` AND COALESCE(w.start_time, w.workout_date::timestamptz) >= NOW() - ($${wIdx} || ' weeks')::INTERVAL`; wParams.push(weeks); wIdx++; }
     if (cardioType) { wWhere += ` AND e.name = $${wIdx}`; wParams.push(cardioType); wIdx++; }
+    if (isAllPrograms) { wWhere += ' AND w.program_id IS NOT NULL'; }
+    else if (pid) { wWhere += ` AND w.program_id = $${wIdx}`; wParams.push(pid); wIdx++; }
 
-    // cardio_sessions rows
-    const csRows = await pool.query(`
+    // cardio_sessions rows — has no program_id, so a program-scoped view (single or 'all') excludes this source entirely
+    const csRows = (pid || isAllPrograms)
+      ? { rows: [] }
+      : await pool.query(`
       SELECT
         id AS session_id, session_date, start_time, cardio_type,
         duration_seconds, distance, distance_unit,
@@ -403,6 +423,11 @@ async function getCardioStats(req, res) {
 // Auto-detected PRs: heaviest single set, most reps at a weight, best est. 1RM
 async function getRecords(req, res) {
   const userId = resolveUserId(req);
+  const { programId } = req.query;
+  const isAllPrograms = programId === 'all';
+  const pid = (!isAllPrograms && programId) ? parseInt(programId) : null;
+  const params = pid ? [userId, pid] : [userId];
+  const programCond = pid ? 'AND w.program_id = $2' : (isAllPrograms ? 'AND w.program_id IS NOT NULL' : '');
 
   try {
     const records = await pool.query(`
@@ -438,7 +463,7 @@ async function getRecords(req, res) {
         JOIN exercises e ON we.exercise_id = e.id
         JOIN workout_sets ws ON we.id = ws.workout_exercise_id
         WHERE w.user_id = $1 AND w.status = 'completed'
-          AND ws.weight_used > 0 AND ws.reps_completed > 0
+          AND ws.weight_used > 0 AND ws.reps_completed > 0 ${programCond}
       )
       SELECT DISTINCT ON (exercise_id)
         exercise_id, exercise_name, category,
@@ -451,7 +476,7 @@ async function getRecords(req, res) {
         MAX(workout_date) OVER (PARTITION BY exercise_id) AS last_logged
       FROM ranked
       ORDER BY exercise_id, best_est_1rm DESC NULLS LAST
-    `, [userId]);
+    `, params);
 
     res.json({ records: records.rows });
   } catch (err) {
@@ -464,7 +489,12 @@ async function getRecords(req, res) {
 // All metrics on a shared date axis for cross-domain correlation view
 async function getCombinedStats(req, res) {
   const userId = resolveUserId(req);
-  const { weeks = 52 } = req.query;
+  const { weeks = 52, programId } = req.query;
+  const isAllPrograms = programId === 'all';
+  const pid = (!isAllPrograms && programId) ? parseInt(programId) : null;
+  const params = pid ? [userId, weeks, pid] : [userId, weeks];
+  const programCond = pid ? 'AND w.program_id = $3' : (isAllPrograms ? 'AND w.program_id IS NOT NULL' : '');
+  const includeCardio = !pid && !isAllPrograms;
 
   try {
     const combined = await pool.query(`
@@ -500,9 +530,10 @@ async function getCombinedStats(req, res) {
         LEFT JOIN workout_sets ws ON we.id = ws.workout_exercise_id
         WHERE w.user_id = $1 AND w.status = 'completed'
           AND COALESCE(w.start_time, w.workout_date::timestamptz) >= NOW() - ($2 || ' weeks')::INTERVAL
+          ${programCond}
         GROUP BY w.id, wr.name
 
-        UNION ALL
+        ${includeCardio ? `UNION ALL
 
         -- Cardio sessions
         SELECT
@@ -519,10 +550,10 @@ async function getCombinedStats(req, res) {
           cs.id AS workout_id
         FROM cardio_sessions cs
         WHERE cs.user_id = $1 AND cs.status = 'completed'
-          AND COALESCE(cs.start_time, cs.session_date::timestamptz) >= NOW() - ($2 || ' weeks')::INTERVAL
+          AND COALESCE(cs.start_time, cs.session_date::timestamptz) >= NOW() - ($2 || ' weeks')::INTERVAL` : ''}
       ) all_sessions
       ORDER BY COALESCE(start_time, date::timestamptz) DESC
-    `, [userId, weeks]);
+    `, params);
 
     res.json({ sessions: combined.rows });
   } catch (err) {

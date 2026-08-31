@@ -18,7 +18,8 @@ const HOURS = Array.from({ length: 24 }, (_, i) =>
   i === 0 ? '12a' : i < 12 ? `${i}a` : i === 12 ? '12p' : `${i - 12}p`
 );
 
-const TABS = ['Overview', 'Strength', 'Cardio', 'Records', 'Combined', 'History'];
+const TABS = ['Overview', 'Strength', 'Cardio', 'Records', 'Combined', 'History', 'Programs'];
+const PROGRAM_SUB_TABS = ['Overview', 'Strength', 'Cardio', 'Records', 'Combined', 'History'];
 
 function token() { return localStorage.getItem('ripfit_token'); }
 
@@ -414,7 +415,7 @@ function WorkoutCalendar({ onSelectWorkout }) {
 // ═══════════════════════════════════════════════════════════════════════════
 // OVERVIEW TAB
 // ═══════════════════════════════════════════════════════════════════════════
-function OverviewTab({ onSelectWorkout }) {
+function OverviewTab({ onSelectWorkout, programId }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [combinedChartMetric, setCombinedChartMetric] = useState('workouts'); // 'workouts' | 'duration' | 'both'
@@ -425,12 +426,13 @@ function OverviewTab({ onSelectWorkout }) {
   const [typePieData, setTypePieData] = useState([]);
   const [weeks, setWeeks] = useState(4);
   const [customWeeks, setCustomWeeks] = useState('');
+  const pidQ = programId ? `&programId=${programId}` : '';
 
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      apiFetch(`/overview?weeks=${weeks}`),
-      apiFetch(`/combined?weeks=${weeks}`),
+      apiFetch(`/overview?weeks=${weeks}${pidQ}`),
+      apiFetch(`/combined?weeks=${weeks}${pidQ}`),
     ]).then(([overview, combined]) => {
       setData({ ...overview, sessions: combined.sessions || [] });
 
@@ -477,7 +479,7 @@ function OverviewTab({ onSelectWorkout }) {
       sessions.forEach(s => { tCounts[s.type] = (tCounts[s.type] || 0) + 1; });
       setTypePieData(Object.entries(tCounts).map(([name, value]) => ({ name, value })));
     }).catch(console.error).finally(() => setLoading(false));
-  }, [weeks]);
+  }, [weeks, programId]);
 
   if (loading) return <Loading />;
   if (!data) return <Empty />;
@@ -698,7 +700,7 @@ function OverviewTab({ onSelectWorkout }) {
 // ═══════════════════════════════════════════════════════════════════════════
 // STRENGTH TAB
 // ═══════════════════════════════════════════════════════════════════════════
-function StrengthTab() {
+function StrengthTab({ programId }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedEx, setSelectedEx] = useState(null);
@@ -710,13 +712,16 @@ function StrengthTab() {
   const [searchFilter, setSearchFilter] = useState('');
 
   useEffect(() => {
-    const params = muscleFilter ? `?muscleGroup=${encodeURIComponent(muscleFilter)}` : '';
+    const qs = [];
+    if (muscleFilter) qs.push(`muscleGroup=${encodeURIComponent(muscleFilter)}`);
+    if (programId) qs.push(`programId=${programId}`);
+    const params = qs.length ? `?${qs.join('&')}` : '';
     setLoading(true);
     apiFetch(`/strength${params}`)
       .then(setData)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [muscleFilter]);
+  }, [muscleFilter, programId]);
 
   const openExercise = useCallback(async (ex) => {
     setSelectedEx(ex);
@@ -959,7 +964,7 @@ function StrengthTab() {
 // ═══════════════════════════════════════════════════════════════════════════
 // CARDIO TAB
 // ═══════════════════════════════════════════════════════════════════════════
-function CardioTab({ onSelectWorkout, initialDrillType, onDrillChange }) {
+function CardioTab({ onSelectWorkout, initialDrillType, onDrillChange, programId }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [cardioType, setCardioType] = useState('');
@@ -975,13 +980,16 @@ function CardioTab({ onSelectWorkout, initialDrillType, onDrillChange }) {
   };
 
   useEffect(() => {
-    const params = cardioType ? `?cardioType=${encodeURIComponent(cardioType)}` : '';
+    const qs = [];
+    if (cardioType) qs.push(`cardioType=${encodeURIComponent(cardioType)}`);
+    if (programId) qs.push(`programId=${programId}`);
+    const params = qs.length ? `?${qs.join('&')}` : '';
     setLoading(true);
     apiFetch(`/cardio${params}`)
       .then(setData)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [cardioType]);
+  }, [cardioType, programId]);
 
   const CHART_OPTIONS = [
     { value: 'line', label: 'Line' },
@@ -1369,7 +1377,7 @@ function CardioTab({ onSelectWorkout, initialDrillType, onDrillChange }) {
 // ═══════════════════════════════════════════════════════════════════════════
 // RECORDS TAB
 // ═══════════════════════════════════════════════════════════════════════════
-function RecordsTab() {
+function RecordsTab({ programId }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -1390,8 +1398,9 @@ function RecordsTab() {
   }, [selectedExId]);
 
   useEffect(() => {
-    apiFetch('/records').then(setData).catch(console.error).finally(() => setLoading(false));
-  }, []);
+    setLoading(true);
+    apiFetch(`/records${programId ? `?programId=${programId}` : ''}`).then(setData).catch(console.error).finally(() => setLoading(false));
+  }, [programId]);
 
   if (loading) return <Loading />;
   if (!data || data.records.length === 0) return <Empty message="No PRs yet. Log some strength workouts to see your records." />;
@@ -1557,7 +1566,7 @@ function RecordsTab() {
 // ═══════════════════════════════════════════════════════════════════════════
 // COMBINED TAB
 // ═══════════════════════════════════════════════════════════════════════════
-function CombinedTab({ onSelectWorkout }) {
+function CombinedTab({ onSelectWorkout, programId }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [weeks, setWeeks] = useState(8);
@@ -1566,11 +1575,11 @@ function CombinedTab({ onSelectWorkout }) {
 
   useEffect(() => {
     setLoading(true);
-    apiFetch(`/combined?weeks=${weeks}`)
+    apiFetch(`/combined?weeks=${weeks}${programId ? `&programId=${programId}` : ''}`)
       .then(setData)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [weeks]);
+  }, [weeks, programId]);
 
   const CHART_OPTIONS = [
     { value: 'line', label: 'Line chart' },
@@ -1683,7 +1692,7 @@ function CombinedTab({ onSelectWorkout }) {
 // ═══════════════════════════════════════════════════════════════════════════
 // HISTORY TAB
 // ═══════════════════════════════════════════════════════════════════════════
-function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout }) {
+function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout, programId }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [weeks, setWeeks] = useState(8);
@@ -1698,11 +1707,11 @@ function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout }) {
 
   useEffect(() => {
     setLoading(true);
-    apiFetch(`/combined?weeks=${weeks}`)
+    apiFetch(`/combined?weeks=${weeks}${programId ? `&programId=${programId}` : ''}`)
       .then(setData)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [weeks]);
+  }, [weeks, programId]);
 
   const CHART_OPTIONS = [
     { value: 'line', label: 'Line chart' },
@@ -2000,11 +2009,109 @@ function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout }) {
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN STATS CENTER
 // ═══════════════════════════════════════════════════════════════════════════
-export default function StatsCenter() {
+// ═══════════════════════════════════════════════════════════════════════════
+// PROGRAMS TAB — same tabs/charts as above, scoped to a program (or all programs
+// vs. no program at all). Selecting multiple programs shows a labeled section per
+// program, side by side, for comparison. Cross-program overlays on a single chart
+// are a further step, not built yet.
+// ═══════════════════════════════════════════════════════════════════════════
+function ProgramsTab({ onSelectWorkout, selectedProgramIds, setSelectedProgramIds, subTab, setSubTab }) {
+  const [programs, setPrograms] = useState([]);
+  const [loadingPrograms, setLoadingPrograms] = useState(true);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/programs`, { headers: { Authorization: `Bearer ${token()}` } })
+      .then(r => r.json())
+      .then(d => setPrograms(d.programs || []))
+      .catch(console.error)
+      .finally(() => setLoadingPrograms(false));
+  }, []);
+
+  const toggleProgram = (id) => {
+    setSelectedProgramIds(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);
+  };
+
+  const renderSubTab = (pid, key) => {
+    switch (subTab) {
+      case 'Overview': return <OverviewTab key={key} onSelectWorkout={onSelectWorkout} programId={pid} />;
+      case 'Strength': return <StrengthTab key={key} programId={pid} />;
+      case 'Cardio':   return <CardioTab key={key} onSelectWorkout={onSelectWorkout} programId={pid} />;
+      case 'Records':  return <RecordsTab key={key} programId={pid} />;
+      case 'Combined': return <CombinedTab key={key} onSelectWorkout={onSelectWorkout} programId={pid} />;
+      case 'History':  return <HistoryTab key={key} onSelectWorkout={onSelectWorkout} programId={pid} />;
+      default: return null;
+    }
+  };
+
+  return (
+    <div className="sc-programs-tab">
+      <div className="sc-subtab-bar">
+        {PROGRAM_SUB_TABS.map(t => (
+          <button key={t} className={`sc-subtab-btn ${subTab === t ? 'active' : ''}`} onClick={() => setSubTab(t)}>{t}</button>
+        ))}
+      </div>
+
+      <div className="sc-program-selector">
+        {loadingPrograms ? (
+          <span className="sc-program-selector-loading">Loading programs…</span>
+        ) : programs.length === 0 ? (
+          <span className="sc-program-selector-empty">No programs yet.</span>
+        ) : (
+          programs.map(p => (
+            <button
+              key={p.id}
+              className={`sc-program-pill ${selectedProgramIds.includes(p.id) ? 'active' : ''}`}
+              onClick={() => toggleProgram(p.id)}
+            >
+              {p.name}
+            </button>
+          ))
+        )}
+        {selectedProgramIds.length > 0 && (
+          <button className="sc-program-pill sc-program-pill-clear" onClick={() => setSelectedProgramIds([])}>
+            Clear
+          </button>
+        )}
+      </div>
+
+      {selectedProgramIds.length === 0 && (
+        <div className="sc-program-section">
+          <h4 className="sc-program-section-title">All Programs</h4>
+          {renderSubTab('all', 'all')}
+        </div>
+      )}
+
+      {selectedProgramIds.length === 1 && renderSubTab(selectedProgramIds[0], selectedProgramIds[0])}
+
+      {selectedProgramIds.length > 1 && selectedProgramIds.map(id => {
+        const prog = programs.find(p => p.id === id);
+        return (
+          <div key={id} className="sc-program-section">
+            <h4 className="sc-program-section-title">{prog?.name || `Program ${id}`}</h4>
+            {renderSubTab(id, id)}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export default function StatsCenter({ initialProgramId, onProgramStatsConsumed }) {
   const [tab, setTab] = useState('Overview');
   const [selectedHistoryId, setSelectedHistoryId] = useState(null);
   const [detailWorkout, setDetailWorkout] = useState(null); // { id, type }
   const [cardioDrillType, setCardioDrillType] = useState(null); // restored after back from detail
+  const [programsSelectedIds, setProgramsSelectedIds] = useState([]);
+  const [programsSubTab, setProgramsSubTab] = useState('Overview');
+
+  // Deep link from a program's "Stats →" button
+  useEffect(() => {
+    if (initialProgramId) {
+      setTab('Programs');
+      setProgramsSelectedIds([initialProgramId]);
+      onProgramStatsConsumed?.();
+    }
+  }, [initialProgramId]);
 
   const handleSelectWorkout = (session) => {
     const id = session.workout_id ?? session.id;
@@ -2045,6 +2152,15 @@ export default function StatsCenter() {
         {tab === 'Records'   && <RecordsTab />}
         {tab === 'Combined'  && <CombinedTab onSelectWorkout={handleSelectWorkout} />}
         {tab === 'History'   && <HistoryTab initialWorkoutId={selectedHistoryId} onClearSelected={() => setSelectedHistoryId(null)} onSelectWorkout={handleSelectWorkout} />}
+        {tab === 'Programs'  && (
+          <ProgramsTab
+            onSelectWorkout={handleSelectWorkout}
+            selectedProgramIds={programsSelectedIds}
+            setSelectedProgramIds={setProgramsSelectedIds}
+            subTab={programsSubTab}
+            setSubTab={setProgramsSubTab}
+          />
+        )}
       </div>
     </div>
   );

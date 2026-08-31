@@ -447,7 +447,7 @@ function FreeLiftTitleModal({ onStart, onClose }) {
   );
 }
 
-export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workoutSummary, setWorkoutSummary, showNavClock, setShowNavClock, hubView, setHubView, selectedProgramId, setSelectedProgramId, onViewWorkout }) {
+export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workoutSummary, setWorkoutSummary, showNavClock, setShowNavClock, hubView, setHubView, selectedProgramId, setSelectedProgramId, onViewWorkout, onViewProgramStats }) {
   const [token, setToken] = useState(localStorage.getItem('ripfit_token'));
   const [routines, setRoutines] = useState([]);
   const [selectedRoutine, setSelectedRoutine] = useState(null);
@@ -989,6 +989,8 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
       case 'size_asc':     return list.sort((a,b) => (a.exercise_count||0) - (b.exercise_count||0));
       case 'created':      return list.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
       case 'created_asc':  return list.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+      case 'used':         return list.sort((a,b) => (b.use_count||0) - (a.use_count||0));
+      case 'used_asc':     return list.sort((a,b) => (a.use_count||0) - (b.use_count||0));
       default:             return list;
     }
   };
@@ -1007,7 +1009,7 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
             setSelectedProgramId(null);
             startProgramWorkout(programId, day);
           }}
-          onViewProgramStats={() => {}}
+          onViewProgramStats={onViewProgramStats}
           onViewWorkout={onViewWorkout}
           onProgramOpened={setSelectedProgramId}
         />
@@ -1115,6 +1117,8 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
             <option value="size_asc">Fewest exercises</option>
             <option value="created">Newest first</option>
             <option value="created_asc">Oldest first</option>
+            <option value="used">Most used</option>
+            <option value="used_asc">Least used</option>
           </select>
         </div>
 

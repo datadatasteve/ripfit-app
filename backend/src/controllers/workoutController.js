@@ -722,7 +722,9 @@ const updateExerciseNotes = async (req, res) => {
 // GET /api/v1/workouts/history
 const getCombinedHistory = async (req, res) => {
   const user_id = req.user.userId;
-  const { limit = 50, offset = 0 } = req.query;
+  const { limit = 50, offset = 0, programId } = req.query;
+  const isAllPrograms = programId === 'all';
+  const pid = (!isAllPrograms && programId) ? parseInt(programId) : null;
   try {
     const strengthResult = await pool.query(
       `SELECT
@@ -738,12 +740,15 @@ const getCombinedHistory = async (req, res) => {
        FROM workouts w
        LEFT JOIN workout_routines wr ON w.routine_id = wr.id
        LEFT JOIN workout_exercises we ON w.id = we.workout_id
-       WHERE w.user_id = $1 AND w.status != 'cancelled'
+       WHERE w.user_id = $1 AND w.status != 'cancelled' ${pid ? 'AND w.program_id = $2' : isAllPrograms ? 'AND w.program_id IS NOT NULL' : ''}
        GROUP BY w.id, wr.name
        ORDER BY w.workout_date DESC, w.start_time DESC`,
-      [user_id]
+      pid ? [user_id, pid] : [user_id]
     );
-    const cardioResult = await pool.query(
+    // cardio_sessions has no program_id — a program-scoped history (single or 'all') can never include it
+    const cardioResult = (pid || isAllPrograms)
+      ? { rows: [] }
+      : await pool.query(
       `SELECT
         id, 'cardio' AS type, session_date AS date,
         start_time, end_time, duration_seconds,

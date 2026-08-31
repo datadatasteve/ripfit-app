@@ -163,11 +163,15 @@ function App() {
                 selectedProgramId={selectedProgramId}
                 setSelectedProgramId={setSelectedProgramId}
                 onViewWorkout={(id, type) => setViewingWorkout({ id, type: type || 'strength' })}
+                onViewProgramStats={(pid) => { setProgramStatsId(pid); setCurrentView('stats'); }}
               />
             ) : currentView === 'exercises' ? (
               <ExerciseBrowser activeWorkout={activeWorkout} setActiveWorkout={setActiveWorkout} />
             ) : currentView === 'stats' ? (
-              <StatsCenter />
+              <StatsCenter
+                initialProgramId={programStatsId}
+                onProgramStatsConsumed={() => setProgramStatsId(null)}
+              />
             ) : currentView === 'preferences' ? (
               <UserPreferencesPage onBack={() => setCurrentView('workout')} />
             ) : currentView === 'admin' ? (
