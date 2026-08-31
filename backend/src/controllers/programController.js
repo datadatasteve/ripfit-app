@@ -378,16 +378,22 @@ const getProgramProgress = async (req, res) => {
     const achievement = await pool.query(
       `SELECT
         pw.workout_id,
-        ROUND(AVG(CASE
-          WHEN we.target_sets IS NOT NULL AND ws_agg.set_count >= we.target_sets THEN 100.0
-          WHEN we.target_sets IS NOT NULL THEN ws_agg.set_count::NUMERIC / we.target_sets * 100
-          ELSE NULL
-        END), 1) AS target_achievement_pct
+        ROUND(AVG(
+          CASE
+            WHEN we.target_sets IS NULL THEN NULL
+            ELSE LEAST(100.0, (COALESCE(qualifying.qualifying_count, 0)::NUMERIC / we.target_sets) * 100)
+          END
+        ), 1) AS target_achievement_pct
        FROM program_workouts pw
        JOIN workout_exercises we ON we.workout_id = pw.workout_id
        LEFT JOIN (
-         SELECT workout_exercise_id, COUNT(*) AS set_count FROM workout_sets GROUP BY workout_exercise_id
-       ) ws_agg ON ws_agg.workout_exercise_id = we.id
+         SELECT ws.workout_exercise_id, COUNT(*) AS qualifying_count
+         FROM workout_sets ws
+         JOIN workout_exercises we2 ON we2.id = ws.workout_exercise_id
+         WHERE (we2.target_reps IS NULL OR ws.reps_completed >= we2.target_reps)
+           AND (we2.target_weight IS NULL OR ws.weight_used >= we2.target_weight)
+         GROUP BY ws.workout_exercise_id
+       ) qualifying ON qualifying.workout_exercise_id = we.id
        WHERE pw.program_id = $1 AND we.target_sets IS NOT NULL
        GROUP BY pw.workout_id`,
       [id]

@@ -47,7 +47,7 @@ function daysFromSlots(weeks) {
   return days;
 }
 
-export default function ProgramBuilder({ existingProgram, onSaved, onClose }) {
+export default function ProgramBuilder({ existingProgram, onSaved, onClose, onDeleted }) {
   const isEditing = !!existingProgram;
 
   const [name, setName] = useState(existingProgram?.name || '');
@@ -62,6 +62,8 @@ export default function ProgramBuilder({ existingProgram, onSaved, onClose }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [showRoutineBuilder, setShowRoutineBuilder] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchRoutines();
@@ -174,6 +176,18 @@ export default function ProgramBuilder({ existingProgram, onSaved, onClose }) {
       setError('Failed to save. Try again.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await fetch(`${API}/programs/${existingProgram.id}`, { method: 'DELETE', headers: authHeaders() });
+      onDeleted?.();
+    } catch (err) {
+      console.error('Delete program error:', err);
+      setError('Failed to delete. Try again.');
+      setDeleting(false);
     }
   };
 
@@ -322,6 +336,22 @@ export default function ProgramBuilder({ existingProgram, onSaved, onClose }) {
         </button>
         <button className="pb-cancel-btn" onClick={onClose}>Cancel</button>
       </div>
+
+      {isEditing && (
+        <div className="pb-danger-zone">
+          {!showDeleteConfirm ? (
+            <button className="pb-delete-btn" onClick={() => setShowDeleteConfirm(true)}>Delete Program</button>
+          ) : (
+            <div className="pb-delete-confirm">
+              <p>Delete "{existingProgram.name}"? This cannot be undone.</p>
+              <button className="pb-delete-confirm-btn" onClick={handleDelete} disabled={deleting}>
+                {deleting ? 'Deleting…' : 'Yes, Delete'}
+              </button>
+              <button className="pb-cancel-btn" onClick={() => setShowDeleteConfirm(false)}>Cancel</button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

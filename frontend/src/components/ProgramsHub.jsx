@@ -47,7 +47,7 @@ function ProgramCard({ program, onClick }) {
   );
 }
 
-export default function ProgramsHub({ onStartProgramWorkout, onViewProgramStats, initialProgramId }) {
+export default function ProgramsHub({ onStartProgramWorkout, onViewProgramStats, onViewWorkout, initialProgramId }) {
   const [programs, setPrograms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState('list'); // list | detail | builder
@@ -104,6 +104,7 @@ export default function ProgramsHub({ onStartProgramWorkout, onViewProgramStats,
       <ProgramBuilder
         existingProgram={editingProgram}
         onSaved={handleSaved}
+        onDeleted={handleDeleted}
         onClose={() => setView(selectedProgram ? 'detail' : 'list')}
       />
     );
@@ -115,9 +116,9 @@ export default function ProgramsHub({ onStartProgramWorkout, onViewProgramStats,
         programId={selectedProgram.id}
         onBack={() => setView('list')}
         onEdit={() => openBuilder(selectedProgram)}
-        onDeleted={handleDeleted}
         onStartWorkout={onStartProgramWorkout}
         onViewStats={onViewProgramStats}
+        onViewWorkout={onViewWorkout}
       />
     );
   }

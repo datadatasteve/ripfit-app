@@ -54,13 +54,12 @@ function JournalEntry({ entry, onEdit, onDelete }) {
   );
 }
 
-export default function ProgramDetail({ programId, onBack, onEdit, onDeleted, onStartWorkout, onViewStats }) {
+export default function ProgramDetail({ programId, onBack, onEdit, onStartWorkout, onViewStats, onViewWorkout }) {
   const [data, setData] = useState(null);
   const [progress, setProgress] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('Overview');
   const [journalText, setJournalText] = useState('');
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [calView, setCalView] = useState('week');
 
   useEffect(() => { fetchAll(); }, [programId]);
@@ -88,11 +87,6 @@ export default function ProgramDetail({ programId, onBack, onEdit, onDeleted, on
       body: JSON.stringify({ start_date: new Date().toISOString().slice(0, 10) }),
     });
     fetchAll();
-  };
-
-  const handleDelete = async () => {
-    await fetch(`${API}/programs/${programId}`, { method: 'DELETE', headers: authHeaders() });
-    onDeleted?.();
   };
 
   const addJournal = async () => {
@@ -241,7 +235,12 @@ export default function ProgramDetail({ programId, onBack, onEdit, onDeleted, on
             <div className="pd-recent">
               <h3>Recent</h3>
               {workoutDays.filter(d => d.completed_date).slice(-5).reverse().map((d, i) => (
-                <div key={i} className="pd-recent-row">
+                <div
+                  key={i}
+                  className="pd-recent-row"
+                  onClick={() => d.completed_workout_id && onViewWorkout?.(d.completed_workout_id)}
+                  style={{ cursor: d.completed_workout_id ? 'pointer' : 'default' }}
+                >
                   <span className="pd-recent-name">{d.routine_name}</span>
                   <span className="pd-recent-date">{new Date(d.completed_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ✓</span>
                 </div>
@@ -340,20 +339,6 @@ export default function ProgramDetail({ programId, onBack, onEdit, onDeleted, on
         </div>
       )}
 
-      {/* Delete — in Overview only */}
-      {tab === 'Overview' && (
-        <div className="pd-danger-zone">
-          {!showDeleteConfirm ? (
-            <button className="pd-delete-btn" onClick={() => setShowDeleteConfirm(true)}>Delete Program</button>
-          ) : (
-            <div className="pd-delete-confirm">
-              <p>Delete "{data.name}"? This cannot be undone.</p>
-              <button className="pd-delete-confirm-btn" onClick={handleDelete}>Yes, Delete</button>
-              <button className="pd-cancel-btn" onClick={() => setShowDeleteConfirm(false)}>Cancel</button>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }

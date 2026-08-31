@@ -447,7 +447,7 @@ function FreeLiftTitleModal({ onStart, onClose }) {
   );
 }
 
-export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workoutSummary, setWorkoutSummary, showNavClock, setShowNavClock, hubView, setHubView, selectedProgramId, setSelectedProgramId }) {
+export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workoutSummary, setWorkoutSummary, showNavClock, setShowNavClock, hubView, setHubView, selectedProgramId, setSelectedProgramId, onViewWorkout }) {
   const [token, setToken] = useState(localStorage.getItem('ripfit_token'));
   const [routines, setRoutines] = useState([]);
   const [selectedRoutine, setSelectedRoutine] = useState(null);
@@ -1008,6 +1008,7 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
             startProgramWorkout(programId, day);
           }}
           onViewProgramStats={() => {}}
+          onViewWorkout={onViewWorkout}
         />
       </div>
     );

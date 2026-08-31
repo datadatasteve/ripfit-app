@@ -3,6 +3,7 @@ import ProfileMenu from './components/ProfileMenu'
 import ActiveWorkout from './components/ActiveWorkout'
 import ExerciseBrowser from './components/ExerciseBrowser'
 import StatsCenter from './components/StatsCenter'
+import WorkoutDetailPage from './components/WorkoutDetailPage'
 import UserPreferencesPage from './components/UserPreferencesPage'
 import AdminPanel from './components/AdminPanel'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -55,6 +56,7 @@ function App() {
   const [verifiedToast, setVerifiedToast] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [programStatsId, setProgramStatsId] = useState(null);
+  const [viewingWorkout, setViewingWorkout] = useState(null); // { id, type }
 
   // Handle ?verified=true redirect from email verification link
   useEffect(() => {
@@ -140,6 +142,12 @@ function App() {
         <ErrorBoundary>
         {!isLoggedIn ? (
           <Login onLogin={handleLogin} />
+        ) : viewingWorkout ? (
+          <WorkoutDetailPage
+            workoutId={viewingWorkout.id}
+            workoutType={viewingWorkout.type}
+            onBack={() => setViewingWorkout(null)}
+          />
         ) : (
           <>
             {currentView === 'workout' ? (
@@ -154,6 +162,7 @@ function App() {
                 setHubView={setHubView}
                 selectedProgramId={selectedProgramId}
                 setSelectedProgramId={setSelectedProgramId}
+                onViewWorkout={(id, type) => setViewingWorkout({ id, type: type || 'strength' })}
               />
             ) : currentView === 'exercises' ? (
               <ExerciseBrowser activeWorkout={activeWorkout} setActiveWorkout={setActiveWorkout} />
