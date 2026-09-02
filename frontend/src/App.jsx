@@ -146,7 +146,10 @@ function App() {
           <WorkoutDetailPage
             workoutId={viewingWorkout.id}
             workoutType={viewingWorkout.type}
-            onBack={() => setViewingWorkout(null)}
+            onBack={() => {
+              setViewingWorkout(null);
+              if (selectedProgramId) setHubView('programs');
+            }}
           />
         ) : (
           <>

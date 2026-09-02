@@ -122,9 +122,11 @@ const getRoutines = async (req, res) => {
     const result = await pool.query(
       `SELECT 
         r.id, r.name, r.description, r.is_active, r.created_at,
-        COUNT(re.id) as exercise_count
+        COUNT(DISTINCT re.id) AS exercise_count,
+        COUNT(DISTINCT w.id) AS use_count
        FROM workout_routines r
        LEFT JOIN routine_exercises re ON r.id = re.routine_id
+       LEFT JOIN workouts w ON w.routine_id = r.id AND w.status = 'completed'
        WHERE r.user_id = $1
        GROUP BY r.id
        ORDER BY r.is_active DESC, r.name`,

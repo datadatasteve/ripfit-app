@@ -1,5 +1,5 @@
 // frontend/src/components/StatsCenter.jsx
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   LineChart, Line, BarChart, Bar, ScatterChart, Scatter,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -2018,6 +2018,10 @@ function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout, progra
 function ProgramsTab({ onSelectWorkout, selectedProgramIds, setSelectedProgramIds, subTab, setSubTab }) {
   const [programs, setPrograms] = useState([]);
   const [loadingPrograms, setLoadingPrograms] = useState(true);
+  // activePids is what actually gets passed to the sub-tab — only updates after a 300ms debounce
+  // to prevent a fetch storm when the user toggles pills quickly
+  const [activePids, setActivePids] = useState(selectedProgramIds);
+  const debounceRef = useRef(null);
 
   useEffect(() => {
     fetch(`${API_BASE}/programs`, { headers: { Authorization: `Bearer ${token()}` } })
@@ -2028,17 +2032,38 @@ function ProgramsTab({ onSelectWorkout, selectedProgramIds, setSelectedProgramId
   }, []);
 
   const toggleProgram = (id) => {
-    setSelectedProgramIds(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);
+    const next = selectedProgramIds.includes(id)
+      ? selectedProgramIds.filter(p => p !== id)
+      : [...selectedProgramIds, id];
+    setSelectedProgramIds(next);
+    // debounce the actual fetch trigger
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setActivePids(next), 300);
   };
 
-  const renderSubTab = (pid, key) => {
+  const clearAll = () => {
+    setSelectedProgramIds([]);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setActivePids([]), 300);
+  };
+
+  // Derived: what programId to pass to the single rendered sub-tab
+  // 0 selected → 'all'
+  // 1 selected → that program's id
+  // 2+ selected → we render one section per program, handled below
+  const compareMode = activePids.length > 1;
+  const singlePid = activePids.length === 0 ? 'all' : activePids.length === 1 ? activePids[0] : null;
+
+  const renderSubTab = (pid) => {
+    // key includes both pid and subTab so switching either triggers a clean remount + fresh fetch
+    const key = `${pid}-${subTab}`;
     switch (subTab) {
       case 'Overview': return <OverviewTab key={key} onSelectWorkout={onSelectWorkout} programId={pid} />;
       case 'Strength': return <StrengthTab key={key} programId={pid} />;
-      case 'Cardio':   return <CardioTab key={key} onSelectWorkout={onSelectWorkout} programId={pid} />;
-      case 'Records':  return <RecordsTab key={key} programId={pid} />;
+      case 'Cardio':   return <CardioTab   key={key} onSelectWorkout={onSelectWorkout} programId={pid} />;
+      case 'Records':  return <RecordsTab  key={key} programId={pid} />;
       case 'Combined': return <CombinedTab key={key} onSelectWorkout={onSelectWorkout} programId={pid} />;
-      case 'History':  return <HistoryTab key={key} onSelectWorkout={onSelectWorkout} programId={pid} />;
+      case 'History':  return <HistoryTab  key={key} onSelectWorkout={onSelectWorkout} programId={pid} />;
       default: return null;
     }
   };
@@ -2068,27 +2093,27 @@ function ProgramsTab({ onSelectWorkout, selectedProgramIds, setSelectedProgramId
           ))
         )}
         {selectedProgramIds.length > 0 && (
-          <button className="sc-program-pill sc-program-pill-clear" onClick={() => setSelectedProgramIds([])}>
-            Clear
-          </button>
+          <button className="sc-program-pill sc-program-pill-clear" onClick={clearAll}>Clear</button>
         )}
       </div>
 
-      {selectedProgramIds.length === 0 && (
+      {/* Single program or 'all' — one fetch, one sub-tab */}
+      {!compareMode && (
         <div className="sc-program-section">
-          <h4 className="sc-program-section-title">All Programs</h4>
-          {renderSubTab('all', 'all')}
+          {activePids.length === 0 && (
+            <h4 className="sc-program-section-title">All Programs</h4>
+          )}
+          {renderSubTab(singlePid)}
         </div>
       )}
 
-      {selectedProgramIds.length === 1 && renderSubTab(selectedProgramIds[0], selectedProgramIds[0])}
-
-      {selectedProgramIds.length > 1 && selectedProgramIds.map(id => {
+      {/* Compare mode — one section per program, each rendering one sub-tab */}
+      {compareMode && activePids.map(id => {
         const prog = programs.find(p => p.id === id);
         return (
           <div key={id} className="sc-program-section">
             <h4 className="sc-program-section-title">{prog?.name || `Program ${id}`}</h4>
-            {renderSubTab(id, id)}
+            {renderSubTab(id)}
           </div>
         );
       })}
