@@ -2019,9 +2019,22 @@ function ProgramsTab({ onSelectWorkout, selectedProgramIds, setSelectedProgramId
   const [programs, setPrograms] = useState([]);
   const [loadingPrograms, setLoadingPrograms] = useState(true);
   // activePids is what actually gets passed to the sub-tab — only updates after a 300ms debounce
-  // to prevent a fetch storm when the user toggles pills quickly
+  // to prevent a fetch storm when the user toggles pills quickly.
   const [activePids, setActivePids] = useState(selectedProgramIds);
   const debounceRef = useRef(null);
+
+  // Sync activePids when the parent sets selectedProgramIds externally
+  // (e.g. deep-link via Stats → button on ProgramDetail).
+  // Skip if the arrays are already equal to avoid a spurious re-fetch.
+  useEffect(() => {
+    const same =
+      selectedProgramIds.length === activePids.length &&
+      selectedProgramIds.every((id, i) => id === activePids[i]);
+    if (!same) {
+      clearTimeout(debounceRef.current);
+      setActivePids(selectedProgramIds);
+    }
+  }, [selectedProgramIds]);
 
   useEffect(() => {
     fetch(`${API_BASE}/programs`, { headers: { Authorization: `Bearer ${token()}` } })

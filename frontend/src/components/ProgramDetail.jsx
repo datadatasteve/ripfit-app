@@ -140,7 +140,12 @@ export default function ProgramDetail({ programId, onBack, onEdit, onStartWorkou
   });
   const weeksToShow = calView === 'week' ? [1] : Array.from({ length: totalWeeks }, (_, i) => i + 1);
 
-  const workoutDays = days.filter(d => !d.is_rest_day);
+  // Normalize completed_date: treat null, undefined, and empty string as incomplete.
+  // The DB returns a timestamp string for completed rows and null for incomplete ones;
+  // the coercion guards against any edge case where pg serializes null differently.
+  const workoutDays = days
+    .filter(d => !d.is_rest_day)
+    .map(d => ({ ...d, completed_date: d.completed_date || null }));
 
   return (
     <div className="pd-container">

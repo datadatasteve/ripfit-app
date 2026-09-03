@@ -90,17 +90,27 @@ const getProgramById = async (req, res) => {
 
     const program = progResult.rows[0];
 
-    // Get days with routine info
+    // Get days with routine info.
+    // Use a lateral subquery for the program_workouts join to:
+    //   1. Scope the lookup to this program (prevents cross-program contamination)
+    //   2. Guarantee at most one row per program_routine (avoids GROUP BY fan-out
+    //      that could produce duplicate day rows if the unique constraint is missing)
     const daysResult = await pool.query(
       `SELECT pr.*, wr.name AS routine_name, wr.description AS routine_description,
         COUNT(re.id) AS exercise_count,
-        pw.completed_date, pw.workout_id AS completed_workout_id
+        latest_pw.completed_date, latest_pw.workout_id AS completed_workout_id
        FROM program_routines pr
        LEFT JOIN workout_routines wr ON wr.id = pr.routine_id
        LEFT JOIN routine_exercises re ON re.routine_id = wr.id
-       LEFT JOIN program_workouts pw ON pw.program_routine_id = pr.id
+       LEFT JOIN LATERAL (
+         SELECT pw.completed_date, pw.workout_id
+         FROM program_workouts pw
+         WHERE pw.program_routine_id = pr.id AND pw.program_id = $1
+         ORDER BY pw.completed_date DESC
+         LIMIT 1
+       ) latest_pw ON TRUE
        WHERE pr.program_id = $1
-       GROUP BY pr.id, wr.name, wr.description, pw.completed_date, pw.workout_id
+       GROUP BY pr.id, wr.name, wr.description, latest_pw.completed_date, latest_pw.workout_id
        ORDER BY pr.week_number, pr.day_of_week, pr.order_index`,
       [id]
     );
