@@ -23,12 +23,24 @@ const PROGRAM_SUB_TABS = ['Overview', 'Strength', 'Cardio', 'Records', 'Combined
 
 function token() { return localStorage.getItem('ripfit_token'); }
 
-async function apiFetch(path) {
-  const res = await fetch(`${API_BASE}/stats${path}`, {
-    headers: { Authorization: `Bearer ${token()}` },
-  });
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json();
+async function apiFetch(path, retries = 3, signal) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+    const res = await fetch(`${API_BASE}/stats${path}`, {
+      headers: { Authorization: `Bearer ${token()}` },
+      signal,
+    });
+    if (res.status === 429 && attempt < retries) {
+      // Exponential backoff: 500ms, 1000ms, 2000ms
+      await new Promise((resolve, reject) => {
+        const t = setTimeout(resolve, 500 * Math.pow(2, attempt));
+        signal?.addEventListener('abort', () => { clearTimeout(t); reject(new DOMException('Aborted', 'AbortError')); });
+      });
+      continue;
+    }
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  }
 }
 
 // ── Chart type toggle ─────────────────────────────────────────────────────
@@ -297,7 +309,7 @@ function TimeWindowSelector({ weeks, setWeeks, customWeeks, setCustomWeeks }) {
 }
 
 // ── WorkoutCalendar ───────────────────────────────────────────────────────
-function WorkoutCalendar({ onSelectWorkout }) {
+function WorkoutCalendar({ onSelectWorkout, programId }) {
   const [sessions, setSessions] = useState([]);
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date();
@@ -306,15 +318,19 @@ function WorkoutCalendar({ onSelectWorkout }) {
   const [selected, setSelected] = useState(null);
 
   useEffect(() => {
-    apiFetch('/combined?weeks=52')
+    const ctrl = new AbortController();
+    const pidQ = programId ? `&programId=${programId}` : '';
+    apiFetch(`/combined?weeks=52${pidQ}`, 3, ctrl.signal)
       .then(d => setSessions(d.sessions || []))
-      .catch(console.error);
-  }, []);
+      .catch(e => { if (e.name !== 'AbortError') console.error(e); });
+    return () => ctrl.abort();
+  }, [programId]);
 
   const byDate = {};
   sessions.forEach(s => {
-    // Normalize date: bare dates are already YYYY-MM-DD; timestamps extract local date
-    let d = s.date?.slice(0, 10);
+    // Always use the bare date portion to avoid UTC-to-local offset shifting the day.
+    // s.date may be 'YYYY-MM-DD' or a full ISO timestamp — slice to 10 chars either way.
+    const d = s.date?.slice(0, 10);
     if (!d) return;
     if (!byDate[d]) byDate[d] = [];
     byDate[d].push(s);
@@ -429,10 +445,11 @@ function OverviewTab({ onSelectWorkout, programId }) {
   const pidQ = programId ? `&programId=${programId}` : '';
 
   useEffect(() => {
+    const ctrl = new AbortController();
     setLoading(true);
     Promise.all([
-      apiFetch(`/overview?weeks=${weeks}${pidQ}`),
-      apiFetch(`/combined?weeks=${weeks}${pidQ}`),
+      apiFetch(`/overview?weeks=${weeks}${pidQ}`, 3, ctrl.signal),
+      apiFetch(`/combined?weeks=${weeks}${pidQ}`, 3, ctrl.signal),
     ]).then(([overview, combined]) => {
       setData({ ...overview, sessions: combined.sessions || [] });
 
@@ -478,7 +495,8 @@ function OverviewTab({ onSelectWorkout, programId }) {
       const tCounts = {};
       sessions.forEach(s => { tCounts[s.type] = (tCounts[s.type] || 0) + 1; });
       setTypePieData(Object.entries(tCounts).map(([name, value]) => ({ name, value })));
-    }).catch(console.error).finally(() => setLoading(false));
+    }).catch(e => { if (e.name !== 'AbortError') console.error(e); }).finally(() => setLoading(false));
+    return () => ctrl.abort();
   }, [weeks, programId]);
 
   if (loading) return <Loading />;
@@ -582,7 +600,7 @@ function OverviewTab({ onSelectWorkout, programId }) {
 
       {/* Calendar */}
       <Section title="Activity Calendar">
-        <WorkoutCalendar onSelectWorkout={onSelectWorkout} />
+        <WorkoutCalendar onSelectWorkout={onSelectWorkout} programId={programId} />
       </Section>
 
       {/* Time window selector */}
@@ -712,15 +730,17 @@ function StrengthTab({ programId }) {
   const [searchFilter, setSearchFilter] = useState('');
 
   useEffect(() => {
+    const ctrl = new AbortController();
     const qs = [];
     if (muscleFilter) qs.push(`muscleGroup=${encodeURIComponent(muscleFilter)}`);
     if (programId) qs.push(`programId=${programId}`);
     const params = qs.length ? `?${qs.join('&')}` : '';
     setLoading(true);
-    apiFetch(`/strength${params}`)
+    apiFetch(`/strength${params}`, 3, ctrl.signal)
       .then(setData)
-      .catch(console.error)
+      .catch(e => { if (e.name !== 'AbortError') console.error(e); })
       .finally(() => setLoading(false));
+    return () => ctrl.abort();
   }, [muscleFilter, programId]);
 
   const openExercise = useCallback(async (ex) => {
@@ -980,15 +1000,17 @@ function CardioTab({ onSelectWorkout, initialDrillType, onDrillChange, programId
   };
 
   useEffect(() => {
+    const ctrl = new AbortController();
     const qs = [];
     if (cardioType) qs.push(`cardioType=${encodeURIComponent(cardioType)}`);
     if (programId) qs.push(`programId=${programId}`);
     const params = qs.length ? `?${qs.join('&')}` : '';
     setLoading(true);
-    apiFetch(`/cardio${params}`)
+    apiFetch(`/cardio${params}`, 3, ctrl.signal)
       .then(setData)
-      .catch(console.error)
+      .catch(e => { if (e.name !== 'AbortError') console.error(e); })
       .finally(() => setLoading(false));
+    return () => ctrl.abort();
   }, [cardioType, programId]);
 
   const CHART_OPTIONS = [
@@ -1390,16 +1412,23 @@ function RecordsTab({ programId }) {
 
   useEffect(() => {
     if (!selectedExId) return;
+    const ctrl = new AbortController();
     setExLoading(true);
-    apiFetch(`/exercise/${selectedExId}`)
+    apiFetch(`/exercise/${selectedExId}`, 3, ctrl.signal)
       .then(setExData)
-      .catch(console.error)
+      .catch(e => { if (e.name !== 'AbortError') console.error(e); })
       .finally(() => setExLoading(false));
+    return () => ctrl.abort();
   }, [selectedExId]);
 
   useEffect(() => {
+    const ctrl = new AbortController();
     setLoading(true);
-    apiFetch(`/records${programId ? `?programId=${programId}` : ''}`).then(setData).catch(console.error).finally(() => setLoading(false));
+    apiFetch(`/records${programId ? `?programId=${programId}` : ''}`, 3, ctrl.signal)
+      .then(setData)
+      .catch(e => { if (e.name !== 'AbortError') console.error(e); })
+      .finally(() => setLoading(false));
+    return () => ctrl.abort();
   }, [programId]);
 
   if (loading) return <Loading />;
@@ -1574,11 +1603,13 @@ function CombinedTab({ onSelectWorkout, programId }) {
   const [chartType, setChartType] = useState('line');
 
   useEffect(() => {
+    const ctrl = new AbortController();
     setLoading(true);
-    apiFetch(`/combined?weeks=${weeks}${programId ? `&programId=${programId}` : ''}`)
+    apiFetch(`/combined?weeks=${weeks}${programId ? `&programId=${programId}` : ''}`, 3, ctrl.signal)
       .then(setData)
-      .catch(console.error)
+      .catch(e => { if (e.name !== 'AbortError') console.error(e); })
       .finally(() => setLoading(false));
+    return () => ctrl.abort();
   }, [weeks, programId]);
 
   const CHART_OPTIONS = [
@@ -1706,11 +1737,13 @@ function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout, progra
   const [page, setPage] = useState(1);
 
   useEffect(() => {
+    const ctrl = new AbortController();
     setLoading(true);
-    apiFetch(`/combined?weeks=${weeks}${programId ? `&programId=${programId}` : ''}`)
+    apiFetch(`/combined?weeks=${weeks}${programId ? `&programId=${programId}` : ''}`, 3, ctrl.signal)
       .then(setData)
-      .catch(console.error)
+      .catch(e => { if (e.name !== 'AbortError') console.error(e); })
       .finally(() => setLoading(false));
+    return () => ctrl.abort();
   }, [weeks, programId]);
 
   const CHART_OPTIONS = [
@@ -2049,15 +2082,15 @@ function ProgramsTab({ onSelectWorkout, selectedProgramIds, setSelectedProgramId
       ? selectedProgramIds.filter(p => p !== id)
       : [...selectedProgramIds, id];
     setSelectedProgramIds(next);
-    // debounce the actual fetch trigger
+    // Debounce the actual fetch trigger — 600ms prevents 429s on rapid pill clicks
     clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => setActivePids(next), 300);
+    debounceRef.current = setTimeout(() => setActivePids(next), 600);
   };
 
   const clearAll = () => {
     setSelectedProgramIds([]);
     clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => setActivePids([]), 300);
+    debounceRef.current = setTimeout(() => setActivePids([]), 600);
   };
 
   // Derived: what programId to pass to the single rendered sub-tab
@@ -2068,15 +2101,17 @@ function ProgramsTab({ onSelectWorkout, selectedProgramIds, setSelectedProgramId
   const singlePid = activePids.length === 0 ? 'all' : activePids.length === 1 ? activePids[0] : null;
 
   const renderSubTab = (pid) => {
-    // key includes both pid and subTab so switching either triggers a clean remount + fresh fetch
-    const key = `${pid}-${subTab}`;
+    // No key here — sub-tabs receive programId as a prop and re-fetch via their own
+    // useEffect([programId]). Keying on pid would remount immediately on every pill
+    // toggle, firing fetches before the debounce settles and triggering 429s.
+    // Switching subTab still causes a remount because the component type changes.
     switch (subTab) {
-      case 'Overview': return <OverviewTab key={key} onSelectWorkout={onSelectWorkout} programId={pid} />;
-      case 'Strength': return <StrengthTab key={key} programId={pid} />;
-      case 'Cardio':   return <CardioTab   key={key} onSelectWorkout={onSelectWorkout} programId={pid} />;
-      case 'Records':  return <RecordsTab  key={key} programId={pid} />;
-      case 'Combined': return <CombinedTab key={key} onSelectWorkout={onSelectWorkout} programId={pid} />;
-      case 'History':  return <HistoryTab  key={key} onSelectWorkout={onSelectWorkout} programId={pid} />;
+      case 'Overview': return <OverviewTab onSelectWorkout={onSelectWorkout} programId={pid} />;
+      case 'Strength': return <StrengthTab programId={pid} />;
+      case 'Cardio':   return <CardioTab   onSelectWorkout={onSelectWorkout} programId={pid} />;
+      case 'Records':  return <RecordsTab  programId={pid} />;
+      case 'Combined': return <CombinedTab onSelectWorkout={onSelectWorkout} programId={pid} />;
+      case 'History':  return <HistoryTab  onSelectWorkout={onSelectWorkout} programId={pid} />;
       default: return null;
     }
   };
