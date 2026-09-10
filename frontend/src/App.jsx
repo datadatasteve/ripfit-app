@@ -202,6 +202,39 @@ function App() {
         </div>
       )}
 
+      {/* Bottom tab bar — mobile only, rendered via CSS display:none on desktop */}
+      {isLoggedIn && (
+        <nav className="bottom-tab-bar">
+          <button
+            className={`bottom-tab-btn ${currentView === 'workout' ? 'active' : ''}`}
+            onClick={goToWorkouts}
+          >
+            {activeWorkout && (
+              <span className={`bottom-tab-dot ${activeWorkout.workout?.paused_at ? 'paused' : ''}`} />
+            )}
+            <span className="bottom-tab-label">Workouts</span>
+          </button>
+          <button
+            className={`bottom-tab-btn ${currentView === 'exercises' ? 'active' : ''}`}
+            onClick={() => setCurrentView('exercises')}
+          >
+            <span className="bottom-tab-label">Exercises</span>
+          </button>
+          <button
+            className={`bottom-tab-btn ${currentView === 'stats' ? 'active' : ''}`}
+            onClick={() => setCurrentView('stats')}
+          >
+            <span className="bottom-tab-label">Stats</span>
+          </button>
+          <button
+            className={`bottom-tab-btn ${currentView === 'nutrition' ? 'active' : ''}`}
+            onClick={() => setCurrentView('nutrition')}
+          >
+            <span className="bottom-tab-label">Nutrition</span>
+          </button>
+        </nav>
+      )}
+
       <footer className="footer">
         <div className="container">
           <p>© 2026 RipFit</p>

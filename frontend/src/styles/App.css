@@ -199,34 +199,119 @@
 
 /* Responsive Design */
 @media (max-width: 768px) {
+  /* Hide desktop nav links — replaced by bottom tab bar */
   .nav-menu {
     display: none;
   }
-  
+
   .hero-title {
     font-size: var(--font-size-3xl);
   }
-  
+
   .hero-subtitle {
     font-size: var(--font-size-lg);
   }
-  
+
   .hero-actions {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .hero-actions .btn {
     width: 100%;
   }
-  
+
   .feature-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .nav-actions .btn {
     padding: var(--space-xs) var(--space-md);
     font-size: var(--font-size-sm);
+  }
+
+  /* Push main content up so bottom tab bar does not overlap it */
+  .main {
+    padding-bottom: 64px;
+  }
+}
+
+/* == Bottom tab bar (mobile only) ========================================== */
+.bottom-tab-bar {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .bottom-tab-bar {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    background-color: var(--bg-elevated);
+    border-top: 1px solid var(--border-color);
+    z-index: var(--z-fixed);
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+  }
+
+  .bottom-tab-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 6px 4px;
+    font-weight: var(--font-weight-medium);
+    color: var(--text-secondary);
+    transition: color var(--transition-fast);
+    position: relative;
+    gap: 2px;
+  }
+
+  .bottom-tab-btn.active {
+    color: var(--color-primary);
+  }
+
+  .bottom-tab-btn:active {
+    opacity: 0.7;
+  }
+
+  .bottom-tab-label {
+    font-size: 0.68rem;
+    line-height: 1;
+  }
+
+  /* Active indicator bar at top of tab */
+  .bottom-tab-btn.active::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 20%;
+    right: 20%;
+    height: 2px;
+    background-color: var(--color-primary);
+    border-radius: 0 0 2px 2px;
+  }
+
+  /* Active workout dot in Workouts tab */
+  .bottom-tab-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    background-color: #4caf50;
+    border-radius: 50%;
+    position: absolute;
+    top: 6px;
+    right: calc(50% - 18px);
+    animation: pulse-dot 2s infinite;
+  }
+
+  .bottom-tab-dot.paused {
+    background-color: #ff9800;
   }
 }
 
