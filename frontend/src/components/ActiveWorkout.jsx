@@ -3,6 +3,8 @@ import RoutineBuilder from './RoutineBuilder';
 import CardioWorkout from './CardioWorkout';
 import ProgramsHub from './ProgramsHub';
 import WaterWidget from './WaterWidget';
+import WorkoutTimerBar from './WorkoutTimers';
+import MeditationTimer from './MeditationTimer';
 import './ActiveWorkout.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
@@ -455,6 +457,7 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
   const [showRoutineBuilder, setShowRoutineBuilder] = useState(false);
   const [editingRoutine, setEditingRoutine] = useState(null);
   const [showCardio, setShowCardio] = useState(false);
+  const [showMeditation, setShowMeditation] = useState(false);
   const [showFreeLiftModal, setShowFreeLiftModal] = useState(false);
   const [activePrograms, setActivePrograms] = useState([]);
   // Routine sort/filter — persisted in localStorage
@@ -779,6 +782,24 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
         }).catch(e => console.error('Failed to save rating:', e));
       }
 
+      // Progressive overload preference: programs carry their own strategy,
+      // standalone routines fall back to the per-exercise default.
+      let overloadStrategy = null;
+      let overloadIncrement = null;
+      if (activeWorkout.workout.program_id) {
+        try {
+          const progRes = await fetch(`${API_BASE}/programs/${activeWorkout.workout.program_id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const progData = await progRes.json();
+          const prog = progData.program || progData;
+          overloadStrategy = prog?.overload_strategy || 'none';
+          overloadIncrement = prog?.overload_increment ?? null;
+        } catch (err) {
+          console.error('Failed to load program overload prefs:', err);
+        }
+      }
+
       // Build summary data before clearing workout (subtract any paused time)
       const pausedSeconds = activeWorkout.workout.total_paused_seconds || 0;
       const rawMs = Date.now() - new Date(activeWorkout.workout.start_time).getTime();
@@ -793,6 +814,7 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
           .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
           .map(ex => ({
             exercise_name: ex.exercise_name,
+            exercise_id: ex.exercise_id,
             category: ex.category,
             subcategory: ex.subcategory || null,
             order_index: ex.order_index,
@@ -804,7 +826,23 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
             exercise_notes: ex.exercise_notes
           })),
         workout_notes: workoutNotes || '',
-        previous_workout_notes: activeWorkout.previous_overall_notes || null
+        previous_workout_notes: activeWorkout.previous_overall_notes || null,
+        routine_id: activeWorkout.workout.routine_id || null,
+        overload: activeWorkout.workout.routine_id
+          ? computeOverloadSuggestions(
+              activeWorkout.exercises.map(ex => ({
+                exercise_id: ex.exercise_id,
+                exercise_name: ex.exercise_name,
+                category: ex.category,
+                logged_sets: ex.logged_sets || [],
+                target_sets: ex.template?.target_sets,
+                target_reps: ex.template?.target_reps,
+                target_weight: ex.template?.target_weight,
+              })),
+              overloadStrategy,
+              overloadIncrement
+            )
+          : null
       });
       setActiveWorkout(null);
     } catch (err) {
@@ -949,6 +987,14 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
             </div>
           )}
 
+          {workoutSummary.overload?.length > 0 && workoutSummary.routine_id && (
+            <OverloadSuggestionCard
+              routineId={workoutSummary.routine_id}
+              suggestions={workoutSummary.overload}
+              onDone={() => setWorkoutSummary(prev => ({ ...prev, overload: null }))}
+            />
+          )}
+
           <button
             onClick={() => setWorkoutSummary(null)}
             className="finish-btn"
@@ -959,6 +1005,10 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
         </div>
       </div>
     );
+  }
+
+  if (showMeditation && !activeWorkout) {
+    return <MeditationTimer onClose={() => setShowMeditation(false)} />;
   }
 
   if (activeWorkout) {
@@ -1086,6 +1136,9 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
           <button className="workout-type-btn" onClick={() => setHubView('programs')}>
             Programs
           </button>
+          <button className="workout-type-btn" onClick={() => setShowMeditation(true)}>
+            Meditation
+          </button>
         </div>
       </div>
 
@@ -1196,6 +1249,215 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
             fetchRoutines();
           }}
         />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Collapsible read-only view of the notes from the most recent completed
+ * workout that contained this exercise. Fetched lazily on first expand.
+ */
+// ── Progressive overload ───────────────────────────────────────────────────
+
+const DEFAULT_WEIGHT_INCREMENT = 2.5;
+const DEFAULT_REP_INCREMENT = 1;
+
+/**
+ * Compares a finished workout's logged sets against its routine targets.
+ *
+ * Returns null unless every strength exercise that carried targets hit all of
+ * them — the suggestion is a reward for a clean session, not a nudge after a
+ * partial one. Cardio and untargeted ad-hoc exercises are ignored.
+ */
+function computeOverloadSuggestions(exercises, strategy, increment) {
+  if (strategy === 'none') return null;
+
+  const considered = exercises.filter(ex =>
+    ex.category !== 'Cardio' && ex.target_sets && ex.target_reps
+  );
+  if (considered.length === 0) return null;
+
+  const suggestions = [];
+
+  for (const ex of considered) {
+    const sets = ex.logged_sets || [];
+    const targetSets = parseInt(ex.target_sets, 10);
+    const targetReps = parseInt(ex.target_reps, 10);
+    const targetWeight = ex.target_weight != null ? parseFloat(ex.target_weight) : null;
+
+    if (sets.length < targetSets) return null;
+
+    const allHit = sets.every(s =>
+      parseInt(s.reps_completed, 10) >= targetReps &&
+      (targetWeight == null || parseFloat(s.weight_used) >= targetWeight)
+    );
+    if (!allHit) return null;
+
+    // With no explicit strategy, add weight where the exercise is loaded and
+    // reps where it is bodyweight.
+    const mode = strategy || (targetWeight > 0 ? 'weight' : 'reps');
+    const step = increment != null && increment !== ''
+      ? parseFloat(increment)
+      : (mode === 'weight' ? DEFAULT_WEIGHT_INCREMENT : DEFAULT_REP_INCREMENT);
+
+    if (!Number.isFinite(step) || step <= 0) continue;
+
+    suggestions.push({
+      exercise_id: ex.exercise_id,
+      exercise_name: ex.exercise_name,
+      mode,
+      step,
+      target_sets: targetSets,
+      target_reps: targetReps,
+      target_weight: targetWeight,
+      new_reps: mode === 'reps' ? targetReps + step : targetReps,
+      new_weight: mode === 'weight' ? (targetWeight || 0) + step : targetWeight,
+    });
+  }
+
+  return suggestions.length > 0 ? suggestions : null;
+}
+
+/** Overload card on the post-workout summary. Nothing applies without a tap. */
+function OverloadSuggestionCard({ routineId, suggestions, onDone }) {
+  const [state, setState] = useState('');   // '' | 'saving' | 'applied' | 'error'
+
+  const accept = async () => {
+    setState('saving');
+    try {
+      const tok = localStorage.getItem('ripfit_token');
+      const detailRes = await fetch(`${API_BASE}/routines/${routineId}`, {
+        headers: { Authorization: `Bearer ${tok}` },
+      });
+      if (!detailRes.ok) throw new Error('Could not load routine');
+      const detail = await detailRes.json();
+
+      const byExercise = new Map(suggestions.map(s => [s.exercise_id, s]));
+
+      // Full-list replacement, so untouched rows are passed through unchanged.
+      const exercises = (detail.exercises || []).map(ex => {
+        const bump = byExercise.get(ex.exercise_id);
+        return {
+          exercise_id: ex.exercise_id,
+          order_index: ex.order_index,
+          target_sets: ex.target_sets,
+          target_reps: bump ? bump.new_reps : ex.target_reps,
+          target_weight: bump ? bump.new_weight : ex.target_weight,
+          superset_group: ex.superset_group,
+          notes: ex.notes,
+        };
+      });
+
+      const res = await fetch(`${API_BASE}/routines/${routineId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({ exercises }),
+      });
+      if (!res.ok) throw new Error('Update failed');
+
+      setState('applied');
+    } catch (err) {
+      console.error('Failed to apply overload:', err);
+      setState('error');
+    }
+  };
+
+  return (
+    <div className="aw-overload-card">
+      <h4 className="aw-overload-title">🎯 Every target hit</h4>
+      <p className="aw-overload-sub">Bump next session&apos;s targets?</p>
+
+      <ul className="aw-overload-list">
+        {suggestions.map(s => (
+          <li key={s.exercise_id}>
+            <strong>{s.exercise_name}</strong>{' '}
+            {s.mode === 'weight'
+              ? `+${s.step} lbs → ${s.new_weight} lbs`
+              : `+${s.step} rep${s.step === 1 ? '' : 's'} → ${s.new_reps} reps`}
+          </li>
+        ))}
+      </ul>
+
+      {state === 'applied' ? (
+        <p className="aw-overload-applied">✓ Routine targets updated.</p>
+      ) : (
+        <div className="aw-overload-actions">
+          <button className="aw-overload-accept" onClick={accept} disabled={state === 'saving'}>
+            {state === 'saving' ? 'Applying…' : 'Accept'}
+          </button>
+          <button className="aw-overload-dismiss" onClick={onDone}>Dismiss</button>
+        </div>
+      )}
+      {state === 'error' && <p className="aw-overload-error">Could not update the routine. Try again.</p>}
+    </div>
+  );
+}
+function PreviousNotesDropdown({ exerciseId }) {
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // A different exercise invalidates whatever was fetched for the last one.
+  useEffect(() => { setOpen(false); setData(null); setError(''); }, [exerciseId]);
+
+  const toggle = async () => {
+    const next = !open;
+    setOpen(next);
+    if (!next || data || loading || !exerciseId) return;
+
+    setLoading(true);
+    setError('');
+    try {
+      const tok = localStorage.getItem('ripfit_token');
+      const res = await fetch(`${API_BASE}/workouts/previous-notes?exerciseId=${exerciseId}`, {
+        headers: { Authorization: `Bearer ${tok}` },
+      });
+      if (!res.ok) throw new Error('request failed');
+      setData(await res.json());
+    } catch {
+      setError('Could not load last session notes.');
+    }
+    setLoading(false);
+  };
+
+  if (!exerciseId) return null;
+
+  const hasNotes = data && (data.exercise_notes || data.overall_notes);
+
+  return (
+    <div className="aw-prev-notes">
+      <button className="aw-prev-notes-toggle" onClick={toggle} aria-expanded={open}>
+        <span>Last session notes</span>
+        <span className="aw-prev-notes-caret">{open ? '▾' : '▸'}</span>
+      </button>
+
+      {open && (
+        <div className="aw-prev-notes-body">
+          {loading && <p className="aw-prev-notes-empty">Loading…</p>}
+          {!loading && error && <p className="aw-prev-notes-empty">{error}</p>}
+          {!loading && !error && !hasNotes && (
+            <p className="aw-prev-notes-empty">No notes from a previous session.</p>
+          )}
+          {!loading && !error && hasNotes && (
+            <>
+              {data.workout_date && (
+                <p className="aw-prev-notes-date">
+                  {new Date(`${data.workout_date}T00:00:00`).toLocaleDateString()}
+                  {data.workout_title ? ` — ${data.workout_title}` : ''}
+                </p>
+              )}
+              {data.exercise_notes && <pre>{data.exercise_notes}</pre>}
+              {data.overall_notes && (
+                <>
+                  <strong className="aw-prev-notes-label">Session notes</strong>
+                  <pre>{data.overall_notes}</pre>
+                </>
+              )}
+            </>
+          )}
+        </div>
       )}
     </div>
   );
@@ -1862,7 +2124,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
   }
 
   return (
-    <div className="workout-container">
+    <div className="workout-container aw-in-progress">
       <div className="workout-header">
         <h2>{workout.routine_name}</h2>
         <div className="header-buttons">
@@ -1894,11 +2156,25 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
               </div>
             )}
           </div>
-          <button onClick={() => setShowWorkoutNotes(true)} className="workout-notes-btn">
-            Workout Notes {workoutNotes ? '📝' : ''}
+          <button
+            onClick={() => setShowWorkoutNotes(true)}
+            className="workout-notes-btn"
+            title="Workout notes"
+            aria-label="Workout notes"
+          >
+            <span className="aw-icon-glyph">📝</span>
+            <span className="aw-icon-text">Workout Notes</span>
+            {workoutNotes && <span className="aw-icon-badge" />}
           </button>
-          <button onClick={() => setShowAllExercises(true)} className="view-all-btn">View All</button>
-          <button onClick={() => setShowFinishConfirm(true)} className="finish-btn">Finish Workout</button>
+          <button
+            onClick={() => setShowAllExercises(true)}
+            className="view-all-btn"
+            title="View all exercises"
+            aria-label="View all exercises"
+          >
+            <span className="aw-icon-glyph">☰</span>
+            <span className="aw-icon-text">View All</span>
+          </button>
         </div>
       </div>
 
@@ -1971,6 +2247,64 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
             {currentExercise.last_performance.sets_completed.length < (currentExercise.template?.target_sets || 0) && (
               <p className="sets-caution">⚠️ Completed {currentExercise.last_performance.sets_completed.length} of {currentExercise.template.target_sets} target sets</p>
             )}
+          </div>
+        )}
+
+        <PreviousNotesDropdown exerciseId={currentExercise.exercise_id} />
+
+        <WorkoutTimerBar exercise={currentExercise} />
+
+        {isResting && (
+          <div className="rest-timer">
+            <div className="timer-display">{restSeconds}s</div>
+            <button onClick={skipRest} className="skip-rest-btn">Skip Rest</button>
+          </div>
+        )}
+
+        {currentExercise.category === 'Cardio' ? (
+          <CardioSegmentForm
+            exercise={currentExercise}
+            workoutId={workout.workout.id}
+            segments={cardioSegmentsByExercise[currentExercise.id] || []}
+            setSegments={(updater) => setCardioSegmentsByExercise(prev => ({
+              ...prev,
+              [currentExercise.id]: typeof updater === 'function'
+                ? updater(prev[currentExercise.id] || [])
+                : updater,
+            }))}
+          />
+        ) : (
+          <div className={`set-form ${isResting ? 'resting' : ''}`}>
+            <h4>Log Set {loggedSets.length + 1}</h4>
+            <div className="form-row">
+              <input
+                type="number"
+                placeholder="Reps"
+                value={setForm.reps}
+                onChange={(e) => setSetForm({...setForm, reps: e.target.value})}
+              />
+              <input
+                type="number"
+                step="0.1"
+                placeholder="Weight (lbs)"
+                value={setForm.weight}
+                onChange={(e) => setSetForm({...setForm, weight: e.target.value})}
+              />
+              <input
+                type="number"
+                placeholder="RPE"
+                min="1"
+                max="11"
+                value={setForm.rpe}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '' || (parseInt(val) >= 1 && parseInt(val) <= 11)) {
+                    setSetForm({...setForm, rpe: val});
+                  }
+                }}
+              />
+            </div>
+            <button onClick={handleLogSet} className="log-set-btn">Complete Set</button>
           </div>
         )}
 
@@ -2215,60 +2549,6 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
           </div>
         </div>
 
-        {isResting && (
-          <div className="rest-timer">
-            <div className="timer-display">{restSeconds}s</div>
-            <button onClick={skipRest} className="skip-rest-btn">Skip Rest</button>
-          </div>
-        )}
-
-        {currentExercise.category === 'Cardio' ? (
-          <CardioSegmentForm
-            exercise={currentExercise}
-            workoutId={workout.workout.id}
-            segments={cardioSegmentsByExercise[currentExercise.id] || []}
-            setSegments={(updater) => setCardioSegmentsByExercise(prev => ({
-              ...prev,
-              [currentExercise.id]: typeof updater === 'function'
-                ? updater(prev[currentExercise.id] || [])
-                : updater,
-            }))}
-          />
-        ) : (
-          <div className={`set-form ${isResting ? 'resting' : ''}`}>
-            <h4>Log Set {loggedSets.length + 1}</h4>
-            <div className="form-row">
-              <input
-                type="number"
-                placeholder="Reps"
-                value={setForm.reps}
-                onChange={(e) => setSetForm({...setForm, reps: e.target.value})}
-              />
-              <input
-                type="number"
-                step="0.1"
-                placeholder="Weight (lbs)"
-                value={setForm.weight}
-                onChange={(e) => setSetForm({...setForm, weight: e.target.value})}
-              />
-              <input
-                type="number"
-                placeholder="RPE"
-                min="1"
-                max="11"
-                value={setForm.rpe}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === '' || (parseInt(val) >= 1 && parseInt(val) <= 11)) {
-                    setSetForm({...setForm, rpe: val});
-                  }
-                }}
-              />
-            </div>
-            <button onClick={handleLogSet} className="log-set-btn">Complete Set</button>
-          </div>
-        )}
-
         <div className="exercise-nav">
           <button onClick={prevExercise} disabled={currentExerciseIdx === 0}>
             ← Previous
@@ -2285,10 +2565,24 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
           <button onClick={() => setShowAddExercise(true)} className="add-exercise-btn">
             + Add Exercise
           </button>
-          <button onClick={nextExercise} disabled={currentExerciseIdx === exercises.length - 1}>
-            Next →
-          </button>
         </div>
+      </div>
+
+      {/* Primary actions — pinned to the bottom of the viewport on mobile */}
+      <div className="aw-action-bar">
+        <button
+          onClick={() => setShowFinishConfirm(true)}
+          className="finish-btn aw-action-btn"
+        >
+          Finish Workout
+        </button>
+        <button
+          onClick={nextExercise}
+          disabled={currentExerciseIdx === exercises.length - 1}
+          className="aw-action-btn aw-action-next"
+        >
+          Next Exercise →
+        </button>
       </div>
 
       {showAddExercise && (

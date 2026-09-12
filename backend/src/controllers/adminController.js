@@ -318,9 +318,239 @@ async function submitBugReport(req, res) {
   }
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// EXERCISE MANAGER
+// ══════════════════════════════════════════════════════════════════════════
+
+// Whitelisted so a request body can never write to an unexpected column.
+const EXERCISE_FIELDS = [
+  'name', 'description', 'category', 'subcategory', 'equipment_type',
+  'muscles_primary', 'muscles_secondary', 'force', 'level', 'mechanic',
+  'instructions', 'video_url_male', 'video_url_female',
+];
+
+const ARRAY_FIELDS = new Set(['muscles_primary', 'muscles_secondary', 'instructions']);
+
+/** Normalises one incoming field value for its column type. */
+function coerceField(field, value) {
+  if (ARRAY_FIELDS.has(field)) {
+    if (value === null || value === undefined) return null;
+    const arr = Array.isArray(value) ? value : [value];
+    const cleaned = arr.map(v => String(v).trim()).filter(Boolean);
+    return cleaned.length ? cleaned : null;
+  }
+  if (value === undefined || value === null) return null;
+  const str = String(value).trim();
+  return str === '' ? null : str;
+}
+
+// ── GET /admin/exercises?search=&category= ─────────────────────────────────
+async function listExercises(req, res) {
+  if (!(await requireAdmin(req, res))) return;
+
+  const { search, category } = req.query;
+  const limit = Math.min(parseInt(req.query.limit, 10) || 100, 500);
+  const offset = parseInt(req.query.offset, 10) || 0;
+
+  try {
+    const where = [];
+    const params = [];
+
+    if (search) {
+      params.push(`%${search}%`);
+      where.push(`e.name ILIKE $${params.length}`);
+    }
+    if (category) {
+      params.push(category);
+      where.push(`e.category = $${params.length}`);
+    }
+    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+    const countResult = await pool.query(
+      `SELECT COUNT(*)::int AS total FROM exercises e ${whereSql}`,
+      params
+    );
+
+    params.push(limit, offset);
+    const result = await pool.query(
+      `SELECT e.id, e.name, e.description, e.category, e.subcategory, e.equipment_type,
+              e.muscles_primary, e.muscles_secondary, e.force, e.level, e.mechanic,
+              e.instructions, e.video_url_male, e.video_url_female,
+              e.is_custom, e.created_by_user_id,
+              COUNT(re.id)::int AS routine_use_count
+       FROM exercises e
+       LEFT JOIN routine_exercises re ON re.exercise_id = e.id
+       ${whereSql}
+       GROUP BY e.id
+       ORDER BY e.name ASC
+       LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params
+    );
+
+    res.json({ exercises: result.rows, total: countResult.rows[0].total });
+  } catch (err) {
+    console.error('listExercises error:', err);
+    res.status(500).json({ error: 'Failed to list exercises' });
+  }
+}
+
+// ── POST /admin/exercises ──────────────────────────────────────────────────
+async function createExercise(req, res) {
+  if (!(await requireAdmin(req, res))) return;
+
+  const name = (req.body.name || '').trim();
+  if (!name) return res.status(400).json({ error: 'name is required' });
+
+  try {
+    const cols = [];
+    const values = [];
+    EXERCISE_FIELDS.forEach(field => {
+      if (field in req.body) {
+        cols.push(field);
+        values.push(coerceField(field, req.body[field]));
+      }
+    });
+    if (!cols.includes('name')) { cols.push('name'); values.push(name); }
+
+    const placeholders = values.map((_, i) => `$${i + 1}`).join(', ');
+    const result = await pool.query(
+      `INSERT INTO exercises (${cols.join(', ')}) VALUES (${placeholders}) RETURNING *`,
+      values
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error('createExercise error:', err);
+    res.status(500).json({ error: 'Failed to create exercise' });
+  }
+}
+
+// ── PUT /admin/exercises/:id ───────────────────────────────────────────────
+async function updateExercise(req, res) {
+  if (!(await requireAdmin(req, res))) return;
+
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'Invalid exercise id' });
+
+  try {
+    const sets = [];
+    const values = [];
+    EXERCISE_FIELDS.forEach(field => {
+      if (field in req.body) {
+        values.push(coerceField(field, req.body[field]));
+        sets.push(`${field} = $${values.length}`);
+      }
+    });
+
+    if (sets.length === 0) {
+      return res.status(400).json({ error: 'No updatable fields supplied' });
+    }
+
+    values.push(id);
+    const result = await pool.query(
+      `UPDATE exercises SET ${sets.join(', ')} WHERE id = $${values.length} RETURNING *`,
+      values
+    );
+
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Exercise not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('updateExercise error:', err);
+    res.status(500).json({ error: 'Failed to update exercise' });
+  }
+}
+
+// ── DELETE /admin/exercises/:id ────────────────────────────────────────────
+// Refuses on the first call when the exercise is referenced by a routine.
+// The client re-sends with ?force=true once the admin has confirmed.
+async function deleteExercise(req, res) {
+  if (!(await requireAdmin(req, res))) return;
+
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'Invalid exercise id' });
+  const force = req.query.force === 'true';
+
+  try {
+    const refs = await pool.query(
+      `SELECT COUNT(*)::int AS routine_count FROM routine_exercises WHERE exercise_id = $1`,
+      [id]
+    );
+    const routineCount = refs.rows[0].routine_count;
+
+    if (routineCount > 0 && !force) {
+      return res.status(409).json({
+        error: 'Exercise is used in saved routines',
+        routine_count: routineCount,
+        requires_confirmation: true,
+      });
+    }
+
+    const result = await pool.query('DELETE FROM exercises WHERE id = $1 RETURNING id', [id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Exercise not found' });
+
+    res.json({ ok: true, deleted_id: id, routine_references_removed: routineCount });
+  } catch (err) {
+    console.error('deleteExercise error:', err);
+    // Historical workout rows still reference the exercise — surface that
+    // rather than returning an opaque 500.
+    if (err.code === '23503') {
+      return res.status(409).json({
+        error: 'Exercise is referenced by logged workout history and cannot be deleted',
+      });
+    }
+    res.status(500).json({ error: 'Failed to delete exercise' });
+  }
+}
+
+// ── GET /admin/exercise-reports ────────────────────────────────────────────
+async function listExerciseReports(req, res) {
+  if (!(await requireAdmin(req, res))) return;
+
+  const includeResolved = req.query.resolved === 'true';
+
+  try {
+    const result = await pool.query(
+      `SELECT er.id, er.exercise_id, er.user_id, er.report_text, er.created_at, er.resolved,
+              e.name AS exercise_name, e.category,
+              u.email AS reporter_email
+       FROM exercise_reports er
+       LEFT JOIN exercises e ON e.id = er.exercise_id
+       LEFT JOIN users u ON u.id = er.user_id
+       WHERE er.resolved = $1
+       ORDER BY er.created_at DESC`,
+      [includeResolved]
+    );
+    res.json({ reports: result.rows });
+  } catch (err) {
+    console.error('listExerciseReports error:', err);
+    res.status(500).json({ error: 'Failed to list exercise reports' });
+  }
+}
+
+// ── PUT /admin/exercise-reports/:id/resolve ────────────────────────────────
+async function resolveExerciseReport(req, res) {
+  if (!(await requireAdmin(req, res))) return;
+
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'Invalid report id' });
+
+  try {
+    const result = await pool.query(
+      'UPDATE exercise_reports SET resolved = TRUE WHERE id = $1 RETURNING *',
+      [id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Report not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('resolveExerciseReport error:', err);
+    res.status(500).json({ error: 'Failed to resolve report' });
+  }
+}
+
 module.exports = {
   listUsers, getUser, updateUser,
   listBugReports, updateBugReport,
   listErrorLogs, resolveErrorLog,
   logClientError, submitBugReport,
+  listExercises, createExercise, updateExercise, deleteExercise,
+  listExerciseReports, resolveExerciseReport,
 };

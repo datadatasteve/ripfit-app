@@ -224,7 +224,8 @@ const getExerciseById = async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT id, name, description, category, subcategory, equipment_type,
-              muscles_primary, muscles_secondary, force, level, mechanic
+              muscles_primary, muscles_secondary, force, level, mechanic,
+              instructions, video_url_male, video_url_female
        FROM exercises WHERE id = $1`,
       [id]
     );
@@ -951,6 +952,77 @@ const updateWorkoutType = async (req, res) => {
   }
 };
 
+/**
+ * Notes from the most recent completed workout that included this exercise.
+ * GET /api/v1/workouts/previous-notes?exerciseId=123
+ */
+const getPreviousExerciseNotes = async (req, res) => {
+  const user_id = req.user.userId;
+  const exerciseId = parseInt(req.query.exerciseId, 10);
+
+  if (!exerciseId) {
+    return res.status(400).json({ error: 'exerciseId required' });
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT w.id AS workout_id,
+              w.workout_date,
+              w.workout_title,
+              w.overall_notes,
+              we.exercise_notes
+       FROM workout_exercises we
+       JOIN workouts w ON w.id = we.workout_id
+       WHERE w.user_id = $1
+         AND we.exercise_id = $2
+         AND w.status = 'completed'
+       ORDER BY w.workout_date DESC, w.id DESC
+       LIMIT 1`,
+      [user_id, exerciseId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.json({ workout_id: null, exercise_notes: null, overall_notes: null });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Get previous exercise notes error:', error);
+    res.status(500).json({ error: 'Failed to get previous notes' });
+  }
+};
+
+/**
+ * Any logged-in user can flag a problem with an exercise entry.
+ * POST /api/v1/workouts/exercises/:id/report
+ */
+const reportExercise = async (req, res) => {
+  const user_id = req.user.userId;
+  const exerciseId = parseInt(req.params.id, 10);
+  const reportText = (req.body.report_text || '').trim();
+
+  if (!exerciseId) return res.status(400).json({ error: 'Invalid exercise id' });
+  if (!reportText) return res.status(400).json({ error: 'report_text required' });
+
+  try {
+    const exists = await pool.query('SELECT id FROM exercises WHERE id = $1', [exerciseId]);
+    if (exists.rows.length === 0) {
+      return res.status(404).json({ error: 'Exercise not found' });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO exercise_reports (exercise_id, user_id, report_text)
+       VALUES ($1, $2, $3) RETURNING *`,
+      [exerciseId, user_id, reportText]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Report exercise error:', error);
+    res.status(500).json({ error: 'Failed to submit report' });
+  }
+};
+
 module.exports = {
   searchExercises,
   getExerciseById,
@@ -970,4 +1042,6 @@ module.exports = {
   logCardioSegment,
   getCardioSegments,
   updateWorkoutType,
+  getPreviousExerciseNotes,
+  reportExercise,
 };

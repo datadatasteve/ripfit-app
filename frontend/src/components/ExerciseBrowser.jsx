@@ -1,10 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
 import RoutineBuilder from './RoutineBuilder';
+import MuscleDiagram from './MuscleDiagram';
 import './ExerciseBrowser.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 const LIMIT = 50;
-const CATEGORIES = ['All', 'Chest', 'Back', 'Shoulders', 'Arms', 'Legs', 'Abs', 'Cardio', 'General'];
+// Approved category values from exercises.md. Muscle groups keep their original
+// order so the familiar pills stay put; the activity categories follow.
+// 'General' is not an approved value — it is the fallback the older seed scripts
+// wrote, kept last so any rows still carrying it remain reachable.
+const CATEGORIES = [
+  'All',
+  'Chest', 'Back', 'Shoulders', 'Arms', 'Legs', 'Abs', 'Neck',
+  'Cardio', 'Conditioning', 'Stretch', 'Mobility', 'Yoga', 'Pilates',
+  'General',
+];
 
 export default function ExerciseBrowser({ activeWorkout, setActiveWorkout }) {
   const [exercises, setExercises] = useState([]);
@@ -29,6 +39,10 @@ export default function ExerciseBrowser({ activeWorkout, setActiveWorkout }) {
   const [subcategoryFilter, setSubcategoryFilter] = useState('');
   const [equipmentFilter, setEquipmentFilter] = useState('');
   const [armsExpanded, setArmsExpanded] = useState(false);
+
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportText, setReportText] = useState('');
+  const [reportStatus, setReportStatus] = useState(''); // '', 'sending', 'sent', 'error'
 
   const [searchInput, setSearchInput] = useState('');
   const [activeSearch, setActiveSearch] = useState(''); // committed search term
@@ -255,6 +269,8 @@ export default function ExerciseBrowser({ activeWorkout, setActiveWorkout }) {
             exercise_name: selectedExercise.name,
             category: selectedExercise.category,
             equipment_type: selectedExercise.equipment_type,
+            video_url_male: selectedExercise.video_url_male || null,
+            video_url_female: selectedExercise.video_url_female || null,
             is_ad_hoc: true, // flags this for the end-of-workout "save to routine?" prompt
             template: {
               target_sets: newWorkoutExercise.target_sets,
@@ -275,6 +291,37 @@ export default function ExerciseBrowser({ activeWorkout, setActiveWorkout }) {
     } catch (err) {
       console.error('Add to workout failed:', err);
       setAddStatus('error');
+    }
+  };
+
+  // Closing the detail also dismisses the mobile bottom sheet, since the sheet
+  // is just the detail panel repositioned by CSS.
+  const closeDetail = () => {
+    setSelectedExercise(null);
+    setShowAddToWorkout(false);
+    setShowRoutinePicker(false);
+    setPickedRoutineId(null);
+    setReportOpen(false);
+    setReportText('');
+    setReportStatus('');
+  };
+
+  const submitReport = async () => {
+    if (!selectedExercise || !reportText.trim()) return;
+    setReportStatus('sending');
+    try {
+      const res = await fetch(`${API_BASE}/workouts/exercises/${selectedExercise.id}/report`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({ report_text: reportText.trim() }),
+      });
+      if (!res.ok) throw new Error('report failed');
+      setReportStatus('sent');
+      setReportText('');
+      setTimeout(() => { setReportOpen(false); setReportStatus(''); }, 1500);
+    } catch (err) {
+      console.error('Failed to submit exercise report:', err);
+      setReportStatus('error');
     }
   };
 
@@ -389,8 +436,12 @@ export default function ExerciseBrowser({ activeWorkout, setActiveWorkout }) {
         </div>
       </div>
 
-      {/* ---- RIGHT DETAIL PANEL ---- */}
-      <div className="browser-detail">
+      {/* ---- RIGHT DETAIL PANEL (bottom sheet on mobile) ---- */}
+      {selectedExercise && (
+        <div className="browser-sheet-overlay" onClick={closeDetail} />
+      )}
+
+      <div className={`browser-detail ${selectedExercise ? 'sheet-open' : ''}`}>
         {detailLoading && <p className="browser-status">Loading...</p>}
 
         {!selectedExercise && !detailLoading && (
@@ -399,7 +450,11 @@ export default function ExerciseBrowser({ activeWorkout, setActiveWorkout }) {
 
         {selectedExercise && !detailLoading && (
           <div className="detail-card">
-            <h2 className="detail-title">{selectedExercise.name}</h2>
+            <div className="browser-sheet-handle" onClick={closeDetail} />
+            <div className="detail-card-head">
+              <h2 className="detail-title">{selectedExercise.name}</h2>
+              <button className="browser-sheet-close" onClick={closeDetail} aria-label="Close">×</button>
+            </div>
 
             <div className="detail-tags">
               <span className="detail-tag">{selectedExercise.category}</span>
@@ -576,13 +631,72 @@ export default function ExerciseBrowser({ activeWorkout, setActiveWorkout }) {
               </div>
             )}
 
-            <div className="detail-section detail-coming-soon">
-              <h4>Coming Soon</h4>
-              <ul>
-                <li>🎥 Video demonstration</li>
-                <li>💪 Muscles worked diagram</li>
-                <li>📊 Your stats for this exercise (times logged, routines used in)</li>
-              </ul>
+            {selectedExercise.instructions?.length > 0 && (
+              <div className="detail-section">
+                <h4>Instructions</h4>
+                <ol className="detail-instructions">
+                  {selectedExercise.instructions.map((step, i) => <li key={i}>{step}</li>)}
+                </ol>
+              </div>
+            )}
+
+            <div className="detail-section">
+              <h4>Muscles Worked</h4>
+              <MuscleDiagram
+                primary={selectedExercise.muscles_primary}
+                secondary={selectedExercise.muscles_secondary}
+                exerciseName={selectedExercise.name}
+              />
+            </div>
+
+            {(selectedExercise.video_url_male || selectedExercise.video_url_female) && (
+              <div className="detail-section">
+                <h4>Demonstration</h4>
+                <video
+                  className="detail-video"
+                  src={selectedExercise.video_url_male || selectedExercise.video_url_female}
+                  controls
+                  playsInline
+                  preload="metadata"
+                />
+              </div>
+            )}
+
+            <div className="detail-section detail-report">
+              {!reportOpen ? (
+                <button className="detail-report-btn" onClick={() => setReportOpen(true)}>
+                  ⚑ Report an issue with this exercise
+                </button>
+              ) : (
+                <>
+                  <h4>Report an issue</h4>
+                  <textarea
+                    className="detail-report-input"
+                    rows="3"
+                    placeholder="Wrong muscles, bad description, duplicate entry..."
+                    value={reportText}
+                    onChange={e => setReportText(e.target.value)}
+                  />
+                  <div className="add-to-workout-actions">
+                    <button
+                      className="add-to-workout-confirm"
+                      onClick={submitReport}
+                      disabled={!reportText.trim() || reportStatus === 'sending'}
+                    >
+                      {reportStatus === 'sending' ? 'Sending...' : reportStatus === 'sent' ? '✓ Sent' : 'Submit'}
+                    </button>
+                    <button
+                      className="add-to-workout-cancel"
+                      onClick={() => { setReportOpen(false); setReportText(''); setReportStatus(''); }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  {reportStatus === 'error' && (
+                    <p className="add-to-workout-error">Could not submit — try again.</p>
+                  )}
+                </>
+              )}
             </div>
           </div>
         )}

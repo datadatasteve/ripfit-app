@@ -10,7 +10,7 @@
 }
 
 .cardio-card {
-  background: var(--bg-secondary, #1e1e1e);
+  background: var(--bg-secondary);
   border-radius: 12px;
   padding: 24px;
   width: 100%;
@@ -38,7 +38,7 @@
   border: none;
   font-size: 1.1rem;
   cursor: pointer;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
 }
 
 .cardio-timer {
@@ -51,7 +51,7 @@
 .cardio-subtitle {
   margin: 0;
   font-size: 0.85rem;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
 }
 
 .cardio-type-grid {
@@ -62,10 +62,10 @@
 
 .cardio-type-btn {
   padding: 10px 12px;
-  border: 1px solid var(--border-color, #333);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
-  background: var(--bg-primary, #141414);
-  color: var(--text-primary, #eee);
+  background: var(--bg-primary);
+  color: var(--text-primary);
   cursor: pointer;
   font-size: 0.9rem;
   text-align: left;
@@ -86,7 +86,7 @@
 
 .cardio-form label {
   font-size: 0.8rem;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
   margin-bottom: 2px;
 }
 
@@ -94,10 +94,10 @@
 .cardio-form select,
 .cardio-form textarea {
   padding: 8px 10px;
-  border: 1px solid var(--border-color, #333);
+  border: 1px solid var(--border-color);
   border-radius: 6px;
-  background: var(--bg-primary, #141414);
-  color: var(--text-primary, #eee);
+  background: var(--bg-primary);
+  color: var(--text-primary);
   font-size: 0.9rem;
   width: 100%;
   box-sizing: border-box;
@@ -117,7 +117,7 @@
 .cardio-row select { width: 70px; flex-shrink: 0; }
 
 .cardio-hr-zones {
-  border: 1px solid var(--border-color, #333);
+  border: 1px solid var(--border-color);
   border-radius: 6px;
   padding: 8px;
 }
@@ -125,7 +125,7 @@
 .cardio-hr-zones summary {
   cursor: pointer;
   font-size: 0.85rem;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
 }
 
 .cardio-zones-grid {
@@ -165,9 +165,9 @@
 .cardio-secondary-btn {
   padding: 10px 16px;
   background: none;
-  border: 1px solid var(--border-color, #444);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
-  color: var(--text-primary, #eee);
+  color: var(--text-primary);
   cursor: pointer;
   font-size: 0.9rem;
 }

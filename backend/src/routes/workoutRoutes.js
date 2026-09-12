@@ -15,6 +15,12 @@ router.get('/history/:id', authenticate, workoutController.getWorkoutDetail);
 // Open session / Quick Cardio start — must come before /:workoutId routes
 router.post('/start-free', authenticate, workoutController.startFreeLift);
 
+// Last session's notes for one exercise — must come before /:workoutId routes
+router.get('/previous-notes', authenticate, workoutController.getPreviousExerciseNotes);
+
+// User-submitted exercise issue report
+router.post('/exercises/:id/report', authenticate, workoutController.reportExercise);
+
 // Workout logging
 router.post('/', authenticate, workoutController.logWorkout);
 router.get('/', authenticate, workoutController.getWorkouts);

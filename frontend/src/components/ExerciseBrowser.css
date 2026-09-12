@@ -6,8 +6,8 @@
   display: flex;
   height: calc(100vh - 80px);
   overflow: hidden;
-  background: var(--bg-primary, #fff);
-  color: var(--text-primary, #111);
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 /* ---- SIDEBAR ---- */
@@ -16,7 +16,7 @@
   min-width: 260px;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--border-color, #ddd);
+  border-right: 1px solid var(--border-color);
   overflow: hidden;
 }
 
@@ -24,16 +24,16 @@
   display: flex;
   gap: 6px;
   padding: 12px;
-  border-bottom: 1px solid var(--border-color, #ddd);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .browser-search-bar input {
   flex: 1;
   padding: 7px 10px;
   border-radius: 4px;
-  border: 1px solid var(--border-color, #ccc);
-  background: var(--input-bg, #f5f5f5);
-  color: #000;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
   font-size: 0.9em;
 }
 
@@ -51,7 +51,7 @@
   padding: 7px 10px;
   border-radius: 4px;
   border: none;
-  background: var(--btn-secondary-bg, #999);
+  background: var(--bg-tertiary);
   color: #fff;
   cursor: pointer;
   font-size: 0.85em;
@@ -60,10 +60,14 @@
 /* ---- CATEGORY FILTERS ---- */
 .browser-category-filters {
   padding: 10px 12px;
-  border-bottom: 1px solid var(--border-color, #ddd);
+  border-bottom: 1px solid var(--border-color);
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  /* The full category list wraps to several rows in the 340px sidebar — cap it
+     so the exercise list below keeps its share of the column. */
+  max-height: 26vh;
+  overflow-y: auto;
 }
 
 .cat-pill-wrapper {
@@ -73,9 +77,9 @@
 .cat-pill {
   padding: 4px 12px;
   border-radius: 14px;
-  border: 1px solid var(--border-color, #bbb);
+  border: 1px solid var(--border-color);
   background: transparent;
-  color: var(--text-primary, #111);
+  color: var(--text-primary);
   font-size: 0.8em;
   cursor: pointer;
   transition: all 0.15s;
@@ -117,8 +121,8 @@
 .browser-list-header {
   padding: 8px 12px;
   font-size: 0.78em;
-  color: var(--text-muted, #777);
-  border-bottom: 1px solid var(--border-color, #eee);
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .browser-exercise-list {
@@ -128,23 +132,23 @@
 
 .browser-exercise-row {
   padding: 10px 14px;
-  border-bottom: 1px solid var(--border-color, #eee);
+  border-bottom: 1px solid var(--border-color);
   cursor: pointer;
   transition: background 0.1s;
 }
 
 .browser-exercise-row:hover {
-  background: var(--row-hover, #f5f5f5);
+  background: var(--bg-secondary);
 }
 
 .browser-exercise-row.selected {
-  background: var(--row-selected, #e8f5e9);
+  background: var(--row-selected, hsla(142, 71%, 45%, 0.12));
   border-left: 3px solid #4caf50;
 }
 
 .browser-exercise-name {
   font-size: 0.9em;
-  color: var(--text-primary, #111);
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -157,14 +161,14 @@
 
 .browser-exercise-meta {
   font-size: 0.75em;
-  color: var(--text-muted, #777);
+  color: var(--text-secondary);
   margin-top: 2px;
 }
 
 .browser-status {
   padding: 20px;
   text-align: center;
-  color: var(--text-muted, #888);
+  color: var(--text-secondary);
 }
 
 .load-more-btn {
@@ -172,14 +176,14 @@
   padding: 12px;
   background: transparent;
   border: none;
-  border-top: 1px solid var(--border-color, #eee);
+  border-top: 1px solid var(--border-color);
   color: #4caf50;
   cursor: pointer;
   font-size: 0.85em;
 }
 
 .load-more-btn:hover { text-decoration: underline; }
-.load-more-btn:disabled { color: var(--text-muted, #aaa); cursor: default; }
+.load-more-btn:disabled { color: var(--text-tertiary); cursor: default; }
 
 /* ---- DETAIL PANEL ---- */
 .browser-detail {
@@ -193,14 +197,14 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: var(--text-muted, #aaa);
+  color: var(--text-tertiary);
   font-size: 0.95em;
 }
 
 .detail-title {
   margin: 0 0 12px 0;
   font-size: 1.5em;
-  color: var(--text-primary, #111);
+  color: var(--text-primary);
 }
 
 .detail-tags {
@@ -213,10 +217,10 @@
 .detail-tag {
   padding: 3px 12px;
   border-radius: 12px;
-  background: var(--tag-bg, #f0f0f0);
-  border: 1px solid var(--border-color, #ccc);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   font-size: 0.8em;
-  color: var(--text-primary, #111);
+  color: var(--text-primary);
 }
 
 .detail-tag-sub {
@@ -226,7 +230,7 @@
 }
 
 .detail-routine-notice {
-  background: #e8f5e9;
+  background: hsla(142, 71%, 45%, 0.12);
   border: 1px solid #4caf50;
   border-radius: 6px;
   padding: 8px 14px;
@@ -241,21 +245,21 @@
 
 .detail-section h4 {
   margin: 0 0 8px 0;
-  color: var(--text-muted, #888);
+  color: var(--text-secondary);
   font-size: 0.8em;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 
 .detail-section p {
-  color: var(--text-primary, #111);
+  color: var(--text-primary);
   font-size: 0.9em;
   line-height: 1.6;
   margin: 0;
 }
 
 .detail-missing {
-  color: var(--text-muted, #aaa) !important;
+  color: var(--text-tertiary) !important;
   font-style: italic;
 }
 
@@ -274,7 +278,7 @@
 
 .detail-coming-soon li {
   font-size: 0.88em;
-  color: var(--text-muted, #888);
+  color: var(--text-secondary);
 }
 
 /* ---- SEARCH INPUT WRAPPER (inline X button) ---- */
@@ -287,9 +291,9 @@
   width: 100%;
   padding: 7px 28px 7px 10px;
   border-radius: 4px;
-  border: 1px solid var(--border-color, #ccc);
-  background: var(--input-bg, #f5f5f5);
-  color: #000;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
   font-size: 0.9em;
   box-sizing: border-box;
 }
@@ -301,14 +305,14 @@
   transform: translateY(-50%);
   background: none;
   border: none;
-  color: #999;
+  color: var(--text-tertiary);
   cursor: pointer;
   font-size: 0.8em;
   padding: 0;
   line-height: 1;
 }
 
-.search-clear-x:hover { color: #333; }
+.search-clear-x:hover { color: var(--text-primary); }
 
 /* ---- MUSCLE TAGS ---- */
 .muscle-row {
@@ -320,7 +324,7 @@
 
 .muscle-label {
   font-size: 0.78em;
-  color: var(--text-muted, #888);
+  color: var(--text-secondary);
   min-width: 64px;
   padding-top: 3px;
 }
@@ -339,15 +343,15 @@
 }
 
 .muscle-tag.primary {
-  background: #e8f5e9;
+  background: hsla(142, 71%, 45%, 0.12);
   border: 1px solid #4caf50;
   color: #2e7d32;
 }
 
 .muscle-tag.secondary {
-  background: var(--tag-bg, #f0f0f0);
-  border: 1px solid var(--border-color, #ccc);
-  color: var(--text-muted, #666);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
 }
 
 /* ---- DETAIL META ROW (level/mechanic/force) ---- */
@@ -359,10 +363,212 @@
 
 .detail-meta-item {
   font-size: 0.85em;
-  color: var(--text-muted, #777);
+  color: var(--text-secondary);
   text-transform: capitalize;
 }
 
 .detail-meta-item strong {
-  color: var(--text-primary, #111);
+  color: var(--text-primary);
+}
+/* ============================================================
+   NEW DETAIL SECTIONS
+   ============================================================ */
+.detail-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.detail-instructions {
+  margin: 0;
+  padding-left: 1.2em;
+  color: var(--text-primary);
+  font-size: 0.9em;
+  line-height: var(--line-height-relaxed);
+}
+
+.detail-instructions li {
+  margin-bottom: var(--space-xs);
+}
+
+.detail-video {
+  width: 100%;
+  max-height: 340px;
+  border-radius: var(--radius-md);
+  background: #000;   /* letterbox stays black in both themes */
+}
+
+.detail-report-btn {
+  min-height: 44px;
+  padding: 0 var(--space-md);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.detail-report-input {
+  width: 100%;
+  margin-bottom: var(--space-sm);
+  padding: var(--space-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+}
+
+/* Sheet chrome — hidden until the mobile breakpoint */
+.browser-sheet-overlay,
+.browser-sheet-handle,
+.browser-sheet-close {
+  display: none;
+}
+
+/* ============================================================
+   MOBILE — search row stays compact, detail becomes a bottom sheet
+   ============================================================ */
+@media (max-width: 768px) {
+  .browser-layout {
+    flex-direction: column;
+    height: auto;
+    min-height: calc(100vh - 80px);
+    overflow: visible;
+  }
+
+  .browser-sidebar {
+    width: 100%;
+    min-width: 0;
+    border-right: none;
+    overflow: visible;
+  }
+
+  /* Single compact search row */
+  .browser-search-bar {
+    padding: var(--space-sm);
+    gap: var(--space-xs);
+  }
+
+  .browser-search-bar input {
+    min-height: 44px;
+    font-size: 16px;   /* prevents iOS focus zoom */
+  }
+
+  .search-btn {
+    min-height: 44px;
+    padding: 0 var(--space-md);
+    flex: 0 0 auto;
+  }
+
+  /* Filter pills scroll sideways rather than stacking into a wall */
+  .browser-category-filters {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: visible;
+    max-height: none;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: var(--space-sm);
+    gap: var(--space-xs);
+  }
+
+  .browser-category-filters::-webkit-scrollbar {
+    display: none;
+  }
+
+  .cat-pill-wrapper {
+    flex: 0 0 auto;
+  }
+
+  .cat-pill {
+    min-height: 36px;
+    white-space: nowrap;
+  }
+
+  .browser-exercise-list {
+    overflow-y: visible;
+  }
+
+  .browser-exercise-row {
+    min-height: 56px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  /* ---- Bottom sheet ---- */
+  .browser-sheet-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: var(--z-modal-backdrop);
+  }
+
+  .browser-detail {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: var(--z-modal);
+    max-height: 85vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 var(--space-md) calc(var(--space-lg) + env(safe-area-inset-bottom, 0px));
+    background-color: var(--bg-elevated);
+    border-top: 1px solid var(--border-color);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    box-shadow: var(--shadow-xl);
+    transform: translateY(100%);
+    transition: transform var(--transition-base);
+  }
+
+  .browser-detail.sheet-open {
+    transform: translateY(0);
+  }
+
+  /* With nothing selected the panel is off-screen — don't reserve space for it */
+  .browser-detail:not(.sheet-open) {
+    pointer-events: none;
+  }
+
+  .detail-empty {
+    display: none;
+  }
+
+  .browser-sheet-handle {
+    display: block;
+    width: 40px;
+    height: 4px;
+    margin: var(--space-sm) auto;
+    border-radius: var(--radius-full);
+    background-color: var(--border-color);
+    cursor: pointer;
+  }
+
+  .browser-sheet-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 auto;
+    background: none;
+    border: none;
+    font-size: 1.75rem;
+    line-height: 1;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+
+  /* Add buttons live in the sheet and are full-width primary actions */
+  .add-to-workout-btn,
+  .add-to-routine-btn {
+    min-height: 48px;
+  }
 }

@@ -8,7 +8,8 @@ function userId(req) { return req.user.userId; }
 // ── Programs CRUD ─────────────────────────────────────────────────────────────
 
 const createProgram = async (req, res) => {
-  const { name, description, synopsis, duration_weeks, start_date, schedule_shift_pref, days } = req.body;
+  const { name, description, synopsis, duration_weeks, start_date, schedule_shift_pref, days,
+          overload_strategy, overload_increment } = req.body;
   const uid = userId(req);
   if (!name) return res.status(400).json({ error: 'name required' });
 
@@ -17,10 +18,13 @@ const createProgram = async (req, res) => {
     await client.query('BEGIN');
 
     const prog = await client.query(
-      `INSERT INTO programs (user_id, name, description, synopsis, duration_weeks, start_date, status, schedule_shift_pref)
-       VALUES ($1,$2,$3,$4,$5,$6,'draft',$7) RETURNING *`,
+      `INSERT INTO programs (user_id, name, description, synopsis, duration_weeks, start_date, status,
+                             schedule_shift_pref, overload_strategy, overload_increment)
+       VALUES ($1,$2,$3,$4,$5,$6,'draft',$7,$8,$9) RETURNING *`,
       [uid, name, description || null, synopsis || null, duration_weeks || null,
-       start_date || null, schedule_shift_pref || 'none']
+       start_date || null, schedule_shift_pref || 'none',
+       overload_strategy || 'none',
+       overload_increment != null && overload_increment !== '' ? overload_increment : null]
     );
 
     const program = prog.rows[0];
@@ -131,7 +135,8 @@ const getProgramById = async (req, res) => {
 const updateProgram = async (req, res) => {
   const uid = userId(req);
   const { id } = req.params;
-  const { name, description, synopsis, duration_weeks, start_date, status, schedule_shift_pref, days } = req.body;
+  const { name, description, synopsis, duration_weeks, start_date, status, schedule_shift_pref, days,
+          overload_strategy, overload_increment } = req.body;
 
   const client = await pool.connect();
   try {
@@ -146,9 +151,14 @@ const updateProgram = async (req, res) => {
         start_date = COALESCE($5, start_date),
         status = COALESCE($6, status),
         schedule_shift_pref = COALESCE($7, schedule_shift_pref),
+        overload_strategy = COALESCE($8, overload_strategy),
+        overload_increment = COALESCE($9, overload_increment),
         updated_at = NOW()
-       WHERE id = $8 AND user_id = $9 RETURNING *`,
-      [name, description, synopsis, duration_weeks, start_date, status, schedule_shift_pref, id, uid]
+       WHERE id = $10 AND user_id = $11 RETURNING *`,
+      [name, description, synopsis, duration_weeks, start_date, status, schedule_shift_pref,
+       overload_strategy || null,
+       overload_increment != null && overload_increment !== '' ? overload_increment : null,
+       id, uid]
     );
 
     if (result.rows.length === 0) {
@@ -246,8 +256,9 @@ const startProgramWorkout = async (req, res) => {
     // Use existing routine start logic — get template exercises
     const templateResult = await client.query(
       `SELECT re.exercise_id, re.order_index, re.target_sets, re.target_reps,
-              re.target_weight, re.superset_group, re.notes,
-              e.name AS exercise_name, e.category, e.equipment_type
+              re.target_weight, re.superset_group, re.notes, re.cooldown_seconds,
+              e.name AS exercise_name, e.category, e.equipment_type,
+              e.video_url_male, e.video_url_female
        FROM routine_exercises re
        JOIN exercises e ON re.exercise_id = e.id
        WHERE re.routine_id = $1 ORDER BY re.order_index`,
@@ -301,7 +312,10 @@ const startProgramWorkout = async (req, res) => {
         exercise_name: ex.exercise_name,
         category: ex.category,
         equipment_type: ex.equipment_type,
-        template: { target_sets: ex.target_sets, target_reps: ex.target_reps, target_weight: ex.target_weight },
+        video_url_male: ex.video_url_male,
+        video_url_female: ex.video_url_female,
+        template: { target_sets: ex.target_sets, target_reps: ex.target_reps,
+                    target_weight: ex.target_weight, cooldown_seconds: ex.cooldown_seconds },
         last_performance: lastPerf || null,
       });
     }

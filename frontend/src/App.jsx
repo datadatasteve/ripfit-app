@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import ProfileMenu from './components/ProfileMenu'
 import ActiveWorkout from './components/ActiveWorkout'
 import ExerciseBrowser from './components/ExerciseBrowser'
@@ -11,6 +11,23 @@ import NutritionPage from './components/NutritionPage'
 import Login from './components/Login'
 import './styles/App.css'
 
+// Shared elapsed-seconds math for the active workout (excludes paused time).
+function getElapsedSeconds(workout) {
+  if (!workout?.start_time) return 0;
+  const pausedSeconds = workout.total_paused_seconds || 0;
+  const currentPauseSeconds = workout.paused_at
+    ? Math.floor((Date.now() - new Date(workout.paused_at).getTime()) / 1000)
+    : 0;
+  const elapsedMs = Date.now() - new Date(workout.start_time).getTime();
+  return Math.max(0, Math.floor(elapsedMs / 1000) - pausedSeconds - currentPauseSeconds);
+}
+
+function formatClock(totalSeconds) {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 function NavElapsedClock({ workout }) {
   const [, setTick] = useState(0);
 
@@ -21,26 +38,111 @@ function NavElapsedClock({ workout }) {
 
   if (!workout?.start_time) return null;
 
-  const pausedSeconds = workout.total_paused_seconds || 0;
-  const currentPauseSeconds = workout.paused_at
-    ? Math.floor((Date.now() - new Date(workout.paused_at).getTime()) / 1000)
-    : 0;
-  const elapsedMs = Date.now() - new Date(workout.start_time).getTime();
-  const elapsedSeconds = Math.max(0, Math.floor(elapsedMs / 1000) - pausedSeconds - currentPauseSeconds);
-
-  const m = Math.floor(elapsedSeconds / 60);
-  const s = elapsedSeconds % 60;
-
   const isPaused = !!workout.paused_at;
 
   if (isPaused) {
     const pauseSeconds = Math.floor((Date.now() - new Date(workout.paused_at).getTime()) / 1000);
-    const pm = Math.floor(pauseSeconds / 60);
-    const ps = pauseSeconds % 60;
-    return <span className="nav-elapsed-clock paused">{pm}:{String(ps).padStart(2, '0')}</span>;
+    return <span className="nav-elapsed-clock paused">{formatClock(pauseSeconds)}</span>;
   }
 
-  return <span className="nav-elapsed-clock">{m}:{String(s).padStart(2, '0')}</span>;
+  return <span className="nav-elapsed-clock">{formatClock(getElapsedSeconds(workout))}</span>;
+}
+
+/**
+ * Mobile header indicator for an in-progress workout.
+ * On the workout view: a green pulse dot. Anywhere else: a live elapsed timer
+ * (amber while paused) that taps back into the workout.
+ */
+function HeaderWorkoutIndicator({ workout, isOnWorkoutView, onReturn }) {
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    if (isOnWorkoutView) return undefined;
+    const id = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [isOnWorkoutView]);
+
+  if (!workout?.start_time) return null;
+
+  if (isOnWorkoutView) {
+    return <span className="header-workout-pulse" title="Workout in progress" aria-label="Workout in progress" />;
+  }
+
+  const isPaused = !!workout.paused_at;
+  const seconds = isPaused
+    ? Math.floor((Date.now() - new Date(workout.paused_at).getTime()) / 1000)
+    : getElapsedSeconds(workout);
+
+  return (
+    <button
+      type="button"
+      className={`header-workout-timer ${isPaused ? 'paused' : ''}`}
+      onClick={onReturn}
+      aria-label="Return to active workout"
+    >
+      {formatClock(seconds)}
+    </button>
+  );
+}
+
+/** Slide-in drawer nav for mobile viewports. */
+function MobileNavDrawer({ open, onClose, currentView, hasActiveWorkout, onNavigate, onReturnToWorkout }) {
+  const panelRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKeyDown = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [open, onClose]);
+
+  const items = [
+    { key: 'workout', label: 'Workouts' },
+    { key: 'exercises', label: 'Exercises' },
+    { key: 'stats', label: 'Stats' },
+    { key: 'nutrition', label: 'Nutrition' },
+  ];
+
+  return (
+    <div className={`mobile-drawer-root ${open ? 'open' : ''}`} aria-hidden={!open}>
+      <div className="mobile-drawer-overlay" onClick={onClose} />
+      <aside className="mobile-drawer-panel" ref={panelRef} role="dialog" aria-modal="true" aria-label="Navigation">
+        <div className="mobile-drawer-header">
+          <span className="mobile-drawer-title">RipFit</span>
+          <button type="button" className="mobile-drawer-close" onClick={onClose} aria-label="Close menu">×</button>
+        </div>
+
+        <nav className="mobile-drawer-nav">
+          {hasActiveWorkout && (
+            <button
+              type="button"
+              className="mobile-drawer-link return-to-workout"
+              onClick={onReturnToWorkout}
+            >
+              <span className="mobile-drawer-dot" />
+              Return to Active Workout
+            </button>
+          )}
+
+          {items.map(item => (
+            <button
+              key={item.key}
+              type="button"
+              className={`mobile-drawer-link ${currentView === item.key ? 'active' : ''}`}
+              onClick={() => onNavigate(item.key)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
+      </aside>
+    </div>
+  );
 }
 
 function App() {
@@ -57,6 +159,7 @@ function App() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [programStatsId, setProgramStatsId] = useState(null);
   const [viewingWorkout, setViewingWorkout] = useState(null); // { id, type }
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Handle ?verified=true redirect from email verification link
   useEffect(() => {
@@ -91,6 +194,7 @@ function App() {
     setIsAdmin(false);
     setActiveWorkout(null);
     setWorkoutSummary(null);
+    setDrawerOpen(false);
   };
 
   const goToWorkouts = () => {
@@ -100,14 +204,53 @@ function App() {
     setCurrentView('workout');
   };
 
+  // Jump straight back into the in-progress workout. ActiveWorkout short-circuits
+  // to WorkoutInProgress whenever activeWorkout is set, so hubView is left alone.
+  const returnToActiveWorkout = () => {
+    setViewingWorkout(null);
+    setCurrentView('workout');
+    setDrawerOpen(false);
+  };
+
+  const handleDrawerNavigate = (view) => {
+    if (view === 'workout') {
+      goToWorkouts();
+    } else {
+      setCurrentView(view);
+    }
+    setViewingWorkout(null);
+    setDrawerOpen(false);
+  };
+
+  const onWorkoutView = currentView === 'workout' && !viewingWorkout;
+
   return (
     <div className="app">
       <header className="header">
         <div className="container">
           <nav className="nav">
+            {isLoggedIn && (
+              <button
+                type="button"
+                className="nav-hamburger"
+                onClick={() => setDrawerOpen(true)}
+                aria-label="Open menu"
+                aria-expanded={drawerOpen}
+              >
+                <span className="nav-hamburger-bars" />
+              </button>
+            )}
+
             <div className="nav-brand">
               {/* RipFit click → home (no-op until home page is built) */}
               <h1 style={{ cursor: 'pointer' }} onClick={() => setCurrentView('home')}>RipFit</h1>
+              {isLoggedIn && activeWorkout && (
+                <HeaderWorkoutIndicator
+                  workout={activeWorkout.workout}
+                  isOnWorkoutView={onWorkoutView}
+                  onReturn={returnToActiveWorkout}
+                />
+              )}
             </div>
 
             <ul className="nav-menu">
@@ -137,6 +280,17 @@ function App() {
           </nav>
         </div>
       </header>
+
+      {isLoggedIn && (
+        <MobileNavDrawer
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          currentView={currentView}
+          hasActiveWorkout={!!activeWorkout}
+          onNavigate={handleDrawerNavigate}
+          onReturnToWorkout={returnToActiveWorkout}
+        />
+      )}
 
       <main className="main">
         <ErrorBoundary>
@@ -200,39 +354,6 @@ function App() {
         <div className="verified-toast">
           Email verified — you can now log in.
         </div>
-      )}
-
-      {/* Bottom tab bar — mobile only, rendered via CSS display:none on desktop */}
-      {isLoggedIn && (
-        <nav className="bottom-tab-bar">
-          <button
-            className={`bottom-tab-btn ${currentView === 'workout' ? 'active' : ''}`}
-            onClick={goToWorkouts}
-          >
-            {activeWorkout && (
-              <span className={`bottom-tab-dot ${activeWorkout.workout?.paused_at ? 'paused' : ''}`} />
-            )}
-            <span className="bottom-tab-label">Workouts</span>
-          </button>
-          <button
-            className={`bottom-tab-btn ${currentView === 'exercises' ? 'active' : ''}`}
-            onClick={() => setCurrentView('exercises')}
-          >
-            <span className="bottom-tab-label">Exercises</span>
-          </button>
-          <button
-            className={`bottom-tab-btn ${currentView === 'stats' ? 'active' : ''}`}
-            onClick={() => setCurrentView('stats')}
-          >
-            <span className="bottom-tab-label">Stats</span>
-          </button>
-          <button
-            className={`bottom-tab-btn ${currentView === 'nutrition' ? 'active' : ''}`}
-            onClick={() => setCurrentView('nutrition')}
-          >
-            <span className="bottom-tab-label">Nutrition</span>
-          </button>
-        </nav>
       )}
 
       <footer className="footer">

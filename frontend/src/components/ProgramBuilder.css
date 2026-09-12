@@ -230,3 +230,34 @@
   font-size: 0.95rem;
   cursor: pointer;
 }
+
+/* ── Progressive overload preferences ────────────────────────────────────── */
+.pb-hint {
+  margin: 0 0 var(--space-md);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.pb-overload-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+}
+
+.pb-overload-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  flex: 1 1 180px;
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.pb-overload-field select,
+.pb-overload-field input {
+  min-height: 44px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}

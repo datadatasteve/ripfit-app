@@ -386,9 +386,9 @@
 .session-rating-widget {
   margin: 24px 0 8px;
   padding: 16px;
-  background: var(--bg-secondary, #1e1e1e);
+  background: var(--bg-secondary);
   border-radius: 8px;
-  border: 1px solid var(--border-color, #333);
+  border: 1px solid var(--border-color);
 }
 .session-rating-header {
   display: flex;
@@ -420,7 +420,7 @@
   display: flex;
   justify-content: space-between;
   font-size: 0.75em;
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
 }
 .session-rating-value {
   text-align: center;
@@ -437,7 +437,7 @@
   border: none;
   font-size: 1.8em;
   cursor: pointer;
-  color: var(--border-color, #555);
+  color: var(--border-color);
   transition: color 0.15s;
   padding: 0;
 }
@@ -452,9 +452,9 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  border: 1px solid var(--border-color, #444);
+  border: 1px solid var(--border-color);
   background: none;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
   cursor: pointer;
   font-size: 0.9em;
   transition: background 0.15s, color 0.15s;

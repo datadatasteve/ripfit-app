@@ -7,6 +7,8 @@ const {
   listBugReports, updateBugReport,
   listErrorLogs, resolveErrorLog,
   logClientError, submitBugReport,
+  listExercises, createExercise, updateExercise, deleteExercise,
+  listExerciseReports, resolveExerciseReport,
 } = require('../controllers/adminController');
 
 // ── No auth required ───────────────────────────────────────────────────────
@@ -35,5 +37,13 @@ router.get('/bug-reports',                listBugReports);
 router.put('/bug-reports/:id',            updateBugReport);
 router.get('/error-logs',                 listErrorLogs);
 router.put('/error-logs/:id/resolve',     resolveErrorLog);
+
+// Exercise Manager
+router.get('/exercises',                    listExercises);
+router.post('/exercises',                   createExercise);
+router.put('/exercises/:id',                updateExercise);
+router.delete('/exercises/:id',             deleteExercise);
+router.get('/exercise-reports',             listExerciseReports);
+router.put('/exercise-reports/:id/resolve', resolveExerciseReport);
 
 module.exports = router;

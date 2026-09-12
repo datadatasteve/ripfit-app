@@ -28,7 +28,7 @@ function fmtRelative(d) {
 }
 
 // ── Admin tab bar ─────────────────────────────────────────────────────────
-const ADMIN_TABS = ['Users', 'Bug Reports', 'Error Logs'];
+const ADMIN_TABS = ['Users', 'Exercises', 'Bug Reports', 'Error Logs'];
 
 // ── Status badge ──────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
@@ -535,6 +535,456 @@ function ErrorLogsTab() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// EXERCISE MANAGER
+// ═══════════════════════════════════════════════════════════════════════════
+
+const EXERCISE_CATEGORIES = [
+  'Abs', 'Arms', 'Back', 'Cardio', 'Chest', 'Legs', 'Neck', 'Shoulders',
+  'Stretch', 'Yoga', 'Pilates', 'Conditioning', 'Mobility',
+];
+
+const EQUIPMENT_VALUES = [
+  'barbell', 'dumbbell', 'kettlebell', 'cable', 'machine', 'bodyweight',
+  'resistance-band', 'pull-up-bar', 'bench', 'mat', 'box', 'agility-ladder',
+  'yoga-block', 'yoga-strap', 'none',
+];
+
+// react-body-highlighter slugs — the only values the muscle diagram renders.
+const MUSCLE_SLUGS = [
+  'trapezius', 'upper-back', 'lower-back', 'chest', 'biceps', 'triceps',
+  'forearm', 'back-deltoids', 'front-deltoids', 'abs', 'obliques', 'adductor',
+  'hamstring', 'quadriceps', 'abductors', 'calves', 'gluteal', 'head', 'neck',
+];
+
+const FORCE_VALUES = ['push', 'pull', 'static'];
+const LEVEL_VALUES = ['beginner', 'intermediate', 'expert'];
+const MECHANIC_VALUES = ['compound', 'isolation'];
+
+const EMPTY_EXERCISE = {
+  name: '', description: '', category: '', subcategory: '', equipment_type: '',
+  muscles_primary: [], muscles_secondary: [], force: '', level: '', mechanic: '',
+  instructions: [], video_url_male: '', video_url_female: '',
+};
+
+/** Checkbox grid for one of the two muscle-slug arrays. */
+function MuscleSelect({ label, selected, onChange }) {
+  const toggle = (slug) => {
+    onChange(selected.includes(slug)
+      ? selected.filter(s => s !== slug)
+      : [...selected, slug]);
+  };
+
+  return (
+    <div className="exm-field exm-field-wide">
+      <label>{label}</label>
+      <div className="exm-muscle-grid">
+        {MUSCLE_SLUGS.map(slug => (
+          <label key={slug} className={`exm-muscle-chip ${selected.includes(slug) ? 'on' : ''}`}>
+            <input
+              type="checkbox"
+              checked={selected.includes(slug)}
+              onChange={() => toggle(slug)}
+            />
+            {slug}
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Ordered, editable list of instruction steps. */
+function InstructionsEditor({ steps, onChange }) {
+  return (
+    <div className="exm-field exm-field-wide">
+      <label>Instructions</label>
+      {steps.map((step, i) => (
+        <div key={i} className="exm-step-row">
+          <span className="exm-step-num">{i + 1}</span>
+          <input
+            type="text"
+            value={step}
+            onChange={e => onChange(steps.map((s, idx) => (idx === i ? e.target.value : s)))}
+          />
+          <button
+            type="button"
+            className="exm-step-remove"
+            onClick={() => onChange(steps.filter((_, idx) => idx !== i))}
+            aria-label={`Remove step ${i + 1}`}
+          >×</button>
+        </div>
+      ))}
+      <button type="button" className="admin-action-btn" onClick={() => onChange([...steps, ''])}>
+        + Step
+      </button>
+    </div>
+  );
+}
+
+/** Add/edit form. `initial` null means create. */
+function ExerciseForm({ initial, onCancel, onSaved }) {
+  const [form, setForm] = useState(() => ({
+    ...EMPTY_EXERCISE,
+    ...(initial || {}),
+    muscles_primary: initial?.muscles_primary || [],
+    muscles_secondary: initial?.muscles_secondary || [],
+    instructions: initial?.instructions || [],
+    description: initial?.description || '',
+    subcategory: initial?.subcategory || '',
+    equipment_type: initial?.equipment_type || '',
+    force: initial?.force || '',
+    level: initial?.level || '',
+    mechanic: initial?.mechanic || '',
+    video_url_male: initial?.video_url_male || '',
+    video_url_female: initial?.video_url_female || '',
+  }));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const set = (key, value) => setForm(f => ({ ...f, [key]: value }));
+
+  const save = async () => {
+    if (!form.name.trim()) { setError('Name is required.'); return; }
+    setSaving(true);
+    setError('');
+    try {
+      const payload = {
+        ...form,
+        instructions: form.instructions.filter(s => s.trim()),
+      };
+      const res = await fetch(
+        initial ? `${API_BASE}/admin/exercises/${initial.id}` : `${API_BASE}/admin/exercises`,
+        {
+          method: initial ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+          body: JSON.stringify(payload),
+        }
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Save failed');
+      }
+      onSaved();
+    } catch (err) {
+      setError(err.message);
+    }
+    setSaving(false);
+  };
+
+  return (
+    <div className="exm-form">
+      <h3 className="exm-form-title">{initial ? `Edit: ${initial.name}` : 'Add exercise'}</h3>
+
+      <div className="exm-form-grid">
+        <div className="exm-field exm-field-wide">
+          <label>Name</label>
+          <input type="text" value={form.name} onChange={e => set('name', e.target.value)} />
+        </div>
+
+        <div className="exm-field">
+          <label>Category</label>
+          <select value={form.category} onChange={e => set('category', e.target.value)}>
+            <option value="">—</option>
+            {EXERCISE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+
+        <div className="exm-field">
+          <label>Subcategory</label>
+          <input type="text" value={form.subcategory} onChange={e => set('subcategory', e.target.value)} />
+        </div>
+
+        <div className="exm-field">
+          <label>Equipment</label>
+          <select value={form.equipment_type} onChange={e => set('equipment_type', e.target.value)}>
+            <option value="">—</option>
+            {EQUIPMENT_VALUES.map(v => <option key={v} value={v}>{v}</option>)}
+          </select>
+        </div>
+
+        <div className="exm-field">
+          <label>Force</label>
+          <select value={form.force} onChange={e => set('force', e.target.value)}>
+            <option value="">—</option>
+            {FORCE_VALUES.map(v => <option key={v} value={v}>{v}</option>)}
+          </select>
+        </div>
+
+        <div className="exm-field">
+          <label>Level</label>
+          <select value={form.level} onChange={e => set('level', e.target.value)}>
+            <option value="">—</option>
+            {LEVEL_VALUES.map(v => <option key={v} value={v}>{v}</option>)}
+          </select>
+        </div>
+
+        <div className="exm-field">
+          <label>Mechanic</label>
+          <select value={form.mechanic} onChange={e => set('mechanic', e.target.value)}>
+            <option value="">—</option>
+            {MECHANIC_VALUES.map(v => <option key={v} value={v}>{v}</option>)}
+          </select>
+        </div>
+
+        <MuscleSelect
+          label="Primary muscles"
+          selected={form.muscles_primary}
+          onChange={v => set('muscles_primary', v)}
+        />
+        <MuscleSelect
+          label="Secondary muscles"
+          selected={form.muscles_secondary}
+          onChange={v => set('muscles_secondary', v)}
+        />
+
+        <div className="exm-field exm-field-wide">
+          <label>Description</label>
+          <textarea rows="3" value={form.description} onChange={e => set('description', e.target.value)} />
+        </div>
+
+        <InstructionsEditor steps={form.instructions} onChange={v => set('instructions', v)} />
+
+        <div className="exm-field">
+          <label>Video URL (male)</label>
+          <input type="text" value={form.video_url_male} onChange={e => set('video_url_male', e.target.value)} />
+        </div>
+
+        <div className="exm-field">
+          <label>Video URL (female)</label>
+          <input type="text" value={form.video_url_female} onChange={e => set('video_url_female', e.target.value)} />
+        </div>
+      </div>
+
+      {error && <p className="exm-error">{error}</p>}
+
+      <div className="exm-form-actions">
+        <button className="admin-action-btn" onClick={save} disabled={saving}>
+          {saving ? 'Saving…' : initial ? 'Save changes' : 'Create exercise'}
+        </button>
+        <button className="admin-action-btn" onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+function ExerciseManagerTab() {
+  const [exercises, setExercises] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('');
+  const [editing, setEditing] = useState(undefined);   // undefined = closed, null = new
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [actionMsg, setActionMsg] = useState('');
+
+  const [reports, setReports] = useState([]);
+  const [reportsLoading, setReportsLoading] = useState(true);
+
+  async function load(searchTerm = search, cat = category) {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (searchTerm) params.set('search', searchTerm);
+      if (cat) params.set('category', cat);
+      const res = await fetch(`${API_BASE}/admin/exercises?${params}`, {
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      const data = await res.json();
+      setExercises(data.exercises || []);
+      setTotal(data.total || 0);
+    } catch (err) {
+      console.error('Failed to load exercises:', err);
+    }
+    setLoading(false);
+  }
+
+  async function loadReports() {
+    setReportsLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/admin/exercise-reports`, {
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      const data = await res.json();
+      setReports(data.reports || []);
+    } catch (err) {
+      console.error('Failed to load exercise reports:', err);
+    }
+    setReportsLoading(false);
+  }
+
+  useEffect(() => { load(); loadReports(); }, []);
+
+  async function resolveReport(id) {
+    try {
+      await fetch(`${API_BASE}/admin/exercise-reports/${id}/resolve`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      setReports(rs => rs.filter(r => r.id !== id));
+    } catch (err) {
+      console.error('Failed to resolve report:', err);
+    }
+  }
+
+  // Two-step delete: the server rejects the first call when routines reference
+  // the exercise, and the confirm dialog re-sends with force=true.
+  async function doDelete(exercise, force) {
+    try {
+      const res = await fetch(
+        `${API_BASE}/admin/exercises/${exercise.id}${force ? '?force=true' : ''}`,
+        { method: 'DELETE', headers: { Authorization: `Bearer ${token()}` } }
+      );
+      const body = await res.json().catch(() => ({}));
+
+      if (res.status === 409 && body.requires_confirmation) {
+        setConfirmDelete({ exercise, routineCount: body.routine_count });
+        return;
+      }
+      if (!res.ok) {
+        setActionMsg(body.error || 'Delete failed');
+        setConfirmDelete(null);
+        return;
+      }
+
+      setConfirmDelete(null);
+      setActionMsg(`Deleted "${exercise.name}"`);
+      load();
+    } catch (err) {
+      console.error('Delete failed:', err);
+      setActionMsg('Delete failed');
+    }
+  }
+
+  if (editing !== undefined) {
+    return (
+      <ExerciseForm
+        initial={editing}
+        onCancel={() => setEditing(undefined)}
+        onSaved={() => { setEditing(undefined); load(); }}
+      />
+    );
+  }
+
+  return (
+    <div className="exm-tab">
+      {/* ── Unresolved reports ── */}
+      <div className="exm-reports">
+        <h3 className="exm-section-title">
+          Flagged exercises
+          {reports.length > 0 && <span className="admin-badge admin-badge-red">{reports.length}</span>}
+        </h3>
+        {reportsLoading ? (
+          <p className="admin-loading">Loading…</p>
+        ) : reports.length === 0 ? (
+          <p className="exm-empty">No unresolved reports.</p>
+        ) : (
+          reports.map(r => (
+            <div key={r.id} className="exm-report-row">
+              <div className="exm-report-body">
+                <strong>{r.exercise_name || `Exercise #${r.exercise_id}`}</strong>
+                <p>{r.report_text}</p>
+                <span className="exm-report-meta">
+                  {r.reporter_email || 'Unknown'} · {fmtDate(r.created_at)}
+                </span>
+              </div>
+              <div className="exm-report-actions">
+                <button
+                  className="admin-action-btn"
+                  onClick={() => {
+                    const target = exercises.find(e => e.id === r.exercise_id);
+                    if (target) setEditing(target);
+                    else setActionMsg('Search for the exercise to edit it.');
+                  }}
+                >Edit</button>
+                <button className="admin-action-btn" onClick={() => resolveReport(r.id)}>Resolve</button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* ── Search / filter / add ── */}
+      <div className="exm-toolbar">
+        <input
+          type="text"
+          className="exm-search"
+          placeholder="Search by name…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && load(search, category)}
+        />
+        <select
+          value={category}
+          onChange={e => { setCategory(e.target.value); load(search, e.target.value); }}
+        >
+          <option value="">All categories</option>
+          {EXERCISE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <button className="admin-action-btn" onClick={() => load(search, category)}>Search</button>
+        <button className="admin-action-btn" onClick={() => setEditing(null)}>+ Add exercise</button>
+      </div>
+
+      {actionMsg && <p className="exm-action-msg">{actionMsg}</p>}
+
+      {/* ── Delete confirmation ── */}
+      {confirmDelete && (
+        <div className="exm-confirm">
+          <p>
+            <strong>{confirmDelete.exercise.name}</strong> is used in {confirmDelete.routineCount} saved
+            routine{confirmDelete.routineCount !== 1 ? 's' : ''}. Deleting removes it from those routines.
+          </p>
+          <div className="exm-form-actions">
+            <button className="admin-action-btn danger" onClick={() => doDelete(confirmDelete.exercise, true)}>
+              Delete anyway
+            </button>
+            <button className="admin-action-btn" onClick={() => setConfirmDelete(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── List ── */}
+      {loading ? (
+        <p className="admin-loading">Loading…</p>
+      ) : (
+        <>
+          <p className="exm-count">{exercises.length} of {total} shown</p>
+          <div className="admin-table-wrapper">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Category</th>
+                  <th>Primary muscles</th>
+                  <th>Routines</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {exercises.map(ex => (
+                  <tr key={ex.id}>
+                    <td>{ex.name}</td>
+                    <td>{ex.category || '—'}</td>
+                    <td className="exm-muscle-cell">{(ex.muscles_primary || []).join(', ') || '—'}</td>
+                    <td>{ex.routine_use_count}</td>
+                    <td className="exm-row-actions">
+                      <button className="admin-action-btn" onClick={() => setEditing(ex)}>Edit</button>
+                      <button className="admin-action-btn danger" onClick={() => doDelete(ex, false)}>Delete</button>
+                    </td>
+                  </tr>
+                ))}
+                {exercises.length === 0 && (
+                  <tr><td colSpan={5} className="exm-empty-cell">No exercises match.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // MAIN ADMIN PANEL
 // ═══════════════════════════════════════════════════════════════════════════
 export default function AdminPanel({ onBack }) {
@@ -561,6 +1011,7 @@ export default function AdminPanel({ onBack }) {
 
       <div className="admin-content">
         {tab === 'Users' && <UsersTab />}
+        {tab === 'Exercises' && <ExerciseManagerTab />}
         {tab === 'Bug Reports' && <BugReportsTab />}
         {tab === 'Error Logs' && <ErrorLogsTab />}
       </div>

@@ -1,0 +1,314 @@
+/* ── Compact toolbar inside the active workout ───────────────────────────── */
+.wt-bar-wrap {
+  margin: var(--space-sm) 0;
+}
+
+.wt-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.wt-bar-btn {
+  min-height: 44px;
+  padding: 0 var(--space-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.wt-bar-btn.overridden {
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+
+.wt-bar-cooldown-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+}
+
+.wt-bar-cooldown-edit input {
+  width: 62px;
+  padding: 4px 6px;
+}
+
+/* ── Inline demo video ───────────────────────────────────────────────────── */
+.wt-video {
+  margin-top: var(--space-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-secondary);
+  padding: var(--space-sm);
+}
+
+.wt-video-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.wt-video-toggle {
+  display: flex;
+  gap: 4px;
+}
+
+.wt-video-toggle button {
+  min-height: 36px;
+  padding: 0 var(--space-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.wt-video-toggle button.active {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--text-inverse);
+}
+
+.wt-video-player {
+  width: 100%;
+  max-height: 320px;
+  border-radius: var(--radius-md);
+  background: #000;   /* letterbox stays black in both themes */
+}
+
+/* ── Timer modal ─────────────────────────────────────────────────────────── */
+.wt-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: var(--z-modal);
+}
+
+.wt-modal {
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  box-shadow: var(--shadow-xl);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@media (min-width: 769px) {
+  .wt-overlay { align-items: center; }
+  .wt-modal { border-radius: var(--radius-xl); }
+}
+
+.wt-panel {
+  padding: var(--space-lg);
+}
+
+.wt-panel-title {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--font-size-lg);
+  color: var(--text-primary);
+}
+
+.wt-panel-sub {
+  margin: 0 0 var(--space-md);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.wt-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.wt-mode-btn {
+  min-height: 56px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.wt-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.wt-field-wide {
+  grid-column: 1 / -1;
+}
+
+.wt-fields label,
+.wt-prompt label,
+.wt-amrap-final label {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.wt-fields input,
+.wt-prompt input,
+.wt-amrap-final input {
+  min-height: 48px;
+  margin-top: var(--space-xs);
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+}
+
+.wt-fixed-note {
+  margin-bottom: var(--space-md);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.wt-sound-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.wt-sound-toggle input {
+  width: auto;
+  min-height: 0;
+}
+
+/* ── Live clock ──────────────────────────────────────────────────────────── */
+.wt-clock {
+  text-align: center;
+  padding: var(--space-lg) var(--space-md);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-md);
+  background-color: hsla(142, 71%, 45%, 0.12);
+  border: 2px solid var(--color-success);
+}
+
+.wt-clock.rest {
+  background-color: hsla(199, 89%, 48%, 0.12);
+  border-color: var(--color-info);
+}
+
+.wt-clock.done {
+  background-color: var(--bg-tertiary);
+  border-color: var(--border-color);
+}
+
+.wt-clock-phase {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
+
+.wt-clock-time {
+  font-size: 3.25rem;
+  font-weight: var(--font-weight-bold);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.wt-clock-round {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.wt-amrap {
+  margin-bottom: var(--space-md);
+  text-align: center;
+}
+
+.wt-amrap-count {
+  font-size: var(--font-size-lg);
+  color: var(--text-primary);
+  margin-bottom: var(--space-sm);
+}
+
+.wt-amrap-buttons {
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: center;
+}
+
+.wt-amrap-final {
+  margin-top: var(--space-md);
+  text-align: left;
+}
+
+.wt-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  margin-bottom: var(--space-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+}
+
+.wt-prompt-actions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.wt-panel-actions {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.wt-btn {
+  flex: 1;
+  min-height: 48px;
+  min-width: 88px;
+  padding: 0 var(--space-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.wt-btn-primary {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--text-inverse);
+}
+
+.wt-btn-sm {
+  flex: 0 0 auto;
+  min-height: 36px;
+  min-width: 0;
+  font-size: var(--font-size-sm);
+}

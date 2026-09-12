@@ -275,3 +275,245 @@
   padding: 24px 0;
   text-align: center;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   EXERCISE MANAGER
+   ═══════════════════════════════════════════════════════════════════════════ */
+.exm-section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-lg);
+  color: var(--text-primary);
+}
+
+.exm-reports {
+  margin-bottom: var(--space-xl);
+  padding: var(--space-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background-color: var(--bg-secondary);
+}
+
+.exm-report-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.exm-report-row:last-child { border-bottom: none; }
+
+.exm-report-body {
+  min-width: 0;
+  color: var(--text-primary);
+}
+
+.exm-report-body p {
+  margin: var(--space-xs) 0;
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.exm-report-meta {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+}
+
+.exm-report-actions {
+  display: flex;
+  gap: var(--space-xs);
+  flex: 0 0 auto;
+}
+
+.exm-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: center;
+  margin-bottom: var(--space-md);
+}
+
+.exm-search {
+  flex: 1 1 220px;
+  min-height: 44px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.exm-toolbar select {
+  flex: 0 1 200px;
+  min-height: 44px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.exm-count,
+.exm-empty,
+.exm-empty-cell {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.exm-empty-cell {
+  text-align: center;
+  padding: var(--space-lg);
+}
+
+.exm-action-msg {
+  margin-bottom: var(--space-sm);
+  color: var(--color-info);
+  font-size: var(--font-size-sm);
+}
+
+.exm-error {
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+  margin: var(--space-sm) 0;
+}
+
+.exm-muscle-cell {
+  max-width: 260px;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.exm-row-actions {
+  display: flex;
+  gap: var(--space-xs);
+  white-space: nowrap;
+}
+
+.exm-confirm {
+  padding: var(--space-md);
+  margin-bottom: var(--space-md);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-md);
+  background-color: hsla(4, 90%, 58%, 0.08);
+  color: var(--text-primary);
+}
+
+.exm-confirm p {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-sm);
+}
+
+/* ── Add / edit form ── */
+.exm-form-title {
+  margin: 0 0 var(--space-lg);
+  font-size: var(--font-size-xl);
+  color: var(--text-primary);
+}
+
+.exm-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-md);
+}
+
+.exm-field-wide {
+  grid-column: 1 / -1;
+}
+
+.exm-field label {
+  display: block;
+  margin-bottom: var(--space-xs);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.exm-field input,
+.exm-field select,
+.exm-field textarea {
+  min-height: 44px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.exm-field textarea {
+  min-height: 88px;
+}
+
+.exm-muscle-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.exm-muscle-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+}
+
+.exm-muscle-chip.on {
+  border-color: var(--color-primary);
+  background-color: hsla(220, 80%, 50%, 0.12);
+  color: var(--color-primary);
+}
+
+.exm-muscle-chip input {
+  width: auto;
+  min-height: 0;
+  margin: 0;
+}
+
+.exm-step-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
+}
+
+.exm-step-num {
+  flex: 0 0 24px;
+  text-align: right;
+  font-size: var(--font-size-sm);
+  color: var(--text-tertiary);
+}
+
+.exm-step-remove {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 40px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-secondary);
+  color: var(--color-danger);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.exm-form-actions {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-lg);
+}
+
+@media (max-width: 768px) {
+  .exm-report-row {
+    flex-direction: column;
+  }
+
+  .exm-toolbar > * {
+    flex: 1 1 100%;
+  }
+
+  .exm-row-actions {
+    flex-direction: column;
+  }
+}

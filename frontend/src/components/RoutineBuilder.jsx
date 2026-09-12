@@ -138,6 +138,31 @@ export default function RoutineBuilder({ initialExercises, existingRoutine, onCl
       setError('Add at least one exercise.');
       return;
     }
+
+    // Targets are optional, but anything entered must be sane. Sets/reps are
+    // positive integers; weight is a positive number or blank.
+    for (const [i, ex] of exercises.entries()) {
+      const label = ex.name || `Exercise ${i + 1}`;
+
+      for (const field of ['target_sets', 'target_reps']) {
+        const raw = String(ex[field] ?? '').trim();
+        if (raw === '') continue;
+        if (!/^\d+$/.test(raw) || parseInt(raw, 10) < 1) {
+          setError(`${label}: ${field === 'target_sets' ? 'sets' : 'reps'} must be a whole number of 1 or more.`);
+          return;
+        }
+      }
+
+      const weightRaw = String(ex.target_weight ?? '').trim();
+      if (weightRaw !== '') {
+        const weight = Number(weightRaw);
+        if (!Number.isFinite(weight) || weight <= 0) {
+          setError(`${label}: weight must be a positive number, or left blank.`);
+          return;
+        }
+      }
+    }
+
     setError('');
     setSaving(true);
 

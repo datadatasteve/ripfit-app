@@ -426,8 +426,6 @@
   color: var(--color-danger);
 }
 
-}
-
 .profile-pic-remove-btn {
   background: none;
   border: 1px solid var(--color-danger);

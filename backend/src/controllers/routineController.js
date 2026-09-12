@@ -317,8 +317,9 @@ const startWorkoutFromRoutine = async (req, res) => {
     // Get routine template exercises
     const templateResult = await client.query(
       `SELECT re.exercise_id, re.order_index, re.target_sets, re.target_reps, 
-              re.target_weight, re.superset_group, re.notes,
-              e.name as exercise_name, e.category, e.equipment_type
+              re.target_weight, re.superset_group, re.notes, re.cooldown_seconds,
+              e.name as exercise_name, e.category, e.equipment_type,
+              e.video_url_male, e.video_url_female
        FROM routine_exercises re
        JOIN exercises e ON re.exercise_id = e.id
        WHERE re.routine_id = $1
@@ -403,11 +404,14 @@ const startWorkoutFromRoutine = async (req, res) => {
         exercise_name: ex.exercise_name,
         category: ex.category,
         equipment_type: ex.equipment_type,
+        video_url_male: ex.video_url_male,
+        video_url_female: ex.video_url_female,
         template: {
           target_sets: ex.target_sets,
           target_reps: ex.target_reps,
           target_weight: ex.target_weight,
           superset_group: ex.superset_group,
+          cooldown_seconds: ex.cooldown_seconds,
           notes: ex.notes
         },
         last_performance: lastPerformance || null

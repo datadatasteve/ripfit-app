@@ -2,7 +2,7 @@
   max-width: 800px;
   margin: 0 auto;
   padding: 20px;
-  color: #000;
+  color: var(--text-primary);
 }
  
 .workout-header {
@@ -41,20 +41,20 @@
 }
  
 .routine-card {
-  background: #f0f0f0;
+  background: var(--bg-secondary);
   padding: 20px;
   border-radius: 8px;
-  border: 1px solid #333;
-  color: #000;
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
 }
  
 .routine-card h3 {
   margin: 0 0 10px 0;
-  color: #000;
+  color: var(--text-primary);
 }
  
 .routine-card p {
-  color: #000;
+  color: var(--text-primary);
 }
  
 .routine-card button {
@@ -69,17 +69,17 @@
  
 .exercise-progress {
   text-align: center;
-  color: #000;
+  color: var(--text-primary);
   margin-bottom: 20px;
   font-weight: bold;
 }
  
 .current-exercise {
-  background: white;
+  background: var(--bg-elevated);
   padding: 20px;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  border: 1px solid #333;
+  border: 1px solid var(--border-color);
 }
  
 .exercise-header {
@@ -91,7 +91,7 @@
  
 .change-exercise-btn {
   background: #ffc107;
-  color: #000;
+  color: #1c1917;   /* fixed amber background — text must stay dark in both themes */
   border: none;
   padding: 8px 15px;
   border-radius: 4px;
@@ -101,30 +101,30 @@
  
 .current-exercise h3 {
   margin: 0 0 5px 0;
-  color: #000;
+  color: var(--text-primary);
 }
  
 .category {
-  color: #000;
+  color: var(--text-primary);
   margin: 0 0 15px 0;
 }
  
 .template-info {
-  background: #add8e6;
+  background: hsla(199, 89%, 48%, 0.16);
   padding: 10px;
   border-radius: 4px;
   margin: 15px 0;
-  color: #000;
-  border: 1px solid #000;
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
 }
  
 .last-performance {
-  background: #ffeb99;
+  background: hsla(38, 92%, 50%, 0.20);
   padding: 10px;
   border-radius: 4px;
   margin: 15px 0;
-  color: #000;
-  border: 1px solid #000;
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
 }
  
 .sets-history {
@@ -135,16 +135,16 @@
 }
  
 .set-pill {
-  background: white;
+  background: var(--bg-elevated);
   padding: 5px 10px;
   border-radius: 4px;
   font-size: 14px;
-  border: 1px solid #000;
-  color: #000;
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
 }
  
 .notes-warning {
-  color: #000;
+  color: var(--text-primary);
   margin: 10px 0 0 0;
   font-weight: bold;
 }
@@ -155,29 +155,29 @@
  
 .logged-sets h4 {
   margin: 0 0 10px 0;
-  color: #000;
+  color: var(--text-primary);
 }
  
 .set-entry {
-  background: #f0f0f0;
+  background: var(--bg-secondary);
   padding: 10px;
   margin: 5px 0;
   border-radius: 4px;
-  color: #000;
-  border: 1px solid #333;
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
 }
  
 .set-form {
   margin: 20px 0;
   padding: 20px;
-  background: #f0f0f0;
+  background: var(--bg-secondary);
   border-radius: 4px;
-  border: 1px solid #333;
+  border: 1px solid var(--border-color);
 }
  
 .set-form h4 {
   margin: 0 0 15px 0;
-  color: #000;
+  color: var(--text-primary);
 }
  
 .form-row {
@@ -189,10 +189,10 @@
  
 .form-row input {
   padding: 10px;
-  border: 1px solid #000;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
-  color: #000;
-  background: white;
+  color: var(--text-primary);
+  background: var(--bg-elevated);
 }
  
 .log-set-btn {
@@ -248,20 +248,20 @@
 }
  
 .modal-content {
-  background: white;
+  background: var(--bg-elevated);
   padding: 30px;
   border-radius: 8px;
   max-width: 600px;
   width: 90%;
   max-height: 80vh;
   overflow-y: auto;
-  border: 2px solid #000;
+  border: 2px solid var(--border-color);
   position: relative;
 }
  
 .modal-content h3 {
   margin: 0 0 20px 0;
-  color: #000;
+  color: var(--text-primary);
 }
  
 .search-box {
@@ -273,10 +273,10 @@
 .search-box input {
   flex: 1;
   padding: 10px;
-  border: 1px solid #000;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
-  color: #000;
-  background: white;
+  color: var(--text-primary);
+  background: var(--bg-elevated);
 }
  
 .search-box button {
@@ -296,17 +296,17 @@
 }
  
 .filter-box label {
-  color: #000;
+  color: var(--text-primary);
   font-weight: bold;
 }
  
 .filter-box select {
   flex: 1;
   padding: 8px;
-  border: 1px solid #000;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
-  background: white;
-  color: #000;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
 }
  
 .search-results {
@@ -317,11 +317,11 @@
  
 .result-item {
   padding: 15px;
-  border: 1px solid #000;
+  border: 1px solid var(--border-color);
   margin-bottom: 10px;
   cursor: pointer;
   border-radius: 4px;
-  background: #f0f0f0;
+  background: var(--bg-secondary);
 }
  
 .result-item:hover {
@@ -337,11 +337,11 @@
 .result-item strong {
   display: block;
   margin-bottom: 5px;
-  color: #000;
+  color: var(--text-primary);
 }
  
 .result-item span {
-  color: #000;
+  color: var(--text-primary);
   font-size: 14px;
 }
  
@@ -363,10 +363,10 @@
   width: 100%;
   padding: 10px;
   margin-bottom: 10px;
-  border: 1px solid #000;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
-  color: #000;
-  background: white;
+  color: var(--text-primary);
+  background: var(--bg-elevated);
 }
  
 .add-btn {
@@ -404,7 +404,7 @@
 .rest-timer {
   text-align: center;
   padding: 20px;
-  background: #fff3cd;
+  background: hsla(38, 92%, 50%, 0.14);
   border: 2px solid #ffc107;
   border-radius: 4px;
   margin: 20px 0;
@@ -413,7 +413,7 @@
 .timer-display {
   font-size: 48px;
   font-weight: bold;
-  color: #000;
+  color: var(--text-primary);
   margin-bottom: 10px;
 }
  
@@ -454,13 +454,13 @@
   align-items: center;
   padding: 15px;
   margin-bottom: 10px;
-  background: #f0f0f0;
-  border: 1px solid #000;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   border-radius: 4px;
 }
  
 .exercise-list-item.active {
-  background: #add8e6;
+  background: hsla(199, 89%, 48%, 0.16);
   border: 2px solid #007bff;
 }
  
@@ -470,12 +470,12 @@
  
 .exercise-info strong {
   display: block;
-  color: #000;
+  color: var(--text-primary);
   margin-bottom: 5px;
 }
  
 .exercise-info span {
-  color: #000;
+  color: var(--text-primary);
   font-size: 14px;
 }
  
@@ -506,12 +506,12 @@
 .reason-textarea {
   width: 100%;
   padding: 10px;
-  border: 1px solid #000;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   margin: 15px 0;
   font-family: inherit;
   resize: vertical;
-  color: #000;
+  color: var(--text-primary);
 }
  
 .exercise-notes-section {
@@ -520,18 +520,18 @@
  
 .exercise-notes-section h4 {
   margin: 0 0 10px 0;
-  color: #000;
+  color: var(--text-primary);
 }
  
 .exercise-notes {
   width: 100%;
   padding: 10px;
-  border: 1px solid #000;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   font-family: inherit;
   resize: vertical;
-  color: #000;
-  background: white;
+  color: var(--text-primary);
+  background: var(--bg-elevated);
 }
  
 .notes-indicator {
@@ -542,34 +542,22 @@
 /* Add these styles to ActiveWorkout.css */
 
 .previous-notes {
-  background-color: #f0f0f0;
+  background-color: var(--bg-secondary);
   padding: 8px 12px;
   border-radius: 4px;
   margin-bottom: 8px;
   font-size: 0.9em;
-  color: #555;
+  color: var(--text-secondary);
   border-left: 3px solid #4CAF50;
 }
 
 .previous-notes strong {
-  color: #333;
+  color: var(--text-primary);
   display: block;
   margin-bottom: 4px;
 }
 
 /* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .previous-notes {
-    background-color: #2a2a2a;
-    color: #aaa;
-    border-left-color: #66bb6a;
-  }
-  
-  .previous-notes strong {
-    color: #ddd;
-  }
-}
-
 /* Button styling for Save Note */
 .save-note-btn {
   margin-top: 8px;
@@ -612,9 +600,8 @@
   border-radius: 4px;
   cursor: pointer;
 }
-ß
 .set-pill.caution {
-  background-color: #fff3e0;
+  background-color: hsla(38, 92%, 50%, 0.14);
   border: 1px solid #ff9800;
 }
 
@@ -641,7 +628,7 @@
 
 .workout-summary h3 {
   text-align: center;
-  color: #888;
+  color: var(--text-secondary);
   margin-bottom: 20px;
 }
 
@@ -658,7 +645,7 @@
   flex-direction: column;
   align-items: center;
   padding: 12px 16px;
-  background: #f5f5f5;
+  background: var(--bg-secondary);
   border-radius: 8px;
   min-width: 80px;
 }
@@ -670,7 +657,7 @@
 
 .stat-label {
   font-size: 0.8em;
-  color: #888;
+  color: var(--text-secondary);
   margin-top: 4px;
 }
 
@@ -680,7 +667,7 @@
 
 .summary-exercise-item {
   padding: 12px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .summary-exercise-item strong {
@@ -690,7 +677,7 @@
 
 .summary-category {
   font-size: 0.85em;
-  color: #888;
+  color: var(--text-secondary);
 }
 
 .summary-sets {
@@ -701,20 +688,20 @@
 }
 
 .skipped {
-  color: #999;
+  color: var(--text-tertiary);
   font-style: italic;
 }
 
 .summary-notes {
   font-size: 0.9em;
-  color: #666;
+  color: var(--text-secondary);
   margin-top: 6px;
   white-space: pre-wrap;
 }
 
 .summary-workout-notes {
   padding: 12px;
-  background: #f9f9f9;
+  background: var(--bg-elevated);
   border-radius: 8px;
   margin-bottom: 15px;
 }
@@ -725,7 +712,7 @@
 
 /* Finish confirmation */
 .incomplete-warning {
-  background: #fff3e0;
+  background: hsla(38, 92%, 50%, 0.14);
   padding: 12px;
   border-radius: 8px;
   border-left: 3px solid #ff9800;
@@ -740,24 +727,6 @@
 }
 
 /* Dark mode */
-@media (prefers-color-scheme: dark) {
-  .stat-box {
-    background: #2a2a2a;
-  }
-
-  .summary-exercise-item {
-    border-bottom-color: #333;
-  }
-
-  .summary-workout-notes {
-    background: #2a2a2a;
-  }
-
-  .incomplete-warning {
-    background: #3e2c00;
-  }
-}
-
 .set-entry.rpe-warning {
   color: #e53935;
   font-weight: bold;
@@ -782,17 +751,17 @@
 .filter-pill {
   padding: 4px 12px;
   border-radius: 16px;
-  border: 1px solid #555;
+  border: 1px solid var(--border-color);
   background: transparent;
-  color: #000;
+  color: var(--text-primary);
   font-size: 0.82em;
   cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
 .filter-pill:hover {
-  border-color: #333;
-  color: #000;
+  border-color: var(--border-color);
+  color: var(--text-primary);
 }
 
 .filter-pill.active {
@@ -839,8 +808,8 @@
   width: 100%;
   padding: 8px;
   margin-top: 8px;
-  background: #eee;
-  border: 1px solid #ccc;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   cursor: pointer;
 }
@@ -862,7 +831,7 @@
   border: none;
   cursor: pointer;
   font-size: 14px;
-  color: #888;
+  color: var(--text-secondary);
   padding: 0 4px;
 }
 
@@ -894,9 +863,9 @@
 .workout-type-btn {
   padding: 12px;
   background: none;
-  border: 1px solid var(--border-color, #444);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
-  color: var(--text-primary, #eee);
+  color: var(--text-primary);
   font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
@@ -1005,3 +974,310 @@
 .aw-program-start-btn { background: var(--color-primary); color: #fff; border: none; border-radius: 6px; padding: 6px 14px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
 .aw-program-start-btn:hover { opacity: 0.88; }
 .aw-program-complete { font-size: 0.85rem; color: #22c55e; margin: 0; }
+
+/* ==========================================================================
+   MOBILE ACTIVE WORKOUT LAYOUT
+   Log Set sits directly under the reference info and never moves as sets are
+   added; Finish / Next Exercise are pinned to the bottom of the viewport.
+   ========================================================================== */
+
+/* Header action buttons collapse to icons on small screens so they don't
+   compete with the primary actions in the pinned bar. */
+.workout-notes-btn,
+.view-all-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+}
+
+.aw-icon-glyph {
+  display: none;
+  font-size: 1.05em;
+  line-height: 1;
+}
+
+.aw-icon-badge {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--color-danger);
+}
+
+/* ── Last session notes dropdown ─────────────────────────────────────────── */
+.aw-prev-notes {
+  margin: var(--space-sm) 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-secondary);
+  overflow: hidden;
+}
+
+.aw-prev-notes-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--space-md);
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.aw-prev-notes-caret {
+  color: var(--text-tertiary);
+}
+
+.aw-prev-notes-body {
+  padding: 0 var(--space-md) var(--space-md);
+  border-top: 1px solid var(--border-color);
+}
+
+.aw-prev-notes-body pre {
+  margin: var(--space-xs) 0 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+}
+
+.aw-prev-notes-date,
+.aw-prev-notes-empty {
+  margin: var(--space-sm) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--text-tertiary);
+}
+
+.aw-prev-notes-label {
+  display: block;
+  margin-top: var(--space-sm);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+/* ── Pinned primary actions ──────────────────────────────────────────────── */
+.aw-action-bar {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-lg);
+}
+
+.aw-action-btn {
+  flex: 1;
+  min-height: 52px;
+  padding: 0 var(--space-md);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.aw-action-next {
+  background-color: var(--color-primary);
+  color: var(--text-inverse);
+}
+
+.aw-action-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .workout-container {
+    padding: var(--space-md) var(--space-sm);
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  /* Nothing inside the workout view may force the page sideways. */
+  .workout-container * {
+    max-width: 100%;
+  }
+
+  .workout-container pre,
+  .workout-container textarea {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .workout-header {
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+  }
+
+  .workout-header h2 {
+    flex: 1 1 100%;
+    font-size: var(--font-size-lg);
+  }
+
+  .header-buttons {
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    width: 100%;
+  }
+
+  /* Notes / View All become compact icon buttons */
+  .workout-notes-btn,
+  .view-all-btn {
+    width: 44px;
+    padding: 0;
+    background-color: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+  }
+
+  .aw-icon-glyph { display: inline; }
+  .aw-icon-text  { display: none; }
+
+  .current-exercise {
+    padding: var(--space-md) var(--space-sm);
+  }
+
+  /* Set input row: three full-height fields, reachable without scrolling */
+  .form-row {
+    gap: var(--space-sm);
+  }
+
+  .form-row input {
+    min-height: 48px;
+    font-size: 16px;   /* keeps iOS Safari from zooming on focus */
+    width: 100%;
+  }
+
+  .set-form {
+    padding: var(--space-md);
+    margin: var(--space-md) 0;
+  }
+
+  .log-set-btn {
+    min-height: 52px;
+  }
+
+  .exercise-nav {
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+  }
+
+  .exercise-nav button {
+    flex: 1 1 30%;
+    min-height: 44px;
+    padding: 0 var(--space-sm);
+    font-size: var(--font-size-sm);
+  }
+
+  .note-buttons {
+    flex-wrap: wrap;
+  }
+
+  .note-buttons button {
+    flex: 1 1 140px;
+    min-height: 44px;
+  }
+
+  /* Pinned bottom action bar */
+  .aw-action-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    margin: 0;
+    padding: var(--space-sm) var(--space-sm) calc(var(--space-sm) + env(safe-area-inset-bottom, 0px));
+    background-color: var(--bg-elevated);
+    border-top: 1px solid var(--border-color);
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.12);
+    z-index: var(--z-fixed);
+  }
+
+  /* Leave room for the pinned bar at the end of the scroll area */
+  .workout-container.aw-in-progress {
+    padding-bottom: 84px;
+  }
+}
+
+/* ── Progressive overload suggestion (workout summary) ───────────────────── */
+.aw-overload-card {
+  margin-top: var(--space-lg);
+  padding: var(--space-md);
+  border: 1px solid var(--color-success);
+  border-radius: var(--radius-lg);
+  background-color: hsla(142, 71%, 45%, 0.08);
+}
+
+.aw-overload-title {
+  margin: 0;
+  font-size: var(--font-size-base);
+  color: var(--text-primary);
+}
+
+.aw-overload-sub {
+  margin: var(--space-xs) 0 var(--space-sm);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.aw-overload-list {
+  margin: 0 0 var(--space-md);
+  padding-left: 1.2em;
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+}
+
+.aw-overload-list li {
+  margin-bottom: var(--space-xs);
+}
+
+.aw-overload-actions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.aw-overload-accept,
+.aw-overload-dismiss {
+  flex: 1;
+  min-height: 48px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.aw-overload-accept {
+  border: none;
+  background-color: var(--color-success);
+  color: #fff;
+}
+
+.aw-overload-accept:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.aw-overload-dismiss {
+  border: 1px solid var(--border-color);
+  background-color: transparent;
+  color: var(--text-secondary);
+}
+
+.aw-overload-applied {
+  margin: 0;
+  color: var(--color-success);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.aw-overload-error {
+  margin: var(--space-sm) 0 0;
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+}

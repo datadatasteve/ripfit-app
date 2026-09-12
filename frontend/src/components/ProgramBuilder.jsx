@@ -56,6 +56,10 @@ export default function ProgramBuilder({ existingProgram, onSaved, onClose, onDe
   const [durationWeeks, setDurationWeeks] = useState(existingProgram?.duration_weeks || 8);
   const [customDuration, setCustomDuration] = useState('');
   const [scheduleShift, setScheduleShift] = useState(existingProgram?.schedule_shift_pref || 'none');
+  const [overloadStrategy, setOverloadStrategy] = useState(existingProgram?.overload_strategy || 'none');
+  const [overloadIncrement, setOverloadIncrement] = useState(
+    existingProgram?.overload_increment != null ? String(existingProgram.overload_increment) : ''
+  );
   const [weeks, setWeeks] = useState(buildEmptyWeeks(existingProgram?.duration_weeks || 8));
   const [routines, setRoutines] = useState([]);
   const [dragging, setDragging] = useState(null);
@@ -162,6 +166,10 @@ export default function ProgramBuilder({ existingProgram, onSaved, onClose, onDe
       synopsis: synopsis.trim() || null,
       duration_weeks: durationWeeks,
       schedule_shift_pref: scheduleShift,
+      overload_strategy: overloadStrategy,
+      overload_increment: overloadStrategy === 'none' || overloadIncrement === ''
+        ? null
+        : parseFloat(overloadIncrement),
       days: daysFromSlots(weeks),
     };
     try {
@@ -217,6 +225,37 @@ export default function ProgramBuilder({ existingProgram, onSaved, onClose, onDe
         <input className="pb-input" placeholder="Program name" value={name} onChange={e => setName(e.target.value)} />
         <input className="pb-input" placeholder="Short description (optional)" value={description} onChange={e => setDescription(e.target.value)} />
         <textarea className="pb-textarea" placeholder="Program synopsis / about (optional)" value={synopsis} onChange={e => setSynopsis(e.target.value)} rows={3} />
+      </div>
+
+      <div className="pb-section">
+        <h3>Progressive Overload</h3>
+        <p className="pb-hint">
+          When every set of a program workout hits its targets, suggest a bump for next time.
+          Suggestions are always confirmed by you before anything changes.
+        </p>
+        <div className="pb-overload-row">
+          <label className="pb-overload-field">
+            <span>Strategy</span>
+            <select value={overloadStrategy} onChange={e => setOverloadStrategy(e.target.value)}>
+              <option value="none">None</option>
+              <option value="weight">Weight</option>
+              <option value="reps">Reps</option>
+            </select>
+          </label>
+          {overloadStrategy !== 'none' && (
+            <label className="pb-overload-field">
+              <span>Increment {overloadStrategy === 'weight' ? '(lbs)' : '(reps)'}</span>
+              <input
+                type="number"
+                step={overloadStrategy === 'weight' ? '0.5' : '1'}
+                min="0"
+                placeholder={overloadStrategy === 'weight' ? '2.5' : '1'}
+                value={overloadIncrement}
+                onChange={e => setOverloadIncrement(e.target.value)}
+              />
+            </label>
+          )}
+        </div>
       </div>
 
       <div className="pb-section">
