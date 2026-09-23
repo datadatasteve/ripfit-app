@@ -4,7 +4,7 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const {
   getOverview, getStrengthStats, getCardioStats,
-  getRecords, getCombinedStats, getExerciseStats,
+  getRecords, getCombinedStats, getExerciseStats, getMeditationStats,
   rateWorkout, updateRatingPrefs, adminResetPassword,
 } = require('../controllers/statsController');
 
@@ -21,6 +21,7 @@ router.get('/cardio',            getCardioStats);
 router.get('/records',           getRecords);
 router.get('/combined',          getCombinedStats);
 router.get('/exercise/:id',      getExerciseStats);
+router.get('/meditation',        getMeditationStats);
 
 // Rating
 router.put('/workouts/:id/rating',    rateWorkout);

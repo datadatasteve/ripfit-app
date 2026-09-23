@@ -183,12 +183,21 @@
   padding: 16px 0;
 }
 
+/* Row = main line (handle/arrows, name, targets, remove) + extras line
+   (tempo, overload). */
 .routine-builder-exercise-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--bg-elevated);
+}
+
+.routine-builder-exercise-main {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border-color);
 }
 
 .routine-builder-reorder {
@@ -284,4 +293,196 @@
   background: transparent;
   color: var(--text-primary);
   cursor: pointer;
+}
+
+/* ── Tempo + overload extras ─────────────────────────────────────────────── */
+.routine-builder-exercise-extras {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-sm) var(--space-md);
+  padding-left: 42px;
+}
+
+.rbx-tempo,
+.rbx-overload {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.rbx-tempo-field {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: 36px;
+  padding: 0 var(--space-sm);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.rbx-tempo-value {
+  font-family: var(--font-mono);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.rbx-link {
+  min-height: 36px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-primary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.rbx-summary {
+  color: var(--text-tertiary);
+  text-transform: capitalize;
+}
+
+.rbx-panel {
+  margin-top: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.rbx-tempo-digits {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.rbx-tempo-digit {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+.rbx-tempo-digit input {
+  width: 56px;
+  min-height: 44px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-lg);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.rbx-row {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.rbx-row select,
+.rbx-row input {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.rbx-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+.rbx-field select,
+.rbx-field input {
+  min-height: 40px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.rbx-btn {
+  align-self: flex-start;
+  min-height: 40px;
+  padding: 0 var(--space-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.rbx-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rbx-btn-primary {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--text-inverse);
+}
+
+.rbx-weeks table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+}
+
+.rbx-weeks th {
+  text-align: left;
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+  padding-bottom: 4px;
+}
+
+.rbx-weeks td {
+  padding: 2px 4px 2px 0;
+}
+
+.rbx-weeks td input {
+  width: 100%;
+  min-height: 36px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.rbx-remove {
+  width: 32px;
+  height: 36px;
+  border: none;
+  background: none;
+  color: var(--color-danger);
+  font-size: var(--font-size-lg);
+  cursor: pointer;
+}
+
+.rbx-hint,
+.rbx-ok,
+.rbx-error {
+  margin: 0;
+  font-size: var(--font-size-xs);
+}
+
+.rbx-hint { color: var(--text-tertiary); }
+.rbx-ok { color: var(--color-success); }
+.rbx-error { color: var(--color-danger); }
+
+@media (max-width: 768px) {
+  .routine-builder-exercise-extras {
+    padding-left: 0;
+  }
 }

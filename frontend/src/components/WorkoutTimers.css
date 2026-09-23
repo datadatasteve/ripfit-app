@@ -185,19 +185,7 @@
   color: var(--text-secondary);
 }
 
-.wt-sound-toggle {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  margin-bottom: var(--space-md);
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
-}
 
-.wt-sound-toggle input {
-  width: auto;
-  min-height: 0;
-}
 
 /* ── Live clock ──────────────────────────────────────────────────────────── */
 .wt-clock {
@@ -311,4 +299,207 @@
   min-height: 36px;
   min-width: 0;
   font-size: var(--font-size-sm);
+}
+
+/* ── Panel title row + sound toggle ──────────────────────────────────────── */
+.wt-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
+}
+
+.wt-panel-head .wt-panel-title {
+  margin: 0;
+}
+
+.wt-sound-btn {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 0 var(--space-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.wt-sound-btn.off {
+  color: var(--text-secondary);
+}
+
+/* ── Inline timer (inside the exercise card) ─────────────────────────────── */
+.wt-inline {
+  margin: var(--space-md) 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background-color: var(--bg-elevated);
+}
+
+.wt-bar-btn.active {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.wt-panel-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.wt-info-btn {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-tertiary);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.wt-info-btn:hover,
+.wt-info-btn[aria-expanded="true"] {
+  color: var(--color-primary);
+}
+
+.wt-info-text {
+  flex-basis: 100%;
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.wt-panel-head {
+  flex-wrap: wrap;
+}
+
+.wt-mode-cell {
+  display: flex;
+  flex-direction: column;
+}
+
+.wt-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.wt-mode-row .wt-mode-btn {
+  flex: 1;
+}
+
+.wt-mode-cell .wt-info-text {
+  margin-top: var(--space-xs);
+}
+
+.wt-error {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-danger);
+}
+
+.wt-logged,
+.wt-tabata-total {
+  color: var(--color-success);
+}
+
+.wt-logged {
+  margin: var(--space-sm) 0 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* ── Timer block: attach step ────────────────────────────────────────────── */
+.wt-attach {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--border-color);
+}
+
+.wt-attach-title {
+  margin: 0;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.wt-attach-tabs {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.wt-attach-tabs button {
+  flex: 1;
+  min-height: 40px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.wt-attach-tabs button.active {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--bg-primary);
+}
+
+.wt-attach-row {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.wt-attach-row input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.wt-attach-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.wt-attach-results li + li {
+  border-top: 1px solid var(--border-color);
+}
+
+.wt-attach-results button {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--space-md);
+  border: none;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.wt-attach-results button span {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-sm);
+}
+
+.wt-attach-skip {
+  flex: 0 0 auto;
 }

@@ -13,7 +13,8 @@ async function getProfile(req, res) {
          id, username, email, display_name, profile_picture,
          height_cm, weight_kg, date_of_birth, gender,
          units_weight, units_distance, theme_preference, goals,
-         initials, email_verified, is_admin, workout_rating_prefs, created_at
+         initials, email_verified, is_admin, workout_rating_prefs, created_at,
+         reorder_mode, previous_notes_scope, tempo_visual_enabled, tempo_audio_enabled
        FROM users WHERE id = $1`,
       [req.user.userId]
     );
@@ -293,7 +294,111 @@ async function adminVerifyUser(req, res) {
   }
 }
 
+// ── PUT /users/me/preferences ──────────────────────────────────────────────
+// Workout UI preferences. Only the keys present in the body are changed, and
+// each is validated against the same set the column CHECK constraints allow.
+const PREFERENCE_RULES = {
+  reorder_mode:          v => ['drag', 'arrows'].includes(v),
+  previous_notes_scope:  v => ['all', 'program', 'non_program'].includes(v),
+  tempo_visual_enabled:  v => typeof v === 'boolean',
+  tempo_audio_enabled:   v => typeof v === 'boolean',
+};
+
+async function updatePreferences(req, res) {
+  const sets = [];
+  const values = [];
+
+  for (const [key, isValid] of Object.entries(PREFERENCE_RULES)) {
+    if (!(key in (req.body || {}))) continue;
+    if (!isValid(req.body[key])) {
+      return res.status(400).json({ error: `Invalid value for ${key}` });
+    }
+    values.push(req.body[key]);
+    sets.push(`${key} = $${values.length}`);
+  }
+
+  if (sets.length === 0) {
+    return res.status(400).json({ error: 'No preference fields supplied' });
+  }
+
+  try {
+    values.push(req.user.userId);
+    const result = await pool.query(
+      `UPDATE users SET ${sets.join(', ')} WHERE id = $${values.length}
+       RETURNING reorder_mode, previous_notes_scope, tempo_visual_enabled, tempo_audio_enabled`,
+      values
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('updatePreferences error:', err);
+    res.status(500).json({ error: 'Failed to update preferences' });
+  }
+}
+
+// ── Tempo templates ────────────────────────────────────────────────────────
+// GET /users/me/tempo-templates
+async function listTempoTemplates(req, res) {
+  try {
+    const result = await pool.query(
+      `SELECT id, name, eccentric, pause, concentric, created_at
+       FROM tempo_templates WHERE user_id = $1 ORDER BY name ASC`,
+      [req.user.userId]
+    );
+    res.json({ templates: result.rows });
+  } catch (err) {
+    console.error('listTempoTemplates error:', err);
+    res.status(500).json({ error: 'Failed to load tempo templates' });
+  }
+}
+
+// POST /users/me/tempo-templates  { name, eccentric, pause, concentric }
+async function createTempoTemplate(req, res) {
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+  if (!name) return res.status(400).json({ error: 'name is required' });
+
+  const phases = {};
+  for (const key of ['eccentric', 'pause', 'concentric']) {
+    const v = req.body?.[key];
+    if (!Number.isInteger(v) || v < 0) {
+      return res.status(400).json({ error: `${key} must be a whole number of 0 or more` });
+    }
+    phases[key] = v;
+  }
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO tempo_templates (user_id, name, eccentric, pause, concentric)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, name, eccentric, pause, concentric, created_at`,
+      [req.user.userId, name.slice(0, 100), phases.eccentric, phases.pause, phases.concentric]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error('createTempoTemplate error:', err);
+    res.status(500).json({ error: 'Failed to save tempo template' });
+  }
+}
+
+// DELETE /users/me/tempo-templates/:id — only the owner's own template
+async function deleteTempoTemplate(req, res) {
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'Invalid template id' });
+
+  try {
+    const result = await pool.query(
+      'DELETE FROM tempo_templates WHERE id = $1 AND user_id = $2 RETURNING id',
+      [id, req.user.userId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Template not found' });
+    res.json({ ok: true, deleted_id: id });
+  } catch (err) {
+    console.error('deleteTempoTemplate error:', err);
+    res.status(500).json({ error: 'Failed to delete tempo template' });
+  }
+}
+
 module.exports = {
   getProfile, updateProfile, updateProfilePicture, removeProfilePicture,
+  updatePreferences, listTempoTemplates, createTempoTemplate, deleteTempoTemplate,
   updatePassword, verifyEmail, resendVerification, adminVerifyUser
 };

@@ -779,6 +779,10 @@ function ExerciseManagerTab() {
 
   const [reports, setReports] = useState([]);
   const [reportsLoading, setReportsLoading] = useState(true);
+  const [showResolved, setShowResolved] = useState(false);
+  const [resolvingId, setResolvingId] = useState(null);       // report whose resolve form is open
+  const [resolutionNotes, setResolutionNotes] = useState('');
+  const [resolveError, setResolveError] = useState('');
 
   async function load(searchTerm = search, cat = category) {
     setLoading(true);
@@ -798,10 +802,10 @@ function ExerciseManagerTab() {
     setLoading(false);
   }
 
-  async function loadReports() {
+  async function loadReports(resolved = showResolved) {
     setReportsLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/admin/exercise-reports`, {
+      const res = await fetch(`${API_BASE}/admin/exercise-reports${resolved ? '?resolved=true' : ''}`, {
         headers: { Authorization: `Bearer ${token()}` },
       });
       const data = await res.json();
@@ -814,16 +818,34 @@ function ExerciseManagerTab() {
 
   useEffect(() => { load(); loadReports(); }, []);
 
+  function openResolve(id) {
+    setResolvingId(id);
+    setResolutionNotes('');
+    setResolveError('');
+  }
+
   async function resolveReport(id) {
+    setResolveError('');
     try {
-      await fetch(`${API_BASE}/admin/exercise-reports/${id}/resolve`, {
+      const res = await fetch(`${API_BASE}/admin/exercise-reports/${id}/resolve`, {
         method: 'PUT',
-        headers: { Authorization: `Bearer ${token()}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+        body: JSON.stringify({ resolution_notes: resolutionNotes.trim() }),
       });
+      if (!res.ok) throw new Error('Resolve failed');
       setReports(rs => rs.filter(r => r.id !== id));
+      setResolvingId(null);
+      setResolutionNotes('');
     } catch (err) {
       console.error('Failed to resolve report:', err);
+      setResolveError('Could not resolve the report. Try again.');
     }
+  }
+
+  function switchReportView(resolved) {
+    setShowResolved(resolved);
+    setResolvingId(null);
+    loadReports(resolved);
   }
 
   // Two-step delete: the server rejects the first call when routines reference
@@ -869,14 +891,28 @@ function ExerciseManagerTab() {
     <div className="exm-tab">
       {/* ── Unresolved reports ── */}
       <div className="exm-reports">
-        <h3 className="exm-section-title">
-          Flagged exercises
-          {reports.length > 0 && <span className="admin-badge admin-badge-red">{reports.length}</span>}
-        </h3>
+        <div className="exm-reports-head">
+          <h3 className="exm-section-title">
+            Flagged exercises
+            {!showResolved && reports.length > 0 && (
+              <span className="admin-badge admin-badge-red">{reports.length}</span>
+            )}
+          </h3>
+          <div className="exm-report-view-toggle">
+            <button
+              className={`admin-action-btn ${!showResolved ? 'active' : ''}`}
+              onClick={() => switchReportView(false)}
+            >Unresolved</button>
+            <button
+              className={`admin-action-btn ${showResolved ? 'active' : ''}`}
+              onClick={() => switchReportView(true)}
+            >Resolved</button>
+          </div>
+        </div>
         {reportsLoading ? (
           <p className="admin-loading">Loading…</p>
         ) : reports.length === 0 ? (
-          <p className="exm-empty">No unresolved reports.</p>
+          <p className="exm-empty">{showResolved ? 'No resolved reports yet.' : 'No unresolved reports.'}</p>
         ) : (
           reports.map(r => (
             <div key={r.id} className="exm-report-row">
@@ -886,6 +922,36 @@ function ExerciseManagerTab() {
                 <span className="exm-report-meta">
                   {r.reporter_email || 'Unknown'} · {fmtDate(r.created_at)}
                 </span>
+
+                {r.resolved && (
+                  <div className="exm-resolution">
+                    <span className="exm-resolution-label">Resolution</span>
+                    <p>{r.resolution_notes || <em>No notes recorded.</em>}</p>
+                    <span className="exm-report-meta">
+                      {r.resolver_email || 'Unknown admin'}{r.resolved_at ? ` · ${fmtDate(r.resolved_at)}` : ''}
+                    </span>
+                  </div>
+                )}
+
+                {resolvingId === r.id && (
+                  <div className="exm-resolve-form">
+                    <label htmlFor={`resolve-notes-${r.id}`}>Resolution notes (optional)</label>
+                    <textarea
+                      id={`resolve-notes-${r.id}`}
+                      rows="3"
+                      value={resolutionNotes}
+                      onChange={e => setResolutionNotes(e.target.value)}
+                      placeholder="What was changed, or why no change was needed"
+                    />
+                    {resolveError && <p className="exm-error">{resolveError}</p>}
+                    <div className="exm-form-actions">
+                      <button className="admin-action-btn" onClick={() => resolveReport(r.id)}>
+                        Confirm resolve
+                      </button>
+                      <button className="admin-action-btn" onClick={() => setResolvingId(null)}>Cancel</button>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="exm-report-actions">
                 <button
@@ -896,7 +962,9 @@ function ExerciseManagerTab() {
                     else setActionMsg('Search for the exercise to edit it.');
                   }}
                 >Edit</button>
-                <button className="admin-action-btn" onClick={() => resolveReport(r.id)}>Resolve</button>
+                {!r.resolved && resolvingId !== r.id && (
+                  <button className="admin-action-btn" onClick={() => openResolve(r.id)}>Resolve</button>
+                )}
               </div>
             </div>
           ))
@@ -962,7 +1030,14 @@ function ExerciseManagerTab() {
               <tbody>
                 {exercises.map(ex => (
                   <tr key={ex.id}>
-                    <td>{ex.name}</td>
+                    <td>
+                      {ex.name}
+                      {ex.source === 'user_generated' && (
+                        <span className="exm-user-badge" title="Typed in by a user from a timer block — review name, category and muscles">
+                          User-generated
+                        </span>
+                      )}
+                    </td>
                     <td>{ex.category || '—'}</td>
                     <td className="exm-muscle-cell">{(ex.muscles_primary || []).join(', ') || '—'}</td>
                     <td>{ex.routine_use_count}</td>

@@ -261,3 +261,68 @@
   color: var(--text-primary);
   border: 1px solid var(--border-color);
 }
+
+/* ── @dnd-kit schedule ───────────────────────────────────────────────────── */
+.pb-routine-chip {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.pb-dragging-source {
+  opacity: 0.4;
+}
+
+.pb-drag-overlay {
+  box-shadow: var(--shadow-xl);
+  cursor: grabbing;
+}
+
+/* Drop indicator on the day under the pointer */
+.pb-cal-cell.pb-drop-target {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+  background-color: hsla(220, 80%, 50%, 0.1);
+}
+
+.pb-slot-handle {
+  flex: 0 0 auto;
+  padding: 0 2px;
+  border: none;
+  background: none;
+  color: var(--text-tertiary);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: grab;
+  touch-action: manipulation;
+}
+
+.pb-slot-handle:hover,
+.pb-slot-handle:focus-visible {
+  color: var(--text-primary);
+}
+
+.pb-slot-arrows {
+  display: inline-flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+}
+
+.pb-slot-arrows button {
+  padding: 0 2px;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.1;
+  cursor: pointer;
+}
+
+.pb-slot-arrows button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.pb-overload-note {
+  margin-top: var(--space-sm);
+}

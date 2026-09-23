@@ -7,6 +7,7 @@ import './UserPreferencesPage.css';
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import BugReportModal from './BugReportModal';
 import { useTheme } from '../contexts/ThemeContext';
+import { useUserPrefs } from '../contexts/UserPrefsContext';
 import ProfileCircle from './ProfileCircle';
 import './UserPreferencesPage.css';
 
@@ -25,8 +26,43 @@ const GOAL_TYPES = [
 
 function token() { return localStorage.getItem('ripfit_token'); }
 
+const REORDER_OPTIONS = [
+  { value: 'drag', label: 'Drag and drop' },
+  { value: 'arrows', label: 'Arrow buttons' },
+];
+
+const NOTES_SCOPE_OPTIONS = [
+  { value: 'all', label: 'All workouts' },
+  { value: 'program', label: 'This program only' },
+  { value: 'non_program', label: 'Standalone workouts only' },
+];
+
+function PrefRadioGroup({ name, label, hint, options, value, onChange, disabled }) {
+  return (
+    <fieldset className="prefs-field-group prefs-radio-group" disabled={disabled}>
+      <legend>{label}</legend>
+      {hint && <p className="prefs-radio-hint">{hint}</p>}
+      {options.map(opt => (
+        <label key={opt.value} className={`prefs-radio ${value === opt.value ? 'checked' : ''}`}>
+          <input
+            type="radio"
+            name={name}
+            value={opt.value}
+            checked={value === opt.value}
+            onChange={() => onChange(opt.value)}
+          />
+          {opt.label}
+        </label>
+      ))}
+    </fieldset>
+  );
+}
+
 export default function UserPreferencesPage({ onBack }) {
   const { themeMode, setThemeMode } = useTheme();
+  const { prefs, prefsLoaded, updatePrefs } = useUserPrefs();
+  const [prefMsg, setPrefMsg] = useState('');
+  const [prefMsgType, setPrefMsgType] = useState('ok');
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState('profile');
@@ -78,6 +114,15 @@ export default function UserPreferencesPage({ onBack }) {
     typeSetter(type);
     setter(msg);
     setTimeout(() => setter(''), 4000);
+  }
+
+  async function savePref(patch) {
+    try {
+      await updatePrefs(patch);
+      showMsg('Saved.', 'ok', setPrefMsg, setPrefMsgType);
+    } catch (err) {
+      showMsg(err.message || 'Failed to save.', 'error', setPrefMsg, setPrefMsgType);
+    }
   }
 
   async function saveProfile() {
@@ -456,6 +501,28 @@ export default function UserPreferencesPage({ onBack }) {
                   ))}
                 </div>
               </div>
+
+              <PrefRadioGroup
+                name="reorder_mode"
+                label="Reorder method"
+                hint="How you reorder routine exercises, program days and meditation segments."
+                options={REORDER_OPTIONS}
+                value={prefs.reorder_mode}
+                onChange={v => savePref({ reorder_mode: v })}
+                disabled={!prefsLoaded}
+              />
+
+              <PrefRadioGroup
+                name="previous_notes_scope"
+                label="Previous workout notes"
+                hint="Which past workouts “Last session notes” draws from during a workout."
+                options={NOTES_SCOPE_OPTIONS}
+                value={prefs.previous_notes_scope}
+                onChange={v => savePref({ previous_notes_scope: v })}
+                disabled={!prefsLoaded}
+              />
+
+              {prefMsg && <p className={`prefs-msg ${prefMsgType}`}>{prefMsg}</p>}
 
               <div className="prefs-field-group" style={{ marginTop: 24 }}>
                 <label>Email</label>

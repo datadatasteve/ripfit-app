@@ -257,6 +257,8 @@ const startProgramWorkout = async (req, res) => {
     const templateResult = await client.query(
       `SELECT re.exercise_id, re.order_index, re.target_sets, re.target_reps,
               re.target_weight, re.superset_group, re.notes, re.cooldown_seconds,
+              re.overload_strategy, re.overload_increment, re.overload_schedule, re.overload_week_targets,
+              re.tempo_eccentric, re.tempo_pause, re.tempo_concentric,
               e.name AS exercise_name, e.category, e.equipment_type,
               e.video_url_male, e.video_url_female
        FROM routine_exercises re
@@ -315,7 +317,11 @@ const startProgramWorkout = async (req, res) => {
         video_url_male: ex.video_url_male,
         video_url_female: ex.video_url_female,
         template: { target_sets: ex.target_sets, target_reps: ex.target_reps,
-                    target_weight: ex.target_weight, cooldown_seconds: ex.cooldown_seconds },
+                    target_weight: ex.target_weight, cooldown_seconds: ex.cooldown_seconds,
+                    overload_strategy: ex.overload_strategy, overload_increment: ex.overload_increment,
+                    overload_schedule: ex.overload_schedule, overload_week_targets: ex.overload_week_targets,
+                    tempo_eccentric: ex.tempo_eccentric, tempo_pause: ex.tempo_pause,
+                    tempo_concentric: ex.tempo_concentric },
         last_performance: lastPerf || null,
       });
     }

@@ -1,6 +1,11 @@
 // frontend/src/components/ProgramBuilder.jsx
 import { useState, useEffect } from 'react';
+import {
+  DndContext, DragOverlay, MouseSensor, TouchSensor, useSensor, useSensors,
+  useDraggable, useDroppable, pointerWithin,
+} from '@dnd-kit/core';
 import RoutineBuilder from './RoutineBuilder';
+import { useUserPrefs } from '../contexts/UserPrefsContext';
 import './ProgramBuilder.css';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
@@ -47,6 +52,54 @@ function daysFromSlots(weeks) {
   return days;
 }
 
+// ── Schedule drag & drop ───────────────────────────────────────────────────
+// @dnd-kit replaces the old HTML5 drag events, which never fire on touch
+// screens (and right-click, the only other control, doesn't exist there).
+
+/** Routine / Rest Day chip in the palette. Draggable in both reorder modes —
+ *  assigning a routine to a day is not reordering. */
+function PaletteChip({ id, label, payload, rest }) {
+  const { setNodeRef, listeners, attributes, isDragging } = useDraggable({ id, data: { kind: 'palette', ...payload } });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`pb-routine-chip ${rest ? 'pb-rest-chip' : ''} ${isDragging ? 'pb-dragging-source' : ''}`}
+      {...listeners}
+      {...attributes}
+    >
+      {label}
+    </div>
+  );
+}
+
+/** Drop target for one day of one week. */
+function CalendarCell({ wi, dow, slot, children, onContextMenu }) {
+  const { setNodeRef, isOver } = useDroppable({ id: `cell:${wi}:${dow}`, data: { wi, dow } });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`pb-cal-cell ${slot ? (slot.is_rest_day ? 'pb-slot-rest' : 'pb-slot-filled') : 'pb-slot-empty'} ${isOver ? 'pb-drop-target' : ''}`}
+      onContextMenu={onContextMenu}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** ⠿ handle that picks up a filled day (drag mode only). */
+function SlotHandle({ wi, dow, slot }) {
+  const { setNodeRef, listeners, attributes } = useDraggable({
+    id: `slot:${wi}:${dow}`,
+    data: { kind: 'slot', from: [wi, dow], ...slot },
+  });
+  return (
+    <button ref={setNodeRef} type="button" className="pb-slot-handle" title="Drag to another day"
+      aria-label={`Move ${slot.is_rest_day ? 'rest day' : slot.routine_name}`} {...listeners} {...attributes}>
+      ⠿
+    </button>
+  );
+}
+
 export default function ProgramBuilder({ existingProgram, onSaved, onClose, onDeleted }) {
   const isEditing = !!existingProgram;
 
@@ -62,7 +115,13 @@ export default function ProgramBuilder({ existingProgram, onSaved, onClose, onDe
   );
   const [weeks, setWeeks] = useState(buildEmptyWeeks(existingProgram?.duration_weeks || 8));
   const [routines, setRoutines] = useState([]);
-  const [dragging, setDragging] = useState(null);
+  const [activeDrag, setActiveDrag] = useState(null);   // data of the item being dragged, for the overlay
+  const { prefs } = useUserPrefs();
+  const reorderMode = prefs.reorder_mode;
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 8 } }),
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [showRoutineBuilder, setShowRoutineBuilder] = useState(false);
@@ -105,23 +164,48 @@ export default function ProgramBuilder({ existingProgram, onSaved, onClose, onDe
     if (n > 0) setDurationWeeks(n);
   };
 
-  const onDragStartRoutine = (routine) => setDragging({ routine_id: routine.id, routine_name: routine.name });
-  const onDragStartSlot = (wi, dow) => setDragging({ from: [wi, dow], ...weeks[wi].slots[dow] });
+  const slotFrom = (d) => (d.is_rest_day
+    ? { routine_id: null, routine_name: null, is_rest_day: true }
+    : { routine_id: d.routine_id, routine_name: d.routine_name, is_rest_day: false });
 
-  const onDropSlot = (wi, dow) => {
-    if (!dragging) return;
+  // Palette → day assigns (overwriting). Day → day moves, swapping with the
+  // target if it's already filled so nothing is silently lost.
+  const handleDragEnd = ({ active, over }) => {
+    setActiveDrag(null);
+    const d = active?.data?.current;
+    const target = over?.data?.current;
+    if (!d || !target) return;
+    const { wi, dow } = target;
+
     setWeeks(prev => {
       const next = prev.map(w => ({ ...w, slots: [...w.slots] }));
-      if (dragging.from) {
-        const [fwi, fdow] = dragging.from;
-        next[fwi].slots[fdow] = null;
+      if (d.kind === 'slot') {
+        const [fwi, fdow] = d.from;
+        if (fwi === wi && fdow === dow) return prev;
+        const displaced = next[wi].slots[dow];
+        next[wi].slots[dow] = next[fwi].slots[fdow];
+        next[fwi].slots[fdow] = displaced;
+      } else {
+        next[wi].slots[dow] = slotFrom(d);
       }
-      next[wi].slots[dow] = dragging.is_rest_day
-        ? { routine_id: null, routine_name: null, is_rest_day: true }
-        : { routine_id: dragging.routine_id, routine_name: dragging.routine_name, is_rest_day: false };
       return next;
     });
-    setDragging(null);
+  };
+
+  // Arrow mode: swap a day with the previous / next day in program order.
+  const moveSlot = (wi, dow, delta) => {
+    const flat = wi * 7 + dow;
+    const to = flat + delta;
+    if (to < 0 || to >= weeks.length * 7) return;
+    const twi = Math.floor(to / 7);
+    const tdow = to % 7;
+    setWeeks(prev => {
+      const next = prev.map(w => ({ ...w, slots: [...w.slots] }));
+      const displaced = next[twi].slots[tdow];
+      next[twi].slots[tdow] = next[wi].slots[dow];
+      next[wi].slots[dow] = displaced;
+      return next;
+    });
   };
 
   const clearSlot = (wi, dow) => {
@@ -256,6 +340,9 @@ export default function ProgramBuilder({ existingProgram, onSaved, onClose, onDe
             </label>
           )}
         </div>
+        <p className="pb-hint pb-overload-note">
+          These are program-wide defaults. Individual exercises in each routine can override them.
+        </p>
       </div>
 
       <div className="pb-section">
@@ -292,8 +379,21 @@ export default function ProgramBuilder({ existingProgram, onSaved, onClose, onDe
 
       <div className="pb-section">
         <h3>Weekly Schedule</h3>
-        <p className="pb-hint">Drag routines onto calendar days. Right-click a slot to mark as rest or clear it.</p>
+        <p className="pb-hint">
+          Drag routines onto calendar days (on touch screens, press and hold, then drag).{' '}
+          {reorderMode === 'arrows'
+            ? 'Use ↑ ↓ on a day to move it earlier or later.'
+            : 'Drag a day by its ⠿ handle to move it; dropping on a filled day swaps them.'}{' '}
+          Right-click a day to mark it as rest or clear it.
+        </p>
 
+        <DndContext
+          sensors={sensors}
+          collisionDetection={pointerWithin}
+          onDragStart={({ active }) => setActiveDrag(active.data.current)}
+          onDragCancel={() => setActiveDrag(null)}
+          onDragEnd={handleDragEnd}
+        >
         <div className="pb-builder-layout">
           {/* Routine palette */}
           <div className="pb-routine-palette">
@@ -303,14 +403,11 @@ export default function ProgramBuilder({ existingProgram, onSaved, onClose, onDe
             </div>
             {routines.length === 0 && <p className="pb-empty">No routines yet.</p>}
             {routines.map(r => (
-              <div key={r.id} className="pb-routine-chip" draggable onDragStart={() => onDragStartRoutine(r)}>
-                {r.name}
-              </div>
+              <PaletteChip key={r.id} id={`palette:${r.id}`} label={r.name}
+                payload={{ routine_id: r.id, routine_name: r.name, is_rest_day: false }} />
             ))}
-            <div className="pb-routine-chip pb-rest-chip" draggable
-              onDragStart={() => setDragging({ routine_id: null, routine_name: null, is_rest_day: true })}>
-              Rest Day
-            </div>
+            <PaletteChip id="palette:rest" label="Rest Day" rest
+              payload={{ routine_id: null, routine_name: null, is_rest_day: true }} />
           </div>
 
           {/* Calendar grid */}
@@ -324,28 +421,36 @@ export default function ProgramBuilder({ existingProgram, onSaved, onClose, onDe
             {weeks.map((wk, wi) => (
               <div key={wi} className="pb-cal-row">
                 <div className="pb-week-label">W{wk.week}</div>
-                {wk.slots.map((slot, dow) => (
-                  <div
-                    key={dow}
-                    className={`pb-cal-cell ${slot ? (slot.is_rest_day ? 'pb-slot-rest' : 'pb-slot-filled') : 'pb-slot-empty'}`}
-                    onDragOver={e => e.preventDefault()}
-                    onDrop={() => onDropSlot(wi, dow)}
-                    onContextMenu={e => { e.preventDefault(); slot ? clearSlot(wi, dow) : setRestDay(wi, dow); }}
-                  >
-                    {slot && !slot.is_rest_day && (
-                      <div className="pb-slot-content" draggable onDragStart={() => onDragStartSlot(wi, dow)}>
-                        <span className="pb-slot-name">{slot.routine_name}</span>
-                        <button className="pb-slot-clear" onClick={() => clearSlot(wi, dow)}>✕</button>
-                      </div>
-                    )}
-                    {slot?.is_rest_day && (
-                      <div className="pb-slot-content pb-slot-rest-content">
-                        <span className="pb-rest-label">Rest</span>
-                        <button className="pb-slot-clear" onClick={() => clearSlot(wi, dow)}>✕</button>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                {wk.slots.map((slot, dow) => {
+                  const flat = wi * 7 + dow;
+                  return (
+                    <CalendarCell
+                      key={dow}
+                      wi={wi}
+                      dow={dow}
+                      slot={slot}
+                      onContextMenu={e => { e.preventDefault(); slot ? clearSlot(wi, dow) : setRestDay(wi, dow); }}
+                    >
+                      {slot && (
+                        <div className={`pb-slot-content ${slot.is_rest_day ? 'pb-slot-rest-content' : ''}`}>
+                          {reorderMode === 'drag' && <SlotHandle wi={wi} dow={dow} slot={slot} />}
+                          {slot.is_rest_day
+                            ? <span className="pb-rest-label">Rest</span>
+                            : <span className="pb-slot-name">{slot.routine_name}</span>}
+                          {reorderMode === 'arrows' && (
+                            <span className="pb-slot-arrows">
+                              <button type="button" onClick={() => moveSlot(wi, dow, -1)} disabled={flat === 0}
+                                aria-label="Move to previous day" title="Move to previous day">↑</button>
+                              <button type="button" onClick={() => moveSlot(wi, dow, 1)} disabled={flat === weeks.length * 7 - 1}
+                                aria-label="Move to next day" title="Move to next day">↓</button>
+                            </span>
+                          )}
+                          <button className="pb-slot-clear" onClick={() => clearSlot(wi, dow)} aria-label="Clear day">✕</button>
+                        </div>
+                      )}
+                    </CalendarCell>
+                  );
+                })}
                 <div className="pb-row-actions">
                   {wi < weeks.length - 1 && (
                     <button
@@ -359,6 +464,15 @@ export default function ProgramBuilder({ existingProgram, onSaved, onClose, onDe
             ))}
           </div>
         </div>
+
+        <DragOverlay dropAnimation={null}>
+          {activeDrag ? (
+            <div className={`pb-routine-chip pb-drag-overlay ${activeDrag.is_rest_day ? 'pb-rest-chip' : ''}`}>
+              {activeDrag.is_rest_day ? 'Rest Day' : activeDrag.routine_name}
+            </div>
+          ) : null}
+        </DragOverlay>
+        </DndContext>
 
         {durationWeeks > 1 && (
           <button className="pb-repeat-all-btn" onClick={repeatWeek1}>

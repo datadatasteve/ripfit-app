@@ -21,6 +21,9 @@ router.get('/previous-notes', authenticate, workoutController.getPreviousExercis
 // User-submitted exercise issue report
 router.post('/exercises/:id/report', authenticate, workoutController.reportExercise);
 
+// Timer blocks: attach a typed exercise name, creating it if it doesn't exist
+router.post('/exercises/find-or-create', authenticate, workoutController.findOrCreateExercise);
+
 // Workout logging
 router.post('/', authenticate, workoutController.logWorkout);
 router.get('/', authenticate, workoutController.getWorkouts);

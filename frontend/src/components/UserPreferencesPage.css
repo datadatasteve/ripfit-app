@@ -465,3 +465,50 @@
   color: white;
 }
 .number-btn:disabled { opacity: 0.6; cursor: default; }
+
+/* ── Radio preference groups ─────────────────────────────────────────────── */
+.prefs-radio-group {
+  border: none;
+  padding: 0;
+  margin: 24px 0 0;
+}
+
+.prefs-radio-group legend {
+  margin-bottom: var(--space-xs);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+}
+
+.prefs-radio-hint {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+}
+
+.prefs-radio {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: 44px;
+  margin: 0;
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.prefs-radio.checked {
+  background-color: var(--bg-secondary);
+}
+
+.prefs-radio input {
+  width: auto;
+  margin: 0;
+  accent-color: var(--color-primary);
+}
+
+.prefs-radio-group:disabled {
+  opacity: 0.6;
+}

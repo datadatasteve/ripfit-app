@@ -527,9 +527,13 @@ const getWorkouts = async (req, res) => {
 };
 
 // Add before module.exports
+// Timer modes tag their sets (migration 028); anything else is a normal set.
+const LOGGABLE_SET_TYPES = new Set(['normal', 'warmup', 'drop', 'superset', 'emom', 'tabata', 'amrap', 'interval']);
+
 const logWorkoutSet = async (req, res) => {
   const { workoutId } = req.params;
   const { workout_exercise_id, set_number, reps_completed, weight_used, rpe } = req.body;
+  const setType = LOGGABLE_SET_TYPES.has(req.body.set_type) ? req.body.set_type : 'normal';
   const user_id = req.user.userId;
 
   try {
@@ -544,8 +548,8 @@ const logWorkoutSet = async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO workout_sets (workout_exercise_id, set_number, reps_completed, weight_used, rpe, set_type)
-       VALUES ($1, $2, $3, $4, $5, 'normal') RETURNING *`,
-      [workout_exercise_id, set_number, reps_completed, weight_used, rpe || null]
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [workout_exercise_id, set_number, reps_completed, weight_used, rpe || null, setType]
     );
 
     res.status(201).json(result.rows[0]);
@@ -559,10 +563,18 @@ const finishWorkout = async (req, res) => {
   const { workoutId } = req.params;
   const user_id = req.user.userId;
 
+  // Optional explicit length. Meditation sessions are logged once they're over,
+  // so start/end timestamps are seconds apart and can't describe the session.
+  const rawDuration = req.body?.duration_seconds;
+  const durationSeconds = Number.isInteger(rawDuration) && rawDuration >= 0 ? rawDuration : null;
+
   try {
     const result = await pool.query(
-      `UPDATE workouts SET end_time = $1, status = 'completed' WHERE id = $2 AND user_id = $3 RETURNING *`,
-      [new Date().toISOString(), workoutId, user_id]
+      `UPDATE workouts
+       SET end_time = $1, status = 'completed',
+           duration_seconds = COALESCE($4, duration_seconds)
+       WHERE id = $2 AND user_id = $3 RETURNING *`,
+      [new Date().toISOString(), workoutId, user_id, durationSeconds]
     );
 
     if (result.rows.length === 0) {
@@ -954,38 +966,80 @@ const updateWorkoutType = async (req, res) => {
 
 /**
  * Notes from the most recent completed workout that included this exercise.
- * GET /api/v1/workouts/previous-notes?exerciseId=123
+ * GET /api/v1/workouts/previous-notes?exerciseId=123[&scope=all|program|non_program][&programId=9]
+ *
+ * scope defaults to the user's previous_notes_scope preference. 'program'
+ * needs a programId: an explicit request without one is a 400, but when the
+ * scope only came from the preference (e.g. a standalone workout for a user who
+ * prefers program notes) it falls back to 'all'. The applied scope is echoed
+ * back so the client can show it.
  */
+const NOTE_SCOPES = new Set(['all', 'program', 'non_program']);
+
 const getPreviousExerciseNotes = async (req, res) => {
   const user_id = req.user.userId;
   const exerciseId = parseInt(req.query.exerciseId, 10);
+  const programId = parseInt(req.query.programId, 10) || null;
 
   if (!exerciseId) {
     return res.status(400).json({ error: 'exerciseId required' });
   }
 
+  let scope = req.query.scope;
+  const explicitScope = scope !== undefined;
+  if (explicitScope && !NOTE_SCOPES.has(scope)) {
+    return res.status(400).json({ error: 'scope must be all, program or non_program' });
+  }
+
   try {
+    if (!explicitScope) {
+      const pref = await pool.query('SELECT previous_notes_scope FROM users WHERE id = $1', [user_id]);
+      scope = pref.rows[0]?.previous_notes_scope || 'all';
+    }
+    if (scope === 'program' && !programId) {
+      if (explicitScope) return res.status(400).json({ error: 'programId required when scope=program' });
+      scope = 'all';
+    }
+
+    const params = [user_id, exerciseId];
+    let scopeSql = '';
+    if (scope === 'program') {
+      params.push(programId);
+      scopeSql = `AND w.program_id = $${params.length}`;
+    } else if (scope === 'non_program') {
+      scopeSql = 'AND w.program_id IS NULL';
+    }
+
+    // exercise_notes only — workouts.overall_notes is session-level and is
+    // served to the client separately (previous_overall_notes on workout start).
+    // workout_date goes out as a bare YYYY-MM-DD string: pg would otherwise turn
+    // the DATE into a JS Date and serialise it as a UTC timestamp.
     const result = await pool.query(
       `SELECT w.id AS workout_id,
-              w.workout_date,
+              to_char(w.workout_date, 'YYYY-MM-DD') AS workout_date,
               w.workout_title,
-              w.overall_notes,
               we.exercise_notes
        FROM workout_exercises we
        JOIN workouts w ON w.id = we.workout_id
        WHERE w.user_id = $1
          AND we.exercise_id = $2
          AND w.status = 'completed'
+         -- workouts.status defaults to 'completed' at insert, so an in-progress
+         -- workout already reads as completed. end_time is only set by finish
+         -- (and cancel, which the status check excludes), so this skips the
+         -- workout currently being logged.
+         AND w.end_time IS NOT NULL
+         ${scopeSql}
        ORDER BY w.workout_date DESC, w.id DESC
        LIMIT 1`,
-      [user_id, exerciseId]
+      params
     );
 
     if (result.rows.length === 0) {
-      return res.json({ workout_id: null, exercise_notes: null, overall_notes: null });
+      return res.json({ workout_id: null, workout_date: null, exercise_notes: null, scope });
     }
 
-    res.json(result.rows[0]);
+    res.json({ ...result.rows[0], scope });
   } catch (error) {
     console.error('Get previous exercise notes error:', error);
     res.status(500).json({ error: 'Failed to get previous notes' });
@@ -1023,6 +1077,44 @@ const reportExercise = async (req, res) => {
   }
 };
 
+/**
+ * Resolve a typed exercise name to an exercise, creating a minimal record if
+ * none matches. Used when attaching an exercise to a timer block.
+ * POST /api/v1/workouts/exercises/find-or-create  { name }
+ *
+ * Matching is case-insensitive on the trimmed name. exercises.name has no
+ * unique constraint, so this looks up first rather than relying on
+ * ON CONFLICT (which would never fire and would insert duplicates).
+ */
+const findOrCreateExercise = async (req, res) => {
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim().replace(/\s+/g, ' ') : '';
+  if (!name) return res.status(400).json({ error: 'name is required' });
+  if (name.length > 255) return res.status(400).json({ error: 'name is too long' });
+
+  try {
+    const existing = await pool.query(
+      `SELECT id, name, category, equipment_type, source
+       FROM exercises WHERE LOWER(name) = LOWER($1)
+       ORDER BY id LIMIT 1`,
+      [name]
+    );
+    if (existing.rows.length > 0) {
+      return res.json({ ...existing.rows[0], created: false });
+    }
+
+    const inserted = await pool.query(
+      `INSERT INTO exercises (name, category, source, is_custom, created_by_user_id)
+       VALUES ($1, 'General', 'user_generated', TRUE, $2)
+       RETURNING id, name, category, equipment_type, source`,
+      [name, req.user.userId]
+    );
+    res.status(201).json({ ...inserted.rows[0], created: true });
+  } catch (error) {
+    console.error('Find-or-create exercise error:', error);
+    res.status(500).json({ error: 'Failed to resolve exercise' });
+  }
+};
+
 module.exports = {
   searchExercises,
   getExerciseById,
@@ -1044,4 +1136,5 @@ module.exports = {
   updateWorkoutType,
   getPreviousExerciseNotes,
   reportExercise,
+  findOrCreateExercise,
 };

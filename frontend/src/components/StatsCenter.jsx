@@ -18,7 +18,7 @@ const HOURS = Array.from({ length: 24 }, (_, i) =>
   i === 0 ? '12a' : i < 12 ? `${i}a` : i === 12 ? '12p' : `${i - 12}p`
 );
 
-const TABS = ['Overview', 'Strength', 'Cardio', 'Records', 'Combined', 'History', 'Programs'];
+const TABS = ['Overview', 'Strength', 'Cardio', 'Records', 'Combined', 'History', 'Programs', 'Meditation'];
 const PROGRAM_SUB_TABS = ['Overview', 'Strength', 'Cardio', 'Records', 'Combined', 'History'];
 
 function token() { return localStorage.getItem('ripfit_token'); }
@@ -2169,6 +2169,90 @@ function ProgramsTab({ onSelectWorkout, selectedProgramIds, setSelectedProgramId
   );
 }
 
+// ── Meditation (9d) ────────────────────────────────────────────────────────
+// Meditation sessions are excluded from every other tab; this is their view.
+
+function formatHoursMinutes(totalSeconds) {
+  const mins = Math.round((totalSeconds || 0) / 60);
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h === 0) return `${m}m`;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
+}
+
+function formatSessionLength(totalSeconds) {
+  const s = Math.max(0, Math.round(totalSeconds || 0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}` : `${m}:${String(sec).padStart(2, '0')}`;
+}
+
+/** The user's own words from a logged session, without the auto breakdown. */
+function sessionNotesOnly(overallNotes) {
+  if (!overallNotes) return '';
+  const marker = 'Session notes:';
+  const i = overallNotes.indexOf(marker);
+  return i === -1 ? '' : overallNotes.slice(i + marker.length).trim();
+}
+
+function MeditationTab() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    setLoading(true);
+    apiFetch('/meditation', 3, ctrl.signal)
+      .then(setData)
+      .catch(e => { if (e.name !== 'AbortError') console.error(e); })
+      .finally(() => setLoading(false));
+    return () => ctrl.abort();
+  }, []);
+
+  if (loading) return <Loading />;
+  if (!data || data.total_sessions === 0) {
+    return <Empty message="No meditation sessions logged yet. Finish one and tap Log Session to see it here." />;
+  }
+
+  return (
+    <>
+      <div className="sc-stat-grid">
+        <StatCard label="Sessions" value={data.total_sessions} />
+        <StatCard label="Total time" value={formatHoursMinutes(data.total_seconds)} />
+        <StatCard
+          label="Average session"
+          value={formatSessionLength(data.total_seconds / data.total_sessions)}
+        />
+      </div>
+
+      <Section title="Session history">
+        <div className="sc-med-table-wrap">
+          <table className="sc-med-table">
+            <thead>
+              <tr><th>Date</th><th>Duration</th><th>Preset</th><th>Notes</th></tr>
+            </thead>
+            <tbody>
+              {data.sessions.map(sess => {
+                const date = new Date(`${String(sess.workout_date).slice(0, 10)}T00:00:00`);
+                const notes = sessionNotesOnly(sess.overall_notes);
+                return (
+                  <tr key={sess.id}>
+                    <td>{Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString()}</td>
+                    <td className="sc-med-num">{formatSessionLength(sess.duration_seconds)}</td>
+                    <td>{sess.workout_title || 'Meditation'}</td>
+                    <td className="sc-med-notes">{notes || <span className="sc-med-muted">—</span>}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Section>
+    </>
+  );
+}
+
 export default function StatsCenter({ initialProgramId, onProgramStatsConsumed }) {
   const [tab, setTab] = useState('Overview');
   const [selectedHistoryId, setSelectedHistoryId] = useState(null);
@@ -2223,6 +2307,7 @@ export default function StatsCenter({ initialProgramId, onProgramStatsConsumed }
         {tab === 'Strength'  && <StrengthTab />}
         {tab === 'Cardio'    && <CardioTab onSelectWorkout={handleSelectWorkout} initialDrillType={cardioDrillType} onDrillChange={setCardioDrillType} />}
         {tab === 'Records'   && <RecordsTab />}
+        {tab === 'Meditation' && <MeditationTab />}
         {tab === 'Combined'  && <CombinedTab onSelectWorkout={handleSelectWorkout} />}
         {tab === 'History'   && <HistoryTab initialWorkoutId={selectedHistoryId} onClearSelected={() => setSelectedHistoryId(null)} onSelectWorkout={handleSelectWorkout} />}
         {tab === 'Programs'  && (

@@ -424,6 +424,7 @@
 
 /* Sheet chrome — hidden until the mobile breakpoint */
 .browser-sheet-overlay,
+.browser-sheet-grab,
 .browser-sheet-handle,
 .browser-sheet-close {
   display: none;
@@ -508,6 +509,27 @@
     inset: 0;
     background: rgba(0, 0, 0, 0.45);
     z-index: var(--z-modal-backdrop);
+    /* iOS Safari won't deliver a tap to a non-interactive element unless it
+       looks clickable — without this the overlay swallowed taps silently. */
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Full-width grab strip that stays pinned while the sheet scrolls. It owns
+     the swipe gesture; touch-action stops the browser from scrolling the
+     sheet instead, so the drag distance is reported intact on touchend. */
+  .browser-sheet-grab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    height: 28px;
+    margin: 0 calc(-1 * var(--space-md));
+    background-color: var(--bg-elevated);
+    touch-action: none;
+    cursor: grab;
   }
 
   .browser-detail {
@@ -545,10 +567,8 @@
     display: block;
     width: 40px;
     height: 4px;
-    margin: var(--space-sm) auto;
     border-radius: var(--radius-full);
     background-color: var(--border-color);
-    cursor: pointer;
   }
 
   .browser-sheet-close {

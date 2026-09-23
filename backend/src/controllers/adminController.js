@@ -376,7 +376,7 @@ async function listExercises(req, res) {
       `SELECT e.id, e.name, e.description, e.category, e.subcategory, e.equipment_type,
               e.muscles_primary, e.muscles_secondary, e.force, e.level, e.mechanic,
               e.instructions, e.video_url_male, e.video_url_female,
-              e.is_custom, e.created_by_user_id,
+              e.is_custom, e.created_by_user_id, e.source,
               COUNT(re.id)::int AS routine_use_count
        FROM exercises e
        LEFT JOIN routine_exercises re ON re.exercise_id = e.id
@@ -510,13 +510,16 @@ async function listExerciseReports(req, res) {
   try {
     const result = await pool.query(
       `SELECT er.id, er.exercise_id, er.user_id, er.report_text, er.created_at, er.resolved,
+              er.resolution_notes, er.resolved_by, er.resolved_at,
               e.name AS exercise_name, e.category,
-              u.email AS reporter_email
+              u.email AS reporter_email,
+              ru.email AS resolver_email
        FROM exercise_reports er
        LEFT JOIN exercises e ON e.id = er.exercise_id
        LEFT JOIN users u ON u.id = er.user_id
+       LEFT JOIN users ru ON ru.id = er.resolved_by
        WHERE er.resolved = $1
-       ORDER BY er.created_at DESC`,
+       ORDER BY COALESCE(er.resolved_at, er.created_at) DESC`,
       [includeResolved]
     );
     res.json({ reports: result.rows });
@@ -527,16 +530,27 @@ async function listExerciseReports(req, res) {
 }
 
 // ── PUT /admin/exercise-reports/:id/resolve ────────────────────────────────
+// Body: { resolution_notes?: string } — optional note on what was changed.
 async function resolveExerciseReport(req, res) {
   if (!(await requireAdmin(req, res))) return;
 
   const id = parseInt(req.params.id, 10);
   if (!id) return res.status(400).json({ error: 'Invalid report id' });
 
+  const notes = typeof req.body?.resolution_notes === 'string'
+    ? req.body.resolution_notes.trim().slice(0, 2000)
+    : '';
+
   try {
     const result = await pool.query(
-      'UPDATE exercise_reports SET resolved = TRUE WHERE id = $1 RETURNING *',
-      [id]
+      `UPDATE exercise_reports
+       SET resolved = TRUE,
+           resolution_notes = $2,
+           resolved_by = $3,
+           resolved_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [id, notes || null, req.user.userId]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Report not found' });
     res.json(result.rows[0]);

@@ -15,6 +15,9 @@
 .header-buttons {
   display: flex;
   gap: 10px;
+  /* The water widget is taller than the buttons; without this every button
+     stretched to its height. */
+  align-items: center;
 }
  
 .view-all-btn {
@@ -426,9 +429,12 @@
   cursor: pointer;
 }
  
+/* Ring drawn with box-shadow, not a thicker border: a wider border would
+   reflow the form and nudge the Complete Set button down when rest starts. */
 .set-form.resting {
   animation: pulse 2s infinite;
-  border: 3px solid #ffc107;
+  border-color: var(--color-warning);
+  box-shadow: 0 0 0 2px var(--color-warning);
 }
  
 @keyframes pulse {
@@ -1058,18 +1064,36 @@
   color: var(--text-tertiary);
 }
 
-.aw-prev-notes-label {
-  display: block;
-  margin-top: var(--space-sm);
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
-}
 
 /* ── Pinned primary actions ──────────────────────────────────────────────── */
+/* Previous / Next, pinned to the viewport bottom on every screen size.
+   Full-width bar; on wide screens the buttons stay within the 800px workout
+   column. z-index 990 clears page content but stays under .modal-overlay
+   (1000) so it never covers a modal's own buttons. */
 .aw-action-bar {
   display: flex;
   gap: var(--space-sm);
-  margin-top: var(--space-lg);
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 990;
+  padding: var(--space-sm) max(var(--space-sm), calc((100% - 800px) / 2))
+           calc(var(--space-sm) + env(safe-area-inset-bottom, 0px));
+  background-color: var(--bg-elevated);
+  border-top: 1px solid var(--border-color);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.12);
+}
+
+/* Reserve room so the last content isn't hidden behind the bar */
+.workout-container.aw-in-progress {
+  padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+}
+
+.aw-action-prev {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
 }
 
 .aw-action-btn {
@@ -1185,24 +1209,13 @@
     min-height: 44px;
   }
 
-  /* Pinned bottom action bar */
-  .aw-action-bar {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    margin: 0;
-    padding: var(--space-sm) var(--space-sm) calc(var(--space-sm) + env(safe-area-inset-bottom, 0px));
-    background-color: var(--bg-elevated);
-    border-top: 1px solid var(--border-color);
-    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.12);
-    z-index: var(--z-fixed);
+
+  /* Toasts sit above the pinned bar instead of on top of Next Exercise */
+  .aw-in-progress .success-toast {
+    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
   }
 
   /* Leave room for the pinned bar at the end of the scroll area */
-  .workout-container.aw-in-progress {
-    padding-bottom: 84px;
-  }
 }
 
 /* ── Progressive overload suggestion (workout summary) ───────────────────── */
@@ -1280,4 +1293,440 @@
   margin: var(--space-sm) 0 0;
   color: var(--color-danger);
   font-size: var(--font-size-sm);
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PHASE 2 — header, exercise actions, rest pill, tempo, timer block
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Header: title · clock · gear · water … Notes · ☰ · Finish ── */
+.aw-workout-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-sm) var(--space-md);
+}
+
+.aw-header-left,
+.aw-header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.aw-header-left h2 {
+  margin: 0;
+  min-width: 0;
+}
+
+.aw-header-right .finish-btn {
+  padding: 10px 18px;
+  font-weight: var(--font-weight-semibold);
+}
+
+.view-all-btn.aw-icon-only {
+  width: 44px;
+  padding: 0;
+  font-size: 1.1rem;
+}
+
+/* ── Clock = pause/resume control (F3) ── */
+.aw-clock-btn {
+  min-height: 40px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.aw-clock-btn:hover {
+  border-color: var(--text-tertiary);
+}
+
+.aw-clock-btn.paused {
+  border-color: var(--color-warning);
+  background: hsla(38, 92%, 50%, 0.12);
+  color: var(--color-warning);
+}
+
+/* ── Exercise card header: name + ⊘ ↺ + ── */
+.exercise-header {
+  gap: var(--space-sm);
+}
+
+.aw-ex-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
+.aw-ex-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--text-secondary);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.aw-ex-action:hover,
+.aw-ex-action:focus-visible {
+  color: var(--text-primary);
+  background-color: var(--bg-tertiary);
+  transform: scale(1.1);
+}
+
+/* ── Category line + rest pill (fixed-height line, so no layout shift) ── */
+.aw-category-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  min-height: 34px;
+  margin-bottom: 12px;
+}
+
+.aw-category-row .category {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.aw-rest-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 4px 0 10px;
+  border-radius: var(--radius-full);
+  background: hsla(199, 89%, 48%, 0.14);
+  color: var(--color-info);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+.aw-rest-time {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.aw-rest-skip {
+  height: 26px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+}
+
+/* ── Log row: Complete Set + Start Rep ── */
+.aw-log-row {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.aw-log-row .log-set-btn {
+  flex: 1;
+}
+
+.aw-start-rep-btn {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 0 var(--space-md);
+  border: 1px solid var(--color-primary);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.aw-start-rep-btn.running {
+  background: var(--color-primary);
+  color: var(--text-inverse);
+}
+
+/* ── Tempo line + guide ── */
+.aw-tempo {
+  margin-bottom: var(--space-sm);
+}
+
+.aw-tempo-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.aw-tempo-label {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.aw-tempo-label strong {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-base);
+  color: var(--text-primary);
+}
+
+.aw-tempo-guide-btn {
+  min-height: 36px;
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+}
+
+.aw-tempo-guide-btn.on {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.aw-tempo-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+}
+
+.aw-switch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: 40px;
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.aw-switch input { width: auto; }
+
+.aw-tempo-hint {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+}
+
+.aw-tempo-run {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-sm);
+  padding: var(--space-sm);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+}
+
+.aw-tempo-phase {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
+
+.aw-tempo-count {
+  font-size: 3rem;
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+/* Tempo glow: silver on dark, medium gray on light. It fades — 500 ms in,
+   hold, 500 ms out — once per phase, and never strobes. */
+:root { --tempo-glow: #707070; }
+[data-theme="dark"] { --tempo-glow: #C0C0C0; }
+
+.current-exercise {
+  transition: box-shadow 500ms ease-in-out;
+}
+
+.current-exercise.tempo-glow-on {
+  box-shadow: 0 0 0 3px var(--tempo-glow), 0 0 22px 2px var(--tempo-glow);
+}
+
+.aw-tempo-screen-glow {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .aw-tempo-screen-glow {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 980;
+    pointer-events: none;
+    box-shadow: inset 0 0 36px 6px var(--tempo-glow);
+    opacity: 0;
+    transition: opacity 500ms ease-in-out;
+  }
+
+  .aw-tempo-screen-glow.on {
+    opacity: 1;
+  }
+}
+
+/* ── Card footer + timer block ── */
+.aw-card-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-md);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--border-color);
+}
+
+.aw-timer-block-btn {
+  min-height: 44px;
+  padding: 0 var(--space-md);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.aw-timer-block-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--text-tertiary);
+}
+
+.aw-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  justify-content: center;
+}
+
+/* ── Last-session notes: scope toggle ── */
+.aw-prev-notes-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 var(--space-sm);
+  padding-right: var(--space-sm);
+}
+
+.aw-prev-notes-head .aw-prev-notes-toggle {
+  flex: 1 1 auto;
+  width: auto;
+}
+
+.aw-scope-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.aw-scope-toggle button {
+  min-height: 30px;
+  padding: 0 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+}
+
+.aw-scope-toggle button + button {
+  border-left: 1px solid var(--border-color);
+}
+
+.aw-scope-toggle button.active {
+  background: var(--color-primary);
+  color: var(--text-inverse);
+}
+
+.aw-scope-toggle button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Overload card items ── */
+.aw-overload-list {
+  list-style: none;
+  padding-left: 0;
+}
+
+.aw-overload-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.aw-overload-item input {
+  width: auto;
+  margin-top: 3px;
+}
+
+.aw-overload-source {
+  color: var(--text-tertiary);
+}
+
+.summary-tabata {
+  margin: 6px 0 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-success);
+}
+
+@media (max-width: 768px) {
+  .aw-header-left {
+    flex-wrap: wrap;
+    flex: 1 1 100%;
+  }
+
+  .aw-header-left h2 {
+    flex: 1 1 100%;
+  }
+
+  .aw-header-right {
+    flex: 1 1 100%;
+    justify-content: flex-end;
+  }
+
+  .aw-ex-action {
+    width: 44px;
+    height: 44px;
+  }
+
+  .aw-scope-toggle button {
+    min-height: 36px;
+  }
 }

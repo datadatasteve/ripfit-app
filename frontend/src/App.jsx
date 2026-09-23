@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import ProfileMenu from './components/ProfileMenu'
 import ActiveWorkout from './components/ActiveWorkout'
 import ExerciseBrowser from './components/ExerciseBrowser'
@@ -9,6 +9,8 @@ import AdminPanel from './components/AdminPanel'
 import ErrorBoundary from './components/ErrorBoundary'
 import NutritionPage from './components/NutritionPage'
 import Login from './components/Login'
+import { useMeditationEngine, segmentRemaining } from './components/MeditationTimer'
+import { UserPrefsContext, DEFAULT_USER_PREFS, prefsFromProfile } from './contexts/UserPrefsContext'
 import './styles/App.css'
 
 // Shared elapsed-seconds math for the active workout (excludes paused time).
@@ -23,9 +25,12 @@ function getElapsedSeconds(workout) {
 }
 
 function formatClock(totalSeconds) {
-  const m = Math.floor(totalSeconds / 60);
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
   const s = totalSeconds % 60;
-  return `${m}:${String(s).padStart(2, '0')}`;
+  return h > 0
+    ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+    : `${m}:${String(s).padStart(2, '0')}`;
 }
 
 function NavElapsedClock({ workout }) {
@@ -65,28 +70,65 @@ function HeaderWorkoutIndicator({ workout, isOnWorkoutView, onReturn }) {
   if (!workout?.start_time) return null;
 
   if (isOnWorkoutView) {
-    return <span className="header-workout-pulse" title="Workout in progress" aria-label="Workout in progress" />;
+    const paused = !!workout.paused_at;
+    return (
+      <span
+        className={`header-workout-pulse ${paused ? 'paused' : ''}`}
+        title={paused ? 'Workout paused' : 'Workout in progress'}
+        aria-label={paused ? 'Workout paused' : 'Workout in progress'}
+      />
+    );
   }
 
+  // Workout elapsed time (pauses excluded), so while paused it simply holds
+  // still — shown in amber — rather than counting the pause itself.
   const isPaused = !!workout.paused_at;
-  const seconds = isPaused
-    ? Math.floor((Date.now() - new Date(workout.paused_at).getTime()) / 1000)
-    : getElapsedSeconds(workout);
+  const seconds = getElapsedSeconds(workout);
 
   return (
     <button
       type="button"
       className={`header-workout-timer ${isPaused ? 'paused' : ''}`}
       onClick={onReturn}
-      aria-label="Return to active workout"
+      aria-label={isPaused ? `Workout paused at ${formatClock(seconds)}. Return to workout` : 'Return to active workout'}
     >
       {formatClock(seconds)}
     </button>
   );
 }
 
+/**
+ * Mobile header chip for a meditation session running off-screen. Shows the
+ * time left in the current segment (amber when paused) and taps back to it.
+ */
+function HeaderMeditationIndicator({ session, onReturn }) {
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    if (session?.status !== 'running') return undefined;
+    const id = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [session?.status]);
+
+  if (!session) return null;
+
+  const label = session.status === 'done' ? 'Done' : formatClock(segmentRemaining(session));
+
+  return (
+    <button
+      type="button"
+      className={`header-meditation-timer ${session.status}`}
+      onClick={onReturn}
+      aria-label="Return to meditation"
+      title="Return to meditation"
+    >
+      🧘 {label}
+    </button>
+  );
+}
+
 /** Slide-in drawer nav for mobile viewports. */
-function MobileNavDrawer({ open, onClose, currentView, hasActiveWorkout, onNavigate, onReturnToWorkout }) {
+function MobileNavDrawer({ open, onClose, currentView, hasActiveWorkout, workoutPaused, onNavigate, onReturnToWorkout }) {
   const panelRef = useRef(null);
 
   useEffect(() => {
@@ -124,7 +166,7 @@ function MobileNavDrawer({ open, onClose, currentView, hasActiveWorkout, onNavig
               className="mobile-drawer-link return-to-workout"
               onClick={onReturnToWorkout}
             >
-              <span className="mobile-drawer-dot" />
+              <span className={`mobile-drawer-dot ${workoutPaused ? 'paused' : ''}`} />
               Return to Active Workout
             </button>
           )}
@@ -160,6 +202,13 @@ function App() {
   const [programStatsId, setProgramStatsId] = useState(null);
   const [viewingWorkout, setViewingWorkout] = useState(null); // { id, type }
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Lifted like activeWorkout so a session survives switching tabs.
+  const [activeMeditation, setActiveMeditation] = useState(null);
+  const [userPrefs, setUserPrefs] = useState(DEFAULT_USER_PREFS);
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
+
+  // Advances segments, rings bowls and holds the wake lock whichever view is up.
+  useMeditationEngine(activeMeditation, setActiveMeditation);
 
   // Handle ?verified=true redirect from email verification link
   useEffect(() => {
@@ -179,9 +228,40 @@ function App() {
       headers: { Authorization: `Bearer ${tok}` },
     })
       .then(r => r.json())
-      .then(d => { if (d.is_admin) setIsAdmin(true); })
+      .then(d => {
+        if (d.is_admin) setIsAdmin(true);
+        setUserPrefs(prefsFromProfile(d));
+        setPrefsLoaded(true);
+      })
       .catch(() => {});
   }, [isLoggedIn]);
+
+  // Optimistic: the UI switches immediately; a failed save rolls back and
+  // rethrows so the caller can show an error.
+  const prefsRef = useRef(userPrefs);
+  prefsRef.current = userPrefs;
+  const updatePrefs = useCallback(async (patch) => {
+    const previous = prefsRef.current;
+    setUserPrefs(p => ({ ...p, ...patch }));
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1'}/users/me/preferences`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('ripfit_token')}` },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Save failed');
+      const saved = await res.json();
+      setUserPrefs(p => ({ ...p, ...prefsFromProfile({ ...p, ...saved }) }));
+    } catch (err) {
+      setUserPrefs(previous);
+      throw err;
+    }
+  }, []);
+
+  const prefsValue = useMemo(
+    () => ({ prefs: userPrefs, prefsLoaded, updatePrefs }),
+    [userPrefs, prefsLoaded, updatePrefs]
+  );
 
   const handleLogin = (user) => {
     setIsLoggedIn(true);
@@ -194,6 +274,9 @@ function App() {
     setIsAdmin(false);
     setActiveWorkout(null);
     setWorkoutSummary(null);
+    setActiveMeditation(null);
+    setUserPrefs(DEFAULT_USER_PREFS);
+    setPrefsLoaded(false);
     setDrawerOpen(false);
   };
 
@@ -223,8 +306,12 @@ function App() {
   };
 
   const onWorkoutView = currentView === 'workout' && !viewingWorkout;
+  // ActiveWorkout shows the meditation screen whenever a session exists and no
+  // workout is in progress (see its render order).
+  const onMeditationView = onWorkoutView && !activeWorkout && !workoutSummary;
 
   return (
+    <UserPrefsContext.Provider value={prefsValue}>
     <div className="app">
       <header className="header">
         <div className="container">
@@ -248,6 +335,12 @@ function App() {
                 <HeaderWorkoutIndicator
                   workout={activeWorkout.workout}
                   isOnWorkoutView={onWorkoutView}
+                  onReturn={returnToActiveWorkout}
+                />
+              )}
+              {isLoggedIn && activeMeditation && !onMeditationView && (
+                <HeaderMeditationIndicator
+                  session={activeMeditation}
                   onReturn={returnToActiveWorkout}
                 />
               )}
@@ -287,6 +380,7 @@ function App() {
           onClose={() => setDrawerOpen(false)}
           currentView={currentView}
           hasActiveWorkout={!!activeWorkout}
+          workoutPaused={!!activeWorkout?.workout?.paused_at}
           onNavigate={handleDrawerNavigate}
           onReturnToWorkout={returnToActiveWorkout}
         />
@@ -321,6 +415,8 @@ function App() {
                 setSelectedProgramId={setSelectedProgramId}
                 onViewWorkout={(id, type) => setViewingWorkout({ id, type: type || 'strength' })}
                 onViewProgramStats={(pid) => { setProgramStatsId(pid); setCurrentView('stats'); }}
+                activeMeditation={activeMeditation}
+                setActiveMeditation={setActiveMeditation}
               />
             ) : currentView === 'exercises' ? (
               <ExerciseBrowser activeWorkout={activeWorkout} setActiveWorkout={setActiveWorkout} />
@@ -362,6 +458,7 @@ function App() {
         </div>
       </footer>
     </div>
+    </UserPrefsContext.Provider>
   )
 }
 

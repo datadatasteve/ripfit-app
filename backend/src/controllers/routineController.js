@@ -40,6 +40,106 @@ Return - Frontend gets: template (what routine says) + last_performance (what us
 
 */
 
+// ── routine_exercises row writing ──────────────────────────────────────────
+// Every column the app stores on a routine exercise. create/update write rows
+// with delete-and-reinsert, so any column missing from this list was silently
+// reset to NULL on each save (cooldown_seconds and training_type were).
+const ROUTINE_EXERCISE_COLUMNS = [
+  'target_sets', 'target_reps', 'target_weight', 'superset_group', 'superset_order', 'notes',
+  'cooldown_seconds', 'training_type', 'training_duration',
+  'overload_strategy', 'overload_increment', 'overload_schedule', 'overload_week_targets',
+  'tempo_eccentric', 'tempo_pause', 'tempo_concentric',
+];
+
+// NOT NULL columns with a DB default: an empty value means "use the default".
+const DEFAULT_WHEN_EMPTY = new Set(['training_type']);
+
+const OVERLOAD_STRATEGIES = new Set(['none', 'weight', 'reps', 'sets']);
+const OVERLOAD_SCHEDULES = new Set(['linear', 'custom']);
+
+const toPositiveOrNull = v => {
+  const n = Number(v);
+  return v === null || v === undefined || v === '' || !Number.isFinite(n) || n <= 0 ? null : n;
+};
+const toWholeOrNull = v => {
+  const n = Number(v);
+  return v === null || v === undefined || v === '' || !Number.isInteger(n) || n < 0 ? null : n;
+};
+
+/** Normalises one incoming value for its column (invalid → safe default/NULL). */
+function normaliseRoutineExerciseField(column, value) {
+  switch (column) {
+    case 'target_sets':
+    case 'target_reps':
+    case 'target_weight':
+    case 'overload_increment':
+      return toPositiveOrNull(value);
+    case 'cooldown_seconds':
+    case 'training_duration':
+    case 'superset_order':
+    case 'tempo_eccentric':
+    case 'tempo_pause':
+    case 'tempo_concentric':
+      return toWholeOrNull(value);
+    case 'overload_strategy':
+      return OVERLOAD_STRATEGIES.has(value) ? value : 'none';
+    case 'overload_schedule':
+      return OVERLOAD_SCHEDULES.has(value) ? value : 'linear';
+    case 'overload_week_targets': {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+      // { "<week>": <increment> } — keep only positive-integer weeks with numeric values
+      const clean = {};
+      for (const [week, inc] of Object.entries(value)) {
+        const w = Number(week);
+        const n = Number(inc);
+        if (Number.isInteger(w) && w > 0 && inc !== '' && inc !== null && Number.isFinite(n)) clean[w] = n;
+      }
+      return Object.keys(clean).length ? JSON.stringify(clean) : null;
+    }
+    default:
+      return value === '' || value === undefined ? null : value;
+  }
+}
+
+/**
+ * Inserts one routine_exercises row.
+ *
+ * `previous` is the row this exercise had before a delete-and-reinsert update.
+ * A column absent from the payload keeps its previous value, so a caller that
+ * only knows about targets (the overload Accept, Exercise Browser's "add to
+ * routine", the save-ad-hoc prompt) can't wipe cooldown, overload or tempo.
+ * Sending a key explicitly — including null — always wins.
+ */
+async function insertRoutineExercise(client, routineId, ex, previous = null) {
+  const values = [routineId, ex.exercise_id, ex.order_index];
+  const exprs = ['$1', '$2', '$3'];
+  const bind = (v) => { values.push(v); exprs.push(`$${values.length}`); };
+
+  for (const column of ROUTINE_EXERCISE_COLUMNS) {
+    if (column in ex) {
+      const v = normaliseRoutineExerciseField(column, ex[column]);
+      if ((v === null || v === '') && DEFAULT_WHEN_EMPTY.has(column)) exprs.push('DEFAULT');
+      else bind(v);
+    } else if (previous && column in previous) {
+      const prev = previous[column];
+      bind(column === 'overload_week_targets' && prev !== null ? JSON.stringify(prev) : prev);
+    } else {
+      // Neither sent nor previously stored: let the column default apply
+      // (cooldown_seconds 60, training_type 'standard', overload 'none'/'linear').
+      exprs.push('DEFAULT');
+    }
+  }
+
+  const result = await client.query(
+    `INSERT INTO routine_exercises (routine_id, exercise_id, order_index, ${ROUTINE_EXERCISE_COLUMNS.join(', ')})
+     VALUES (${exprs.join(', ')})
+     RETURNING *`,
+    values
+  );
+  return result.rows[0];
+}
+
+
 const createRoutine = async (req, res) => {
   const { name, description, exercises } = req.body;
   const user_id = req.user.userId;
@@ -68,31 +168,10 @@ const createRoutine = async (req, res) => {
 
     // Add exercises to routine
     for (const ex of exercises) {
-      const { exercise_id, order_index, target_sets, target_reps, target_weight, superset_group, notes } = ex;
-
-      if (!exercise_id || !order_index) {
+      if (!ex.exercise_id || !ex.order_index) {
         throw new Error('Each exercise must have exercise_id and order_index');
       }
-
-      const exerciseResult = await client.query(
-        `INSERT INTO routine_exercises (
-          routine_id, exercise_id, order_index, target_sets, 
-          target_reps, target_weight, superset_group, notes
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        RETURNING *`,
-        [
-          routine.id,
-          exercise_id,
-          order_index,
-          target_sets || null,
-          target_reps || null,
-          target_weight || null,
-          superset_group || null,
-          notes || null
-        ]
-      );
-
-      routineExercises.push(exerciseResult.rows[0]);
+      routineExercises.push(await insertRoutineExercise(client, routine.id, ex));
     }
 
     await client.query('COMMIT');
@@ -170,6 +249,9 @@ const getRoutineById = async (req, res) => {
       `SELECT 
         re.id, re.order_index, re.target_sets, re.target_reps, 
         re.target_weight, re.superset_group, re.notes,
+        re.cooldown_seconds, re.training_type,
+        re.overload_strategy, re.overload_increment, re.overload_schedule, re.overload_week_targets,
+        re.tempo_eccentric, re.tempo_pause, re.tempo_concentric,
         e.id as exercise_id, e.name as exercise_name, 
         e.category, e.equipment_type
        FROM routine_exercises re
@@ -225,20 +307,32 @@ const updateRoutine = async (req, res) => {
     // If a full exercise list was provided, replace the routine's exercises
     // entirely (delete-and-reinsert, same pattern as createRoutine).
     if (Array.isArray(exercises)) {
+      // Snapshot current rows so fields a caller doesn't send survive the
+      // delete-and-reinsert. Matched by exercise_id and occurrence, so a routine
+      // that lists the same exercise twice keeps each row's own settings.
+      const previousRows = await client.query(
+        `SELECT * FROM routine_exercises WHERE routine_id = $1 ORDER BY order_index, id`,
+        [id]
+      );
+      const previousByExercise = new Map();
+      for (const row of previousRows.rows) {
+        const list = previousByExercise.get(row.exercise_id) || [];
+        list.push(row);
+        previousByExercise.set(row.exercise_id, list);
+      }
+      const seen = new Map();
+
       await client.query(`DELETE FROM routine_exercises WHERE routine_id = $1`, [id]);
 
       for (const ex of exercises) {
-        const { exercise_id, order_index, target_sets, target_reps, target_weight, superset_group, notes } = ex;
-        if (!exercise_id || !order_index) {
+        if (!ex.exercise_id || !ex.order_index) {
           throw new Error('Each exercise must have exercise_id and order_index');
         }
-        await client.query(
-          `INSERT INTO routine_exercises (
-            routine_id, exercise_id, order_index, target_sets,
-            target_reps, target_weight, superset_group, notes
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-          [id, exercise_id, order_index, target_sets || null, target_reps || null, target_weight || null, superset_group || null, notes || null]
-        );
+        const exId = Number(ex.exercise_id);
+        const occurrence = seen.get(exId) || 0;
+        seen.set(exId, occurrence + 1);
+        const previous = previousByExercise.get(exId)?.[occurrence] || null;
+        await insertRoutineExercise(client, id, ex, previous);
       }
     }
 
@@ -318,6 +412,8 @@ const startWorkoutFromRoutine = async (req, res) => {
     const templateResult = await client.query(
       `SELECT re.exercise_id, re.order_index, re.target_sets, re.target_reps, 
               re.target_weight, re.superset_group, re.notes, re.cooldown_seconds,
+              re.overload_strategy, re.overload_increment, re.overload_schedule, re.overload_week_targets,
+              re.tempo_eccentric, re.tempo_pause, re.tempo_concentric,
               e.name as exercise_name, e.category, e.equipment_type,
               e.video_url_male, e.video_url_female
        FROM routine_exercises re
@@ -412,7 +508,14 @@ const startWorkoutFromRoutine = async (req, res) => {
           target_weight: ex.target_weight,
           superset_group: ex.superset_group,
           cooldown_seconds: ex.cooldown_seconds,
-          notes: ex.notes
+          notes: ex.notes,
+          overload_strategy: ex.overload_strategy,
+          overload_increment: ex.overload_increment,
+          overload_schedule: ex.overload_schedule,
+          overload_week_targets: ex.overload_week_targets,
+          tempo_eccentric: ex.tempo_eccentric,
+          tempo_pause: ex.tempo_pause,
+          tempo_concentric: ex.tempo_concentric
         },
         last_performance: lastPerformance || null
       });

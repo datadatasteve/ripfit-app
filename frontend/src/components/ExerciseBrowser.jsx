@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import RoutineBuilder from './RoutineBuilder';
 import MuscleDiagram from './MuscleDiagram';
 import './ExerciseBrowser.css';
@@ -43,6 +43,9 @@ export default function ExerciseBrowser({ activeWorkout, setActiveWorkout }) {
   const [reportOpen, setReportOpen] = useState(false);
   const [reportText, setReportText] = useState('');
   const [reportStatus, setReportStatus] = useState(''); // '', 'sending', 'sent', 'error'
+
+  // Swipe-down-to-close on the bottom sheet's grab strip
+  const sheetTouchStartY = useRef(null);
 
   const [searchInput, setSearchInput] = useState('');
   const [activeSearch, setActiveSearch] = useState(''); // committed search term
@@ -306,6 +309,17 @@ export default function ExerciseBrowser({ activeWorkout, setActiveWorkout }) {
     setReportStatus('');
   };
 
+  const SHEET_SWIPE_CLOSE_PX = 80;
+  const handleSheetTouchStart = (e) => {
+    sheetTouchStartY.current = e.touches[0].clientY;
+  };
+  const handleSheetTouchEnd = (e) => {
+    if (sheetTouchStartY.current === null) return;
+    const dragged = e.changedTouches[0].clientY - sheetTouchStartY.current;
+    sheetTouchStartY.current = null;
+    if (dragged > SHEET_SWIPE_CLOSE_PX) closeDetail();
+  };
+
   const submitReport = async () => {
     if (!selectedExercise || !reportText.trim()) return;
     setReportStatus('sending');
@@ -441,7 +455,11 @@ export default function ExerciseBrowser({ activeWorkout, setActiveWorkout }) {
         <div className="browser-sheet-overlay" onClick={closeDetail} />
       )}
 
-      <div className={`browser-detail ${selectedExercise ? 'sheet-open' : ''}`}>
+      {/* stopPropagation keeps taps inside the sheet from ever reaching the overlay */}
+      <div
+        className={`browser-detail ${selectedExercise ? 'sheet-open' : ''}`}
+        onClick={e => e.stopPropagation()}
+      >
         {detailLoading && <p className="browser-status">Loading...</p>}
 
         {!selectedExercise && !detailLoading && (
@@ -450,7 +468,16 @@ export default function ExerciseBrowser({ activeWorkout, setActiveWorkout }) {
 
         {selectedExercise && !detailLoading && (
           <div className="detail-card">
-            <div className="browser-sheet-handle" onClick={closeDetail} />
+            <div
+              className="browser-sheet-grab"
+              onClick={closeDetail}
+              onTouchStart={handleSheetTouchStart}
+              onTouchEnd={handleSheetTouchEnd}
+              role="button"
+              aria-label="Close — or swipe down"
+            >
+              <div className="browser-sheet-handle" />
+            </div>
             <div className="detail-card-head">
               <h2 className="detail-title">{selectedExercise.name}</h2>
               <button className="browser-sheet-close" onClick={closeDetail} aria-label="Close">×</button>

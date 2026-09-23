@@ -47,7 +47,7 @@ async function getOverview(req, res) {
         COUNT(*) AS count
       FROM (
         SELECT COALESCE(start_time, workout_date::timestamptz) AS d FROM workouts
-        WHERE user_id = $1 AND (status = 'completed' OR (status IS NULL AND end_time IS NOT NULL)) ${weeksCond} ${programCond}
+        WHERE user_id = $1 AND COALESCE(workout_type, '') <> 'meditation' AND (status = 'completed' OR (status IS NULL AND end_time IS NOT NULL)) ${weeksCond} ${programCond}
         ${includeCardio ? `UNION ALL
         SELECT COALESCE(start_time, session_date::timestamptz) AS d FROM cardio_sessions
         WHERE user_id = $1 AND status = 'completed' ${weeksCond2}` : ''}
@@ -64,7 +64,7 @@ async function getOverview(req, res) {
         COUNT(*) AS count
       FROM (
         SELECT start_time AS d FROM workouts
-        WHERE user_id = $1 AND (status = 'completed' OR (status IS NULL AND end_time IS NOT NULL)) AND start_time IS NOT NULL ${programCond}
+        WHERE user_id = $1 AND COALESCE(workout_type, '') <> 'meditation' AND (status = 'completed' OR (status IS NULL AND end_time IS NOT NULL)) AND start_time IS NOT NULL ${programCond}
         ${includeCardio ? `UNION ALL
         SELECT start_time AS d FROM cardio_sessions
         WHERE user_id = $1 AND status = 'completed' AND start_time IS NOT NULL` : ''}
@@ -80,7 +80,7 @@ async function getOverview(req, res) {
         COUNT(*) AS count
       FROM (
         SELECT COALESCE(start_time, workout_date::timestamptz) AS d FROM workouts
-        WHERE user_id = $1 AND (status = 'completed' OR (status IS NULL AND end_time IS NOT NULL)) ${programCond}
+        WHERE user_id = $1 AND COALESCE(workout_type, '') <> 'meditation' AND (status = 'completed' OR (status IS NULL AND end_time IS NOT NULL)) ${programCond}
         ${includeCardio ? `UNION ALL
         SELECT COALESCE(start_time, session_date::timestamptz) AS d FROM cardio_sessions
         WHERE user_id = $1 AND status = 'completed'` : ''}
@@ -97,7 +97,7 @@ async function getOverview(req, res) {
         'strength' AS type,
         start_time
       FROM workouts
-      WHERE user_id = $1 AND (status = 'completed' OR status IS NULL)
+      WHERE user_id = $1 AND COALESCE(workout_type, '') <> 'meditation' AND (status = 'completed' OR status IS NULL)
         AND end_time IS NOT NULL AND start_time IS NOT NULL
         AND end_time > start_time ${programCond}
       ${includeCardio ? `UNION ALL
@@ -116,7 +116,7 @@ async function getOverview(req, res) {
         'strength' AS type,
         start_time
       FROM workouts
-      WHERE user_id = $1 AND session_rating IS NOT NULL AND (status = 'completed' OR status IS NULL) ${programCond}
+      WHERE user_id = $1 AND COALESCE(workout_type, '') <> 'meditation' AND session_rating IS NOT NULL AND (status = 'completed' OR status IS NULL) ${programCond}
       ${includeCardio ? `UNION ALL
       SELECT
         session_date AS date,
@@ -139,7 +139,7 @@ async function getOverview(req, res) {
           EXTRACT(EPOCH FROM (end_time - start_time))::INTEGER AS dur,
           session_rating
         FROM workouts
-        WHERE user_id = $1 AND (status = 'completed' OR (status IS NULL AND end_time IS NOT NULL)) ${programCond}
+        WHERE user_id = $1 AND COALESCE(workout_type, '') <> 'meditation' AND (status = 'completed' OR (status IS NULL AND end_time IS NOT NULL)) ${programCond}
         ${includeCardio ? `UNION ALL
         SELECT duration_seconds AS dur, session_rating FROM cardio_sessions
         WHERE user_id = $1 AND status = 'completed'` : ''}
@@ -742,7 +742,45 @@ async function adminResetPassword(req, res) {
   }
 }
 
+// ── GET /stats/meditation ──────────────────────────────────────────────────
+// Meditation sessions are kept out of the other stats views; this is their own.
+// Duration prefers the explicit duration_seconds written when a session is
+// logged. Older rows have none and fall back to start/end timestamps, which for
+// meditation logged after the fact is near zero — shown as-is, not guessed.
+async function getMeditationStats(req, res) {
+  try {
+    const sessions = await pool.query(
+      `SELECT w.id,
+              to_char(w.workout_date, 'YYYY-MM-DD') AS workout_date,
+              COALESCE(
+                w.duration_seconds,
+                GREATEST(0, EXTRACT(EPOCH FROM (w.end_time - w.start_time))::int)
+              ) AS duration_seconds,
+              w.workout_title,
+              w.overall_notes
+       FROM workouts w
+       WHERE w.user_id = $1
+         AND w.workout_type = 'meditation'
+         AND w.status = 'completed'
+       ORDER BY w.workout_date DESC, w.id DESC`,
+      [req.user.userId]
+    );
+
+    const totalSeconds = sessions.rows.reduce((sum, r) => sum + (Number(r.duration_seconds) || 0), 0);
+
+    res.json({
+      total_sessions: sessions.rows.length,
+      total_seconds: totalSeconds,
+      sessions: sessions.rows,
+    });
+  } catch (err) {
+    console.error('getMeditationStats error:', err);
+    res.status(500).json({ error: 'Failed to load meditation stats' });
+  }
+}
+
 module.exports = {
+  getMeditationStats,
   getOverview,
   getStrengthStats,
   getCardioStats,

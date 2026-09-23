@@ -3,7 +3,9 @@ import RoutineBuilder from './RoutineBuilder';
 import CardioWorkout from './CardioWorkout';
 import ProgramsHub from './ProgramsHub';
 import WaterWidget from './WaterWidget';
-import WorkoutTimerBar from './WorkoutTimers';
+import WorkoutTimerBar, { baseCooldownFor, InlineTimer } from './WorkoutTimers';
+import { useTempoGuide } from './TempoGuide';
+import { useUserPrefs } from '../contexts/UserPrefsContext';
 import MeditationTimer from './MeditationTimer';
 import './ActiveWorkout.css';
 
@@ -23,10 +25,12 @@ function SessionRatingWidget({ workoutId }) {
 
   useEffect(() => {
     // Fetch user rating prefs
-    fetch(`${API_BASE}/users/me`, { headers: { Authorization: `Bearer ${token}` } })
+    const controller = new AbortController();
+    fetch(`${API_BASE}/users/me`, { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal })
       .then(r => r.json())
       .then(data => { if (data.workout_rating_prefs) setPrefs(data.workout_rating_prefs); })
       .catch(() => {});
+    return () => controller.abort();
   }, []);
 
   const save = async (val) => {
@@ -182,6 +186,8 @@ function CardioSegmentForm({ exercise, workoutId, segments, setSegments, userPac
   const [laps, setLaps] = useState('');
   const [lapDistance, setLapDistance] = useState(exercise.template?.goal_lap_distance || '');
   const [avgSpeed, setAvgSpeed] = useState('');
+  // True once the user types their own average speed; until then it's derived.
+  const [avgSpeedManual, setAvgSpeedManual] = useState(false);
   const [maxSpeed, setMaxSpeed] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
@@ -239,6 +245,13 @@ function CardioSegmentForm({ exercise, workoutId, segments, setSegments, userPac
         setDerived('duration');
       }
     }
+
+    // Average speed (mph) from distance and duration, unless the user typed
+    // one. Miles only — metric waits until unit conversion is in scope.
+    if (!avgSpeedManual && hasDur && hasDist && userDistanceUnit === 'mi') {
+      const mph = dist / (durSecs / 3600);
+      if (Number.isFinite(mph) && mph > 0) setAvgSpeed(String(Math.round(mph * 100) / 100));
+    }
   };
 
   const handleLog = async () => {
@@ -281,7 +294,7 @@ function CardioSegmentForm({ exercise, workoutId, segments, setSegments, userPac
       // Reset form
       setDurationInput(''); setDistance(''); setPace('');
       setPaceOverridden(false); setReps(''); setNotes('');
-      setAvgSpeed(''); setMaxSpeed(''); setDerived(null);
+      setAvgSpeed(''); setAvgSpeedManual(false); setMaxSpeed(''); setDerived(null);
     } catch (e) {
       console.error('Failed to log cardio segment:', e);
     } finally {
@@ -380,10 +393,12 @@ function CardioSegmentForm({ exercise, workoutId, segments, setSegments, userPac
         <div className="form-row" style={{ marginTop: '8px' }}>
           <input
             type="number"
+            inputMode="decimal"
             step="0.1"
             placeholder="Avg speed"
             value={avgSpeed}
-            onChange={e => setAvgSpeed(e.target.value)}
+            onChange={e => { setAvgSpeed(e.target.value); setAvgSpeedManual(e.target.value !== ''); }}
+            title={!avgSpeedManual && avgSpeed ? 'Worked out from distance and duration' : undefined}
           />
           <input
             type="number"
@@ -449,7 +464,7 @@ function FreeLiftTitleModal({ onStart, onClose }) {
   );
 }
 
-export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workoutSummary, setWorkoutSummary, showNavClock, setShowNavClock, hubView, setHubView, selectedProgramId, setSelectedProgramId, onViewWorkout, onViewProgramStats }) {
+export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workoutSummary, setWorkoutSummary, showNavClock, setShowNavClock, hubView, setHubView, selectedProgramId, setSelectedProgramId, onViewWorkout, onViewProgramStats, activeMeditation, setActiveMeditation }) {
   const [token, setToken] = useState(localStorage.getItem('ripfit_token'));
   const [routines, setRoutines] = useState([]);
   const [selectedRoutine, setSelectedRoutine] = useState(null);
@@ -484,22 +499,25 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
     localStorage.setItem('ripfit_routine_sort', routineSort);
   }, [routineSort]);
 
-  const fetchActivePrograms = async () => {
+  const fetchActivePrograms = async (signal) => {
     try {
       const res = await fetch(`${API_BASE}/programs/active`, {
         headers: { Authorization: `Bearer ${token}` },
+        signal,
       });
       const data = await res.json();
       setActivePrograms(data.programs || []);
     } catch (err) {
+      if (err.name === 'AbortError') return;
       console.error('Failed to fetch active programs:', err);
     }
   };
 
-  const fetchProgramMap = async () => {
+  const fetchProgramMap = async (signal) => {
     try {
       const res = await fetch(`${API_BASE}/programs`, {
         headers: { Authorization: `Bearer ${token}` },
+        signal,
       });
       const data = await res.json();
       const map = {};
@@ -507,6 +525,7 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
         // Fetch each program's routines to build the map
         const pr = await fetch(`${API_BASE}/programs/${prog.id}`, {
           headers: { Authorization: `Bearer ${token}` },
+          signal,
         });
         const pd = await pr.json();
         for (const day of (pd.days || [])) {
@@ -555,26 +574,37 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
     }
   };
 
-  const fetchRoutines = async () => {
+  const fetchRoutines = async (signal) => {
     try {
       const res = await fetch(`${API_BASE}/routines`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${token}` },
+        signal,
       });
       const data = await res.json();
       setRoutines(data.routines || []);
     } catch (err) {
+      if (err.name === 'AbortError') return;
       console.error('Failed to fetch routines:', err);
     }
   };
 
-  // All fetch calls after functions are defined
+  // All fetch calls after functions are defined.
+  //
+  // These load the workout hub (routines, programs, and one request per
+  // program for the routine→program map). None of it is shown while a workout
+  // is in progress, but ActiveWorkout remounts every time the user returns to
+  // the Workouts tab — so without the guard each Stats → Workouts round trip
+  // re-fired the whole burst against the API rate limit. It now runs only when
+  // the hub is actually on screen, and refetches once the workout ends.
+  const hubVisible = !activeWorkout;
   useEffect(() => {
-    if (token) {
-      fetchRoutines();
-      fetchActivePrograms();
-      fetchProgramMap();
-    }
-  }, [token]);
+    if (!token || !hubVisible) return undefined;
+    const controller = new AbortController();
+    fetchRoutines(controller.signal);
+    fetchActivePrograms(controller.signal);
+    fetchProgramMap(controller.signal);
+    return () => controller.abort();
+  }, [token, hubVisible]);
 
   const startWorkout = async (routineId, workout_title = null, preloadCardio = null) => {
     try {
@@ -784,8 +814,7 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
 
       // Progressive overload preference: programs carry their own strategy,
       // standalone routines fall back to the per-exercise default.
-      let overloadStrategy = null;
-      let overloadIncrement = null;
+      let programOverload = null;
       if (activeWorkout.workout.program_id) {
         try {
           const progRes = await fetch(`${API_BASE}/programs/${activeWorkout.workout.program_id}`, {
@@ -793,8 +822,15 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
           });
           const progData = await progRes.json();
           const prog = progData.program || progData;
-          overloadStrategy = prog?.overload_strategy || 'none';
-          overloadIncrement = prog?.overload_increment ?? null;
+          // Program week: from the start date; failing that, the week of the
+          // program day this workout was started from.
+          const slotWeek = (progData.days || prog.days || [])
+            .find(d => d.id === activeWorkout.workout.program_routine_id)?.week_number ?? null;
+          programOverload = {
+            strategy: prog?.overload_strategy || 'none',
+            increment: prog?.overload_increment ?? null,
+            week: programWeekFromStart(prog?.start_date) ?? slotWeek,
+          };
         } catch (err) {
           console.error('Failed to load program overload prefs:', err);
         }
@@ -838,9 +874,12 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
                 target_sets: ex.template?.target_sets,
                 target_reps: ex.template?.target_reps,
                 target_weight: ex.template?.target_weight,
+                overload_strategy: ex.template?.overload_strategy,
+                overload_increment: ex.template?.overload_increment,
+                overload_schedule: ex.template?.overload_schedule,
+                overload_week_targets: ex.template?.overload_week_targets,
               })),
-              overloadStrategy,
-              overloadIncrement
+              programOverload
             )
           : null
       });
@@ -952,6 +991,16 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
                     )}
                   </div>
                 )}
+                {(() => {
+                  const tabata = (ex.logged_sets || []).filter(st => st.set_type === 'tabata');
+                  if (tabata.length === 0) return null;
+                  const reps = tabata.reduce((a, st) => a + (parseInt(st.reps_completed, 10) || 0), 0);
+                  return (
+                    <p className="summary-tabata">
+                      ⏱ Tabata: {tabata.length} interval{tabata.length === 1 ? '' : 's'} completed{reps > 0 ? ` · ${reps} reps` : ''}
+                    </p>
+                  );
+                })()}
                 {ex.category !== 'Cardio' && ex.target_sets && (ex.logged_sets?.length || 0) < ex.target_sets && (
                   <p className="sets-caution">Completed {ex.logged_sets?.length || 0} of {ex.target_sets} sets</p>
                 )}
@@ -1007,8 +1056,16 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
     );
   }
 
-  if (showMeditation && !activeWorkout) {
-    return <MeditationTimer onClose={() => setShowMeditation(false)} />;
+  // A running meditation lives in App state, so coming back to this tab lands on
+  // it again even though showMeditation (local, reset on remount) is false.
+  if ((showMeditation || activeMeditation) && !activeWorkout) {
+    return (
+      <MeditationTimer
+        session={activeMeditation}
+        setSession={setActiveMeditation}
+        onClose={() => setShowMeditation(false)}
+      />
+    );
   }
 
   if (activeWorkout) {
@@ -1254,76 +1311,106 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
   );
 }
 
-/**
- * Collapsible read-only view of the notes from the most recent completed
- * workout that contained this exercise. Fetched lazily on first expand.
- */
 // ── Progressive overload ───────────────────────────────────────────────────
 
-const DEFAULT_WEIGHT_INCREMENT = 2.5;
-const DEFAULT_REP_INCREMENT = 1;
+const DEFAULT_INCREMENTS = { weight: 2.5, reps: 1, sets: 1 };
+
+/** Program week today (1-based) from its start date, or null when unknown. */
+function programWeekFromStart(startDate) {
+  if (!startDate) return null;
+  const start = new Date(`${String(startDate).slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(start.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const days = Math.floor((today - start) / 86400000);
+  return days < 0 ? null : Math.floor(days / 7) + 1;
+}
+
+const numOrNull = v => (v === null || v === undefined || v === '' ? null : Number(v));
 
 /**
- * Compares a finished workout's logged sets against its routine targets.
+ * Per-exercise progressive overload suggestions for the end-of-workout screen.
  *
- * Returns null unless every strength exercise that carried targets hit all of
- * them — the suggestion is a reward for a clean session, not a nudge after a
- * partial one. Cardio and untargeted ad-hoc exercises are ignored.
+ * An exercise is eligible when its effective strategy isn't 'none': its own
+ * routine_exercises.overload_strategy, else (program workouts) the program's.
+ * It gets a suggestion only if every target set, rep and weight was hit — each
+ * exercise is judged on its own. The increment is the exercise's own, else the
+ * program's, else a sensible default. Custom schedules look up the current
+ * program week in overload_week_targets and fall back to overload_increment.
  */
-function computeOverloadSuggestions(exercises, strategy, increment) {
-  if (strategy === 'none') return null;
-
-  const considered = exercises.filter(ex =>
-    ex.category !== 'Cardio' && ex.target_sets && ex.target_reps
-  );
-  if (considered.length === 0) return null;
-
+function computeOverloadSuggestions(exercises, program) {
   const suggestions = [];
 
-  for (const ex of considered) {
-    const sets = ex.logged_sets || [];
+  for (const ex of exercises) {
+    if (ex.category === 'Cardio' || !ex.target_sets || !ex.target_reps) continue;
+
+    const own = ex.overload_strategy && ex.overload_strategy !== 'none' ? ex.overload_strategy : null;
+    const inherited = program?.strategy && program.strategy !== 'none' ? program.strategy : null;
+    const strategy = own || inherited;
+    if (!strategy) continue;
+
     const targetSets = parseInt(ex.target_sets, 10);
     const targetReps = parseInt(ex.target_reps, 10);
-    const targetWeight = ex.target_weight != null ? parseFloat(ex.target_weight) : null;
+    const targetWeight = numOrNull(ex.target_weight);
+    // Straight sets only. EMOM / Tabata / AMRAP sets record intervals and
+    // rounds (often at no weight), so they can't be judged against set targets.
+    const sets = (ex.logged_sets || []).filter(st => !st.set_type || st.set_type === 'normal');
 
-    if (sets.length < targetSets) return null;
-
+    if (sets.length < targetSets) continue;
     const allHit = sets.every(s =>
       parseInt(s.reps_completed, 10) >= targetReps &&
       (targetWeight == null || parseFloat(s.weight_used) >= targetWeight)
     );
-    if (!allHit) return null;
+    if (!allHit) continue;
 
-    // With no explicit strategy, add weight where the exercise is loaded and
-    // reps where it is bodyweight.
-    const mode = strategy || (targetWeight > 0 ? 'weight' : 'reps');
-    const step = increment != null && increment !== ''
-      ? parseFloat(increment)
-      : (mode === 'weight' ? DEFAULT_WEIGHT_INCREMENT : DEFAULT_REP_INCREMENT);
-
-    if (!Number.isFinite(step) || step <= 0) continue;
+    // Increment: exercise → program → default. A custom schedule overrides
+    // with this week's entry when there is one.
+    let step = numOrNull(own ? ex.overload_increment : null)
+      ?? numOrNull(program?.increment)
+      ?? DEFAULT_INCREMENTS[strategy];
+    let week = null;
+    if (own && ex.overload_schedule === 'custom' && ex.overload_week_targets) {
+      week = program?.week ?? null;
+      const weekStep = week != null ? numOrNull(ex.overload_week_targets[String(week)]) : null;
+      if (weekStep != null) step = weekStep;
+    }
+    if (!Number.isFinite(step) || step <= 0) continue;   // e.g. a deliberate 0 for this week
 
     suggestions.push({
       exercise_id: ex.exercise_id,
       exercise_name: ex.exercise_name,
-      mode,
+      mode: strategy,
       step,
-      target_sets: targetSets,
-      target_reps: targetReps,
-      target_weight: targetWeight,
-      new_reps: mode === 'reps' ? targetReps + step : targetReps,
-      new_weight: mode === 'weight' ? (targetWeight || 0) + step : targetWeight,
+      week,
+      source: own ? 'exercise' : 'program',
+      new_sets: strategy === 'sets' ? targetSets + step : targetSets,
+      new_reps: strategy === 'reps' ? targetReps + step : targetReps,
+      new_weight: strategy === 'weight' ? (targetWeight || 0) + step : targetWeight,
     });
   }
 
   return suggestions.length > 0 ? suggestions : null;
 }
 
-/** Overload card on the post-workout summary. Nothing applies without a tap. */
+const OVERLOAD_UNITS = { weight: 'lbs', reps: 'reps', sets: 'sets' };
+
+/**
+ * Overload suggestions on the post-workout summary — one row per exercise,
+ * each individually accepted. Nothing changes until the user applies.
+ */
 function OverloadSuggestionCard({ routineId, suggestions, onDone }) {
   const [state, setState] = useState('');   // '' | 'saving' | 'applied' | 'error'
+  const [accepted, setAccepted] = useState(() => new Set(suggestions.map(s => s.exercise_id)));
 
-  const accept = async () => {
+  const toggle = (id) => setAccepted(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+
+  const apply = async () => {
+    const chosen = suggestions.filter(s => accepted.has(s.exercise_id));
+    if (chosen.length === 0) { onDone(); return; }
     setState('saving');
     try {
       const tok = localStorage.getItem('ripfit_token');
@@ -1333,15 +1420,16 @@ function OverloadSuggestionCard({ routineId, suggestions, onDone }) {
       if (!detailRes.ok) throw new Error('Could not load routine');
       const detail = await detailRes.json();
 
-      const byExercise = new Map(suggestions.map(s => [s.exercise_id, s]));
+      const byExercise = new Map(chosen.map(s => [s.exercise_id, s]));
 
-      // Full-list replacement, so untouched rows are passed through unchanged.
+      // Only target fields are sent; the server keeps every other column
+      // (cooldown, overload settings, tempo) for rows it already had.
       const exercises = (detail.exercises || []).map(ex => {
         const bump = byExercise.get(ex.exercise_id);
         return {
           exercise_id: ex.exercise_id,
           order_index: ex.order_index,
-          target_sets: ex.target_sets,
+          target_sets: bump ? bump.new_sets : ex.target_sets,
           target_reps: bump ? bump.new_reps : ex.target_reps,
           target_weight: bump ? bump.new_weight : ex.target_weight,
           superset_group: ex.superset_group,
@@ -1363,18 +1451,34 @@ function OverloadSuggestionCard({ routineId, suggestions, onDone }) {
     }
   };
 
+  const describe = (s) => {
+    const to = s.mode === 'weight' ? `${s.new_weight} lbs` : s.mode === 'reps' ? `${s.new_reps} reps` : `${s.new_sets} sets`;
+    return `+${s.step} ${OVERLOAD_UNITS[s.mode]} → ${to}`;
+  };
+
   return (
     <div className="aw-overload-card">
-      <h4 className="aw-overload-title">🎯 Every target hit</h4>
-      <p className="aw-overload-sub">Bump next session&apos;s targets?</p>
+      <h4 className="aw-overload-title">🎯 Targets hit — ready to progress</h4>
+      <p className="aw-overload-sub">Choose which exercises to bump for next session.</p>
 
       <ul className="aw-overload-list">
         {suggestions.map(s => (
           <li key={s.exercise_id}>
-            <strong>{s.exercise_name}</strong>{' '}
-            {s.mode === 'weight'
-              ? `+${s.step} lbs → ${s.new_weight} lbs`
-              : `+${s.step} rep${s.step === 1 ? '' : 's'} → ${s.new_reps} reps`}
+            <label className="aw-overload-item">
+              <input
+                type="checkbox"
+                checked={accepted.has(s.exercise_id)}
+                onChange={() => toggle(s.exercise_id)}
+                disabled={state === 'saving' || state === 'applied'}
+              />
+              <span>
+                <strong>{s.exercise_name}</strong> {describe(s)}
+                <span className="aw-overload-source">
+                  {s.source === 'program' ? ' · program default' : ''}
+                  {s.week != null ? ` · week ${s.week}` : ''}
+                </span>
+              </span>
+            </label>
           </li>
         ))}
       </ul>
@@ -1383,8 +1487,8 @@ function OverloadSuggestionCard({ routineId, suggestions, onDone }) {
         <p className="aw-overload-applied">✓ Routine targets updated.</p>
       ) : (
         <div className="aw-overload-actions">
-          <button className="aw-overload-accept" onClick={accept} disabled={state === 'saving'}>
-            {state === 'saving' ? 'Applying…' : 'Accept'}
+          <button className="aw-overload-accept" onClick={apply} disabled={state === 'saving' || accepted.size === 0}>
+            {state === 'saving' ? 'Applying…' : `Accept${accepted.size < suggestions.length ? ` (${accepted.size})` : ''}`}
           </button>
           <button className="aw-overload-dismiss" onClick={onDone}>Dismiss</button>
         </div>
@@ -1393,45 +1497,123 @@ function OverloadSuggestionCard({ routineId, suggestions, onDone }) {
     </div>
   );
 }
-function PreviousNotesDropdown({ exerciseId }) {
+
+// ── Last-session notes ─────────────────────────────────────────────────────
+
+const NOTE_SCOPE_OPTIONS = [
+  { value: 'all', label: 'All' },
+  { value: 'program', label: 'Program' },
+  { value: 'non_program', label: 'Standalone' },
+];
+
+/**
+ * Collapsible read-only view of the notes from the most recent completed
+ * workout that contained this exercise. Fetched lazily on first expand, and
+ * again whenever the scope toggle changes.
+ *
+ * `scope` is a session-only override owned by WorkoutInProgress (seeded from
+ * the user's saved preference); changing it here never saves the preference.
+ * "Program" needs a program workout, so it's disabled otherwise.
+ */
+function PreviousNotesDropdown({ exerciseId, programId, scope, onScopeChange }) {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const requestRef = useRef(null);
 
   // A different exercise invalidates whatever was fetched for the last one.
   useEffect(() => { setOpen(false); setData(null); setError(''); }, [exerciseId]);
 
-  const toggle = async () => {
-    const next = !open;
-    setOpen(next);
-    if (!next || data || loading || !exerciseId) return;
+  const effectiveScope = scope === 'program' && !programId ? 'all' : scope;
 
+  const load = async (withScope) => {
+    if (!exerciseId) return;
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
     setLoading(true);
     setError('');
     try {
       const tok = localStorage.getItem('ripfit_token');
-      const res = await fetch(`${API_BASE}/workouts/previous-notes?exerciseId=${exerciseId}`, {
+      const params = new URLSearchParams({ exerciseId: String(exerciseId), scope: withScope });
+      if (withScope === 'program' && programId) params.set('programId', String(programId));
+      const res = await fetch(`${API_BASE}/workouts/previous-notes?${params}`, {
         headers: { Authorization: `Bearer ${tok}` },
+        signal: controller.signal,
       });
       if (!res.ok) throw new Error('request failed');
       setData(await res.json());
-    } catch {
+      setLoading(false);
+    } catch (err) {
+      if (err.name === 'AbortError') return;
       setError('Could not load last session notes.');
+      setLoading(false);
     }
-    setLoading(false);
+  };
+
+  // Re-fetch when the scope changes while the dropdown is open.
+  useEffect(() => {
+    if (open) load(effectiveScope);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveScope]);
+
+  useEffect(() => () => requestRef.current?.abort(), []);
+
+  const toggle = () => {
+    const next = !open;
+    setOpen(next);
+    if (next && (!data || data.scope !== effectiveScope)) load(effectiveScope);
+  };
+
+  const pickScope = (value) => {
+    onScopeChange(value);
+    // Picking a scope while closed opens the dropdown and shows that scope.
+    if (!open) {
+      setOpen(true);
+      load(value === 'program' && !programId ? 'all' : value);
+    }
   };
 
   if (!exerciseId) return null;
 
-  const hasNotes = data && (data.exercise_notes || data.overall_notes);
+  // Per-exercise notes only. Workout-level notes belong to the Workout Notes
+  // modal ("Previous workout notes") and must not appear here.
+  const hasNotes = !!data?.exercise_notes;
+
+  // workout_date is a DATE. Take the YYYY-MM-DD part whatever shape arrives and
+  // parse it as local midnight, so it can't drift a day or render Invalid Date.
+  const lastDate = data?.workout_date
+    ? new Date(`${String(data.workout_date).slice(0, 10)}T00:00:00`)
+    : null;
 
   return (
     <div className="aw-prev-notes">
-      <button className="aw-prev-notes-toggle" onClick={toggle} aria-expanded={open}>
-        <span>Last session notes</span>
-        <span className="aw-prev-notes-caret">{open ? '▾' : '▸'}</span>
-      </button>
+      <div className="aw-prev-notes-head">
+        <button className="aw-prev-notes-toggle" onClick={toggle} aria-expanded={open}>
+          <span>Last session notes</span>
+          <span className="aw-prev-notes-caret">{open ? '▾' : '▸'}</span>
+        </button>
+        <div className="aw-scope-toggle" role="radiogroup" aria-label="Which workouts to draw notes from">
+          {NOTE_SCOPE_OPTIONS.map(opt => {
+            const disabled = opt.value === 'program' && !programId;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                role="radio"
+                aria-checked={effectiveScope === opt.value}
+                className={effectiveScope === opt.value ? 'active' : ''}
+                disabled={disabled}
+                title={disabled ? 'Only for program workouts' : `Notes from ${opt.label.toLowerCase()} workouts`}
+                onClick={() => pickScope(opt.value)}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       {open && (
         <div className="aw-prev-notes-body">
@@ -1442,24 +1624,35 @@ function PreviousNotesDropdown({ exerciseId }) {
           )}
           {!loading && !error && hasNotes && (
             <>
-              {data.workout_date && (
+              {lastDate && !Number.isNaN(lastDate.getTime()) && (
                 <p className="aw-prev-notes-date">
-                  {new Date(`${data.workout_date}T00:00:00`).toLocaleDateString()}
+                  {lastDate.toLocaleDateString()}
                   {data.workout_title ? ` — ${data.workout_title}` : ''}
                 </p>
               )}
-              {data.exercise_notes && <pre>{data.exercise_notes}</pre>}
-              {data.overall_notes && (
-                <>
-                  <strong className="aw-prev-notes-label">Session notes</strong>
-                  <pre>{data.overall_notes}</pre>
-                </>
-              )}
+              <pre>{data.exercise_notes}</pre>
             </>
           )}
         </div>
       )}
     </div>
+  );
+}
+
+/** Elapsed clock that doubles as the pause/resume control (Feature 3). */
+function WorkoutClockButton({ showTime, isPaused, elapsedStr, onToggle }) {
+  return (
+    <button
+      type="button"
+      className={`aw-clock-btn ${isPaused ? 'paused' : ''}`}
+      onClick={onToggle}
+      title={isPaused ? 'Click to resume' : 'Click to pause'}
+      aria-label={isPaused ? `Workout paused at ${elapsedStr}. Resume` : `Elapsed ${elapsedStr}. Pause`}
+      aria-pressed={isPaused}
+    >
+      {isPaused && <span aria-hidden="true">⏸ </span>}
+      {showTime ? elapsedStr : (isPaused ? 'Resume' : 'Pause')}
+    </button>
   );
 }
 
@@ -1526,12 +1719,6 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
     ? `${elapsedH}:${String(elapsedM).padStart(2, '0')}:${String(elapsedS).padStart(2, '0')}`
     : `${elapsedM}:${String(elapsedS).padStart(2, '0')}`;
 
-  const currentPauseSeconds = isPaused
-    ? Math.floor((Date.now() - new Date(workout.workout.paused_at).getTime()) / 1000)
-    : 0;
-  const pauseM = Math.floor(currentPauseSeconds / 60);
-  const pauseS = currentPauseSeconds % 60;
-  const pausedStr = `${pauseM}:${String(pauseS).padStart(2, '0')}`;
 
   // TEMP DEBUG - remove once start_time field is confirmed
   window.__ripfitDebug = workout.workout;
@@ -1547,17 +1734,26 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
   const [ratingPrefs, setRatingPrefs] = useState({ label: 'Effort & Vibes', scale: 5, display: 'slider' });
   // Cardio segments keyed by workout_exercise_id — persists across exercise navigation
   const [cardioSegmentsByExercise, setCardioSegmentsByExercise] = useState({});
+  // User's cooldown override for the current exercise. Owned here rather than in
+  // WorkoutTimerBar so the rest timer started by handleLogSet actually uses it.
+  const [cooldownOverride, setCooldownOverride] = useState(null);
 
   useEffect(() => {
     const tok = localStorage.getItem('ripfit_token');
-    fetch(`${API_BASE}/users/me`, { headers: { Authorization: `Bearer ${tok}` } })
+    const controller = new AbortController();
+    fetch(`${API_BASE}/users/me`, { headers: { Authorization: `Bearer ${tok}` }, signal: controller.signal })
       .then(r => r.json())
       .then(data => { if (data.workout_rating_prefs) setRatingPrefs(data.workout_rating_prefs); })
       .catch(() => {});
+    return () => controller.abort();
   }, []);
 
   const exercises = workout.exercises;
   const currentExercise = exercises[currentExerciseIdx] || {};
+
+  // Only a change of exercise clears the override. Logging a set replaces the
+  // exercise object in activeWorkout but keeps its id, so the override survives.
+  useEffect(() => { setCooldownOverride(null); }, [currentExercise.id]);
 
   // Helper function to format notes based on user preference
   const formatNotesForDisplay = (notes, isPrevious = false) => {
@@ -1890,7 +2086,8 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
           set_number: setNumber,
           reps_completed: parseInt(setForm.reps),
           weight_used: parseFloat(weightValue),
-          rpe: setForm.rpe ? parseInt(setForm.rpe) : null
+          rpe: setForm.rpe ? parseInt(setForm.rpe) : null,
+          set_type: 'normal'
         });
         if (notesUpdated) {
           updated[currentExerciseIdx].exercise_notes = updatedNotesText;
@@ -1908,9 +2105,9 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
     }
 
     // Start rest timer - timestamp-based so it survives navigation/unmount.
-    // Default 60s; respects per-exercise override and on/off toggle if set.
+    // The user's override wins; otherwise the routine's cooldown_seconds, then 60s.
     const restEnabled = currentExercise.rest_timer_enabled !== false; // default true
-    const restDuration = currentExercise.rest_timer_seconds || 60;
+    const restDuration = cooldownOverride ?? baseCooldownFor(currentExercise);
 
     if (restEnabled) {
       setActiveWorkout(prev => ({
@@ -1998,6 +2195,137 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
     }
   };
 
+
+  // ── Timers, timer blocks and tempo ──────────────────────────────────────
+  const { prefs } = useUserPrefs();
+  // "Last session notes" scope: seeded from the saved preference, then a
+  // session-only override (never written back).
+  const [notesScope, setNotesScope] = useState(prefs.previous_notes_scope || 'all');
+  const [timerOpen, setTimerOpen] = useState(false);   // inline timer for the current exercise
+  const [blockOpen, setBlockOpen] = useState(false);   // timer block (no exercise yet)
+  const [tempoGlow, setTempoGlow] = useState(false);
+
+  // An exercise-bound timer belongs to one exercise; changing exercise closes it.
+  useEffect(() => { setTimerOpen(false); }, [currentExercise.id]);
+
+  const tempoGuide = useTempoGuide({
+    exerciseKey: currentExercise.id,
+    eccentric: currentExercise.template?.tempo_eccentric,
+    pause: currentExercise.template?.tempo_pause,
+    concentric: currentExercise.template?.tempo_concentric,
+    onGlow: setTempoGlow,
+  });
+
+  /** Writes one timer-produced set (EMOM minute, Tabata interval, AMRAP result). */
+  const logTimerSet = async ({ set_number, reps, setType }) => {
+    const tok = localStorage.getItem('ripfit_token');
+    const exId = currentExercise.id;
+    // Weight comes from the Log Set form if one is entered, else bodyweight.
+    const w = parseFloat(setForm.weight);
+    const weight = Number.isFinite(w) && w > 0 ? w : 0;
+    const res = await fetch(`${API_BASE}/workouts/${workout.workout.id}/sets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
+      body: JSON.stringify({ workout_exercise_id: exId, set_number, reps_completed: reps, weight_used: weight, set_type: setType }),
+    });
+    if (!res.ok) throw new Error('Failed to log set');
+    setActiveWorkout(prev => ({
+      ...prev,
+      exercises: prev.exercises.map(ex => ex.id === exId
+        ? { ...ex, logged_sets: [...(ex.logged_sets || []), { set_number, reps_completed: reps, weight_used: weight, rpe: null, set_type: setType }] }
+        : ex),
+    }));
+  };
+
+  /** Appends a "General:" line to the current exercise's notes. */
+  const appendExerciseNote = async (text) => {
+    const tok = localStorage.getItem('ripfit_token');
+    const exId = currentExercise.id;
+    const line = `General: ${text}`;
+    const current = currentExercise.exercise_notes || '';
+    const res = await fetch(`${API_BASE}/workouts/${workout.workout.id}/exercises/${exId}/notes`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
+      body: JSON.stringify({ notes: current ? `${current}\n${line}` : line }),
+    });
+    if (!res.ok) throw new Error('Failed to save note');
+    const data = await res.json();
+    setActiveWorkout(prev => ({
+      ...prev,
+      exercises: prev.exercises.map(ex => ex.id === exId ? { ...ex, exercise_notes: data.exercise_notes } : ex),
+    }));
+  };
+
+  /**
+   * End of a timer block. With an exercise: add it to the workout and write
+   * one set per logged interval/round so the block shows up in stats. Without
+   * (Skip): keep the block as a line in the workout-level notes.
+   */
+  const handleBlockComplete = async (summary) => {
+    const tok = localStorage.getItem('ripfit_token');
+    const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` };
+    const blockLine = `Timer block — ${summary.label} ${formatDurationDisplay(summary.elapsedSeconds)} · ${summary.detail}`;
+
+    if (!summary.exercise) {
+      const next = workoutNotes ? `${workoutNotes}\n${blockLine}` : blockLine;
+      const res = await fetch(`${API_BASE}/workouts/${workout.workout.id}/notes`, {
+        method: 'PUT', headers, body: JSON.stringify({ overall_notes: next }),
+      });
+      if (!res.ok) throw new Error('Could not save the block to your workout notes');
+      setWorkoutNotes(next);
+      setWorkoutNotesSaved(true);
+      setBlockOpen(false);
+      return;
+    }
+
+    const ex = summary.exercise;
+    const noteLine = `General: ${blockLine}`;
+    const addRes = await fetch(`${API_BASE}/workouts/${workout.workout.id}/exercises`, {
+      method: 'POST', headers,
+      body: JSON.stringify({ exercise_id: ex.id, order_index: exercises.length + 1, exercise_notes: noteLine }),
+    });
+    if (!addRes.ok) throw new Error('Could not add the exercise to this workout');
+    const created = await addRes.json();
+
+    const logged = [];
+    for (const set of summary.sets) {
+      const res = await fetch(`${API_BASE}/workouts/${workout.workout.id}/sets`, {
+        method: 'POST', headers,
+        body: JSON.stringify({
+          workout_exercise_id: created.id, set_number: set.ordinal,
+          reps_completed: set.reps, weight_used: 0, set_type: set.setType,
+        }),
+      });
+      if (res.ok) logged.push({ set_number: set.ordinal, reps_completed: set.reps, weight_used: 0, rpe: null, set_type: set.setType });
+    }
+
+    setActiveWorkout(prev => ({
+      ...prev,
+      exercises: [...prev.exercises, {
+        ...created,
+        exercise_name: ex.name,
+        category: ex.category,
+        equipment_type: ex.equipment_type,
+        exercise_notes: noteLine,
+        logged_sets: logged,
+        is_ad_hoc: true,
+        template: {},
+      }],
+    }));
+    fetch(`${API_BASE}/workouts/${workout.workout.id}/type`, { method: 'PUT', headers }).catch(() => {});
+    setBlockOpen(false);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+  };
+
+  const skipCurrentExercise = () => {
+    if (loggedSets.length === 0 || window.confirm('Skip this exercise without completing all sets?')) {
+      if (currentExerciseIdx < exercises.length - 1) {
+        nextExercise();
+      }
+    }
+  };
+
   // Free Lift (or any workout) started with no exercises yet — render a
   // safe empty state instead of crashing on currentExercise.logged_sets.
   if (exercises.length === 0) {
@@ -2006,20 +2334,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
         <div className="workout-header">
           <h2>{workout.routine_name || 'Open Session'}</h2>
           <div className="header-buttons">
-            {showHeaderClock && (
-              <>
-                <span className={`workout-elapsed-clock ${isPaused ? 'paused' : ''}`}>
-                  {isPaused ? '⏸' : '⏱'} {elapsedStr}
-                </span>
-                {isPaused && (
-                  <span className="workout-pause-duration">{pausedStr}</span>
-                )}
-              </>
-            )}
-            <WaterWidget />
-            <button onClick={togglePause} className={`pause-resume-btn ${isPaused ? 'is-paused' : ''}`}>
-              {isPaused ? '▶ Resume' : '⏸ Pause'}
-            </button>
+            <WorkoutClockButton showTime={showHeaderClock} isPaused={isPaused} elapsedStr={elapsedStr} onToggle={togglePause} />
             <div className="clock-settings-wrapper">
               <button onClick={() => setShowHeaderClockSettings(prev => !prev)} className="clock-settings-btn" title="Clock display settings">⚙</button>
               {showHeaderClockSettings && (
@@ -2035,17 +2350,28 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
                 </div>
               )}
             </div>
-            <button onClick={() => setShowFinishConfirm(true)} className="finish-btn">Finish Workout</button>
+            <WaterWidget />
+            <button onClick={() => setShowFinishConfirm(true)} className="finish-btn" title="Finish workout" aria-label="Finish workout">Finish Workout</button>
           </div>
         </div>
 
         <div className="current-exercise" style={{ textAlign: 'center', padding: '40px 20px' }}>
-          <p style={{ fontSize: '1.1em', color: '#888', marginBottom: '20px' }}>
-            No exercises yet — add one to get started.
+          <p style={{ fontSize: '1.1em', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+            No exercises yet — add one to get started, or start with a timer.
           </p>
-          <button onClick={() => setShowAddExercise(true)} className="add-exercise-btn" style={{ fontSize: '1em', padding: '12px 24px' }}>
-            + Add Exercise
-          </button>
+          <div className="aw-empty-actions">
+            <button onClick={() => setShowAddExercise(true)} className="add-exercise-btn" style={{ fontSize: '1em', padding: '12px 24px' }}>
+              + Add Exercise
+            </button>
+            {!blockOpen && (
+              <button className="aw-timer-block-btn" onClick={() => setBlockOpen(true)}>⏱ Start Timer Block</button>
+            )}
+          </div>
+          {blockOpen && (
+            <div style={{ textAlign: 'left' }}>
+              <InlineTimer blockMode onClose={() => setBlockOpen(false)} onBlockComplete={handleBlockComplete} />
+            </div>
+          )}
         </div>
 
         {showAddExercise && (
@@ -2125,22 +2451,15 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
 
   return (
     <div className="workout-container aw-in-progress">
-      <div className="workout-header">
-        <h2>{workout.routine_name}</h2>
-        <div className="header-buttons">
-          {showHeaderClock && (
-            <>
-              <span className={`workout-elapsed-clock ${isPaused ? 'paused' : ''}`}>
-                {isPaused ? '⏸' : '⏱'} {elapsedStr}
-              </span>
-              {isPaused && (
-                <span className="workout-pause-duration">{pausedStr}</span>
-              )}
-            </>
-          )}
-          <button onClick={togglePause} className={`pause-resume-btn ${isPaused ? 'is-paused' : ''}`}>
-            {isPaused ? '▶ Resume' : '⏸ Pause'}
-          </button>
+      {/* Mobile only: screen-edge glow for the tempo guide. Always mounted so
+          it can fade out rather than vanish. */}
+      <div className={`aw-tempo-screen-glow ${tempoGlow ? 'on' : ''}`} aria-hidden="true" />
+
+      {/* Desktop: title · clock (pause/resume) · gear · water … Notes · ☰ · Finish */}
+      <div className="workout-header aw-workout-header">
+        <div className="aw-header-left">
+          <h2>{workout.routine_name}</h2>
+          <WorkoutClockButton showTime={showHeaderClock} isPaused={isPaused} elapsedStr={elapsedStr} onToggle={togglePause} />
           <div className="clock-settings-wrapper">
             <button onClick={() => setShowHeaderClockSettings(prev => !prev)} className="clock-settings-btn" title="Clock display settings">⚙</button>
             {showHeaderClockSettings && (
@@ -2156,46 +2475,66 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
               </div>
             )}
           </div>
+          <WaterWidget />
+        </div>
+        <div className="aw-header-right">
           <button
             onClick={() => setShowWorkoutNotes(true)}
             className="workout-notes-btn"
-            title="Workout notes"
-            aria-label="Workout notes"
+            title={workoutNotes ? 'Workout notes (has notes)' : 'Workout notes'}
+            aria-label={workoutNotes ? 'Workout notes, has notes' : 'Workout notes'}
           >
             <span className="aw-icon-glyph">📝</span>
-            <span className="aw-icon-text">Workout Notes</span>
+            <span className="aw-icon-text">Notes</span>
             {workoutNotes && <span className="aw-icon-badge" />}
           </button>
           <button
             onClick={() => setShowAllExercises(true)}
-            className="view-all-btn"
+            className="view-all-btn aw-icon-only"
             title="View all exercises"
             aria-label="View all exercises"
           >
-            <span className="aw-icon-glyph">☰</span>
-            <span className="aw-icon-text">View All</span>
+            ☰
+          </button>
+          <button
+            onClick={() => setShowFinishConfirm(true)}
+            className="finish-btn"
+            title="Finish workout"
+            aria-label="Finish workout"
+          >
+            Finish
           </button>
         </div>
       </div>
-
-      {isPaused && (
-        <div className="workout-paused-banner">
-          Workout paused — duration clock stopped. Rest timer (if active) keeps running.
-        </div>
-      )}
 
       <div className="exercise-progress">
         Exercise {currentExerciseIdx + 1} of {exercises.length}
       </div>
 
-      <div className="current-exercise">
+      <div className={`current-exercise ${tempoGlow ? 'tempo-glow-on' : ''}`}>
         <div className="exercise-header">
           <h3>{currentExercise.exercise_name}</h3>
-          <button onClick={() => setShowChangeExercise(true)} className="change-exercise-btn">
-            Change Exercise
-          </button>
+          <div className="aw-ex-actions">
+            <button type="button" className="aw-ex-action" onClick={skipCurrentExercise}
+              title="Skip Exercise" aria-label="Skip Exercise">⊘</button>
+            <button type="button" className="aw-ex-action" onClick={() => setShowChangeExercise(true)}
+              title="Change Exercise" aria-label="Change Exercise">↺</button>
+            <button type="button" className="aw-ex-action" onClick={() => setShowAddExercise(true)}
+              title="Add Exercise" aria-label="Add Exercise">+</button>
+          </div>
         </div>
-        <p className="category">{currentExercise.category} • {currentExercise.equipment_type}</p>
+        {/* The rest countdown lives on this always-present line, so starting it
+            never pushes the Log Set button down the page. */}
+        <div className="aw-category-row">
+          <p className="category">{currentExercise.category} • {currentExercise.equipment_type}</p>
+          {isResting && (
+            <span className="aw-rest-pill" role="timer" aria-live="off">
+              <span className="aw-rest-label">Rest</span>
+              <span className="aw-rest-time">{formatDurationDisplay(restSeconds)}</span>
+              <button type="button" onClick={skipRest} className="aw-rest-skip">Skip</button>
+            </span>
+          )}
+        </div>
 
         {currentExercise.category === 'Cardio' ? (
           // ── Cardio exercise goal display ──
@@ -2250,16 +2589,20 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
           </div>
         )}
 
-        <PreviousNotesDropdown exerciseId={currentExercise.exercise_id} />
+        <PreviousNotesDropdown
+          exerciseId={currentExercise.exercise_id}
+          programId={workout.workout.program_id || null}
+          scope={notesScope}
+          onScopeChange={setNotesScope}
+        />
 
-        <WorkoutTimerBar exercise={currentExercise} />
-
-        {isResting && (
-          <div className="rest-timer">
-            <div className="timer-display">{restSeconds}s</div>
-            <button onClick={skipRest} className="skip-rest-btn">Skip Rest</button>
-          </div>
-        )}
+        <WorkoutTimerBar
+          exercise={currentExercise}
+          cooldownOverride={cooldownOverride}
+          onCooldownOverrideChange={setCooldownOverride}
+          timerOpen={timerOpen}
+          onToggleTimer={() => setTimerOpen(o => !o)}
+        />
 
         {currentExercise.category === 'Cardio' ? (
           <CardioSegmentForm
@@ -2279,12 +2622,14 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
             <div className="form-row">
               <input
                 type="number"
+                inputMode="numeric"
                 placeholder="Reps"
                 value={setForm.reps}
                 onChange={(e) => setSetForm({...setForm, reps: e.target.value})}
               />
               <input
                 type="number"
+                inputMode="decimal"
                 step="0.1"
                 placeholder="Weight (lbs)"
                 value={setForm.weight}
@@ -2292,6 +2637,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
               />
               <input
                 type="number"
+                inputMode="numeric"
                 placeholder="RPE"
                 min="1"
                 max="11"
@@ -2304,8 +2650,26 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
                 }}
               />
             </div>
-            <button onClick={handleLogSet} className="log-set-btn">Complete Set</button>
+            {tempoGuide.tempoLine}
+            {tempoGuide.guideView}
+            <div className="aw-log-row">
+              <button onClick={handleLogSet} className="log-set-btn">Complete Set</button>
+              {tempoGuide.startRepButton}
+            </div>
           </div>
+        )}
+
+        {/* Inline timer (5d): below the set form, above the logged sets. Keyed
+            by exercise so an in-flight timer never logs to a different one. */}
+        {timerOpen && (
+          <InlineTimer
+            key={currentExercise.id}
+            exerciseName={currentExercise.exercise_name}
+            setsBefore={loggedSets.length}
+            onClose={() => setTimerOpen(false)}
+            onLogSet={logTimerSet}
+            onAppendNote={appendExerciseNote}
+          />
         )}
 
         {currentExercise.category === 'Cardio' ? (
@@ -2549,39 +2913,33 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
           </div>
         </div>
 
-        <div className="exercise-nav">
-          <button onClick={prevExercise} disabled={currentExerciseIdx === 0}>
-            ← Previous
-          </button>
-          <button onClick={() => {
-            if (loggedSets.length === 0 || window.confirm('Skip this exercise without completing all sets?')) {
-              if (currentExerciseIdx < exercises.length - 1) {
-                nextExercise();
-              }
-            }
-          }} className="skip-exercise-btn">
-            Skip Exercise
-          </button>
-          <button onClick={() => setShowAddExercise(true)} className="add-exercise-btn">
-            + Add Exercise
-          </button>
-        </div>
+        {/* Card footer: timer-first logging (5e) — attach an exercise afterwards */}
+        {blockOpen ? (
+          <InlineTimer blockMode onClose={() => setBlockOpen(false)} onBlockComplete={handleBlockComplete} />
+        ) : (
+          <div className="aw-card-footer">
+            <button type="button" className="aw-timer-block-btn" onClick={() => setBlockOpen(true)}>
+              ⏱ Start Timer Block
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Primary actions — pinned to the bottom of the viewport on mobile */}
+      {/* Exercise navigation — pinned to the bottom of the viewport */}
       <div className="aw-action-bar">
         <button
-          onClick={() => setShowFinishConfirm(true)}
-          className="finish-btn aw-action-btn"
+          onClick={prevExercise}
+          disabled={currentExerciseIdx === 0}
+          className="aw-action-btn aw-action-prev"
         >
-          Finish Workout
+          ← Previous
         </button>
         <button
           onClick={nextExercise}
           disabled={currentExerciseIdx === exercises.length - 1}
           className="aw-action-btn aw-action-next"
         >
-          Next Exercise →
+          Next →
         </button>
       </div>
 

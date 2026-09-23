@@ -517,3 +517,82 @@
     flex-direction: column;
   }
 }
+
+/* ── Report resolution ── */
+.exm-reports-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.exm-reports-head .exm-section-title {
+  margin: 0;
+}
+
+.exm-report-view-toggle {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+/* Segmented toggle: the selected view keeps the filled primary style, the
+   other reads as an outline so the two states are distinct. */
+.exm-report-view-toggle .admin-action-btn:not(.active) {
+  background: transparent;
+  color: var(--text-secondary);
+  box-shadow: inset 0 0 0 1px var(--border-color);
+}
+
+.exm-resolve-form {
+  margin-top: var(--space-sm);
+}
+
+.exm-resolve-form label {
+  display: block;
+  margin-bottom: var(--space-xs);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.exm-resolve-form textarea {
+  width: 100%;
+  min-height: 72px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.exm-resolve-form .exm-form-actions {
+  margin-top: var(--space-sm);
+}
+
+.exm-resolution {
+  margin-top: var(--space-sm);
+  padding: var(--space-sm);
+  border-left: 3px solid var(--color-success);
+  background-color: var(--bg-primary);
+  border-radius: var(--radius-sm);
+}
+
+.exm-resolution-label {
+  display: block;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-success);
+}
+
+.exm-user-badge {
+  display: inline-block;
+  margin-left: var(--space-xs);
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  background: hsla(38, 92%, 50%, 0.16);
+  color: var(--color-warning);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}

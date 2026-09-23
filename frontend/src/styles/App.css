@@ -1057,3 +1057,47 @@
     font-size: var(--font-size-sm);
   }
 }
+
+/* ── Paused workout: header dot turns amber (mobile) ─────────────────────── */
+@media (max-width: 768px) {
+  .header-workout-pulse.paused {
+    background-color: var(--color-warning);
+    animation: none;
+  }
+}
+
+/* ── Meditation session chip (mobile header) ─────────────────────────────── */
+.header-meditation-timer {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .header-meditation-timer {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 28px;
+    padding: 3px 9px;
+    border: none;
+    border-radius: var(--radius-full);
+    background: hsla(262, 83%, 58%, 0.16);
+    color: hsl(262, 83%, 62%);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-bold);
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .header-meditation-timer.paused {
+    background: hsla(38, 92%, 50%, 0.16);
+    color: var(--color-warning);
+  }
+}
+
+@media (max-width: 768px) {
+  .mobile-drawer-dot.paused {
+    background-color: var(--color-warning);
+    animation: none;
+  }
+}

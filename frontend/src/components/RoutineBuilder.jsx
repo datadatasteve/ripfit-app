@@ -1,7 +1,37 @@
 import { useState, useEffect } from 'react';
+import SortableList, { newRowKey } from './SortableList';
+import { TempoEditor, OverloadEditor, weekTargetsToRows, rowsToWeekTargets } from './RoutineExerciseExtras';
+import { useUserPrefs } from '../contexts/UserPrefsContext';
 import './RoutineBuilder.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+
+const numOrNull = v => (v === null || v === undefined || v === '' ? null : Number(v));
+
+/**
+ * Normalises a routine exercise (from the API or a caller) into editor state:
+ * a stable _key for drag reordering, plus overload/tempo fields with defaults.
+ * Numeric columns arrive from Postgres as strings ("5", "140.00").
+ */
+function toEditorExercise(ex) {
+  return {
+    _key: newRowKey(),
+    exercise_id: ex.exercise_id,
+    name: ex.name ?? ex.exercise_name,
+    category: ex.category,
+    target_sets: ex.target_sets ?? '',
+    target_reps: ex.target_reps ?? '',
+    target_weight: ex.target_weight ?? '',
+    notes: ex.notes || '',
+    overload_strategy: ex.overload_strategy || 'none',
+    overload_increment: ex.overload_increment ?? '',
+    overload_schedule: ex.overload_schedule || 'linear',
+    overload_week_rows: weekTargetsToRows(ex.overload_week_targets),
+    tempo_eccentric: numOrNull(ex.tempo_eccentric),
+    tempo_pause: numOrNull(ex.tempo_pause),
+    tempo_concentric: numOrNull(ex.tempo_concentric),
+  };
+}
 
 export default function RoutineBuilder({ initialExercises, existingRoutine, onClose, onSaved, onDeleted }) {
   const isEditing = !!existingRoutine;
@@ -9,16 +39,12 @@ export default function RoutineBuilder({ initialExercises, existingRoutine, onCl
   const [name, setName] = useState(existingRoutine?.name || '');
   const [description, setDescription] = useState(existingRoutine?.description || '');
   const [exercises, setExercises] = useState(
-    existingRoutine?.exercises?.map(ex => ({
-      exercise_id: ex.exercise_id,
-      name: ex.exercise_name,
-      category: ex.category,
-      target_sets: ex.target_sets ?? '',
-      target_reps: ex.target_reps ?? '',
-      target_weight: ex.target_weight ?? '',
-      notes: ex.notes || ''
-    })) || initialExercises || []
+    () => (existingRoutine?.exercises || initialExercises || []).map(toEditorExercise)
   );
+  const { prefs } = useUserPrefs();
+  // Tempo templates: null until first needed, then shared by every row.
+  const [tempoTemplates, setTempoTemplates] = useState(null);
+  const [templatesRequested, setTemplatesRequested] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -94,18 +120,25 @@ export default function RoutineBuilder({ initialExercises, existingRoutine, onCl
     searchExercises('Arms', sub);
   };
 
+  const loadTemplates = async () => {
+    if (templatesRequested) return;
+    setTemplatesRequested(true);
+    try {
+      const res = await fetch(`${API_BASE}/users/me/tempo-templates`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      setTempoTemplates(data.templates || []);
+    } catch (err) {
+      console.error('Failed to load tempo templates:', err);
+      setTempoTemplates([]);
+    }
+  };
+
   const addExercise = (ex) => {
     setExercises(prev => [
       ...prev,
-      {
-        exercise_id: ex.id,
-        name: ex.name,
-        category: ex.category,
-        target_sets: '',
-        target_reps: '',
-        target_weight: '',
-        notes: ''
-      }
+      toEditorExercise({ exercise_id: ex.id, name: ex.name, category: ex.category }),
     ]);
     setSearchResults([]);
     setSearchQuery('');
@@ -127,6 +160,20 @@ export default function RoutineBuilder({ initialExercises, existingRoutine, onCl
 
   const updateExerciseField = (idx, field, value) => {
     setExercises(prev => prev.map((ex, i) => i === idx ? { ...ex, [field]: value } : ex));
+  };
+
+  const updateExercise = (idx, patch) => {
+    setExercises(prev => prev.map((ex, i) => i === idx ? { ...ex, ...patch } : ex));
+  };
+
+  // Drag reorder: move one row from `from` to `to`.
+  const moveExerciseTo = (from, to) => {
+    setExercises(prev => {
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
   };
 
   const handleSave = async () => {
@@ -161,6 +208,29 @@ export default function RoutineBuilder({ initialExercises, existingRoutine, onCl
           return;
         }
       }
+
+      if (ex.overload_strategy && ex.overload_strategy !== 'none') {
+        const wholeOnly = ex.overload_strategy !== 'weight';
+        const unit = ex.overload_strategy;
+        const incRaw = String(ex.overload_increment ?? '').trim();
+        if (incRaw !== '') {
+          const inc = Number(incRaw);
+          if (!Number.isFinite(inc) || inc <= 0 || (wholeOnly && !Number.isInteger(inc))) {
+            setError(`${label}: overload increment must be a positive ${wholeOnly ? 'whole number' : 'number'} of ${unit}, or blank to use the program default.`);
+            return;
+          }
+        }
+        if (ex.overload_schedule === 'custom') {
+          for (const r of ex.overload_week_rows || []) {
+            if (r.value === '' || r.value === null) continue;
+            const v = Number(r.value);
+            if (!Number.isFinite(v) || v < 0 || (wholeOnly && !Number.isInteger(v))) {
+              setError(`${label}: week ${r.week} increment must be ${wholeOnly ? 'a whole number' : 'a number'} of 0 or more.`);
+              return;
+            }
+          }
+        }
+      }
     }
 
     setError('');
@@ -176,14 +246,28 @@ export default function RoutineBuilder({ initialExercises, existingRoutine, onCl
         body: JSON.stringify({
           name: name.trim(),
           description: description.trim() || null,
-          exercises: exercises.map((ex, idx) => ({
-            exercise_id: ex.exercise_id,
-            order_index: idx + 1,
-            target_sets: ex.target_sets ? parseInt(ex.target_sets) : null,
-            target_reps: ex.target_reps ? parseInt(ex.target_reps) : null,
-            target_weight: ex.target_weight ? parseFloat(ex.target_weight) : null,
-            notes: ex.notes || null
-          }))
+          exercises: exercises.map((ex, idx) => {
+            const overloadOn = ex.overload_strategy && ex.overload_strategy !== 'none';
+            return {
+              exercise_id: ex.exercise_id,
+              order_index: idx + 1,
+              target_sets: ex.target_sets ? parseInt(ex.target_sets) : null,
+              target_reps: ex.target_reps ? parseInt(ex.target_reps) : null,
+              target_weight: ex.target_weight ? parseFloat(ex.target_weight) : null,
+              notes: ex.notes || null,
+              // Sent explicitly (including nulls) so clearing a value in the
+              // editor actually clears it; the server preserves omitted keys.
+              overload_strategy: overloadOn ? ex.overload_strategy : 'none',
+              overload_increment: overloadOn && ex.overload_increment !== '' ? Number(ex.overload_increment) : null,
+              overload_schedule: overloadOn ? (ex.overload_schedule || 'linear') : 'linear',
+              overload_week_targets: overloadOn && ex.overload_schedule === 'custom'
+                ? rowsToWeekTargets(ex.overload_week_rows)
+                : null,
+              tempo_eccentric: ex.tempo_eccentric,
+              tempo_pause: ex.tempo_pause,
+              tempo_concentric: ex.tempo_concentric,
+            };
+          })
         })
       });
 
@@ -294,40 +378,67 @@ export default function RoutineBuilder({ initialExercises, existingRoutine, onCl
           {exercises.length === 0 && (
             <p className="routine-builder-empty">No exercises added yet. Search above to add some.</p>
           )}
-          {exercises.map((ex, idx) => (
-            <div key={idx} className="routine-builder-exercise-row">
-              <div className="routine-builder-reorder">
-                <button onClick={() => moveExercise(idx, -1)} disabled={idx === 0}>▲</button>
-                <button onClick={() => moveExercise(idx, 1)} disabled={idx === exercises.length - 1}>▼</button>
+          <SortableList
+            items={exercises}
+            getKey={ex => ex._key}
+            onMove={moveExerciseTo}
+            mode={prefs.reorder_mode}
+            handleLabel={ex => `Reorder ${ex.name}`}
+            renderItem={(ex, idx, { handle, overlay }) => (
+              <div className="routine-builder-exercise-row">
+                <div className="routine-builder-exercise-main">
+                  {handle || (
+                    <div className="routine-builder-reorder">
+                      <button onClick={() => moveExercise(idx, -1)} disabled={idx === 0} aria-label={`Move ${ex.name} up`}>▲</button>
+                      <button onClick={() => moveExercise(idx, 1)} disabled={idx === exercises.length - 1} aria-label={`Move ${ex.name} down`}>▼</button>
+                    </div>
+                  )}
+                  <div className="routine-builder-exercise-info">
+                    <strong>{ex.name}</strong>
+                    <span className="routine-builder-exercise-cat">{ex.category}</span>
+                  </div>
+                  <div className="routine-builder-exercise-targets">
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      placeholder="Sets"
+                      value={ex.target_sets}
+                      onChange={e => updateExerciseField(idx, 'target_sets', e.target.value)}
+                    />
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      placeholder="Reps"
+                      value={ex.target_reps}
+                      onChange={e => updateExerciseField(idx, 'target_reps', e.target.value)}
+                    />
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      step="0.5"
+                      placeholder="Weight"
+                      value={ex.target_weight}
+                      onChange={e => updateExerciseField(idx, 'target_weight', e.target.value)}
+                    />
+                  </div>
+                  <button className="routine-builder-remove" onClick={() => removeExercise(idx)} aria-label={`Remove ${ex.name}`}>✕</button>
+                </div>
+
+                {!overlay && (
+                  <div className="routine-builder-exercise-extras">
+                    <TempoEditor
+                      exercise={ex}
+                      onChange={patch => updateExercise(idx, patch)}
+                      templates={tempoTemplates}
+                      loadTemplates={loadTemplates}
+                      onTemplateSaved={t => setTempoTemplates(list => [...(list || []), t].sort((a, b) => a.name.localeCompare(b.name)))}
+                    />
+                    <OverloadEditor exercise={ex} onChange={patch => updateExercise(idx, patch)} />
+                  </div>
+                )}
               </div>
-              <div className="routine-builder-exercise-info">
-                <strong>{ex.name}</strong>
-                <span className="routine-builder-exercise-cat">{ex.category}</span>
-              </div>
-              <div className="routine-builder-exercise-targets">
-                <input
-                  type="number"
-                  placeholder="Sets"
-                  value={ex.target_sets}
-                  onChange={e => updateExerciseField(idx, 'target_sets', e.target.value)}
-                />
-                <input
-                  type="number"
-                  placeholder="Reps"
-                  value={ex.target_reps}
-                  onChange={e => updateExerciseField(idx, 'target_reps', e.target.value)}
-                />
-                <input
-                  type="number"
-                  step="0.5"
-                  placeholder="Weight"
-                  value={ex.target_weight}
-                  onChange={e => updateExerciseField(idx, 'target_weight', e.target.value)}
-                />
-              </div>
-              <button className="routine-builder-remove" onClick={() => removeExercise(idx)}>✕</button>
-            </div>
-          ))}
+            )}
+          />
         </div>
 
         {error && <p className="routine-builder-error">{error}</p>}

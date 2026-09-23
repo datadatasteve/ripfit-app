@@ -1,0 +1,62 @@
+.sortable-row {
+  position: relative;
+}
+
+/* Original row stays in place, faded, while its copy is lifted */
+.sortable-row.is-source {
+  opacity: 0.35;
+}
+
+/* Drop indicator line */
+.sortable-row.drop-before::before,
+.sortable-row.drop-after::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 2px;
+  background-color: var(--color-primary);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.sortable-row.drop-before::before { top: -3px; }
+.sortable-row.drop-after::after   { bottom: -3px; }
+
+.sortable-handle {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  min-height: 44px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-tertiary);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: grab;
+  /* Touch: lets the page scroll unless the press-and-hold activates a drag */
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.sortable-handle:hover,
+.sortable-handle:focus-visible {
+  color: var(--text-primary);
+}
+
+.sortable-handle:active {
+  cursor: grabbing;
+}
+
+/* The lifted copy that follows the pointer */
+.sortable-overlay {
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xl);
+  background-color: var(--bg-elevated);
+  cursor: grabbing;
+}

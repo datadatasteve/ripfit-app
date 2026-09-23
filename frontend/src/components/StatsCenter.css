@@ -829,3 +829,45 @@
   font-size: 13px;
   color: var(--text-secondary);
 }
+
+/* ── Meditation tab ──────────────────────────────────────────────────────── */
+
+.sc-med-table-wrap {
+  overflow-x: auto;
+}
+
+.sc-med-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+}
+
+.sc-med-table th {
+  text-align: left;
+  padding: var(--space-xs) var(--space-sm);
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+
+.sc-med-table td {
+  padding: var(--space-sm);
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: top;
+}
+
+.sc-med-num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sc-med-notes {
+  white-space: pre-wrap;
+  min-width: 180px;
+}
+
+.sc-med-muted {
+  color: var(--text-tertiary);
+}
