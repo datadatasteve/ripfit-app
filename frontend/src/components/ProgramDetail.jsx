@@ -84,7 +84,7 @@ export default function ProgramDetail({ programId, onBack, onEdit, onStartWorkou
   const handleActivate = async () => {
     await fetch(`${API}/programs/${programId}/activate`, {
       method: 'PUT', headers: authHeaders(),
-      body: JSON.stringify({ start_date: new Date().toISOString().slice(0, 10) }),
+      body: JSON.stringify({ start_date: (d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`)(new Date()) }),
     });
     fetchAll();
   };
@@ -214,6 +214,13 @@ export default function ProgramDetail({ programId, onBack, onEdit, onStartWorkou
           {data.status === 'active' && (() => {
             const nextDay = workoutDays.find(d => !d.completed_date);
             if (!nextDay) return <p className="pd-all-done">All workouts complete ✓</p>;
+            // Training-day number within the week ("Day 3"): day_slot when the
+            // builder set one, else this day's position among the week's
+            // non-rest days.
+            const dayNumber = nextDay.day_slot ?? (workoutDays
+              .filter(d => d.week_number === nextDay.week_number)
+              .sort((a, b) => (a.day_of_week ?? a.order_index) - (b.day_of_week ?? b.order_index))
+              .findIndex(d => d.id === nextDay.id) + 1);
             return (
               <div className="pd-next-up">
                 <span className="pd-next-label">Next up</span>
@@ -221,7 +228,8 @@ export default function ProgramDetail({ programId, onBack, onEdit, onStartWorkou
                   <div className="pd-next-info">
                     <span className="pd-next-name">{nextDay.routine_name || 'Workout'}</span>
                     <span className="pd-next-meta">
-                      Week {nextDay.week_number} · {DAY_NAMES[nextDay.day_of_week] || `Day ${nextDay.order_index}`}
+                      Week {nextDay.week_number} · Day {dayNumber}
+                      {DAY_NAMES[nextDay.day_of_week] && ` · ${DAY_NAMES[nextDay.day_of_week]}`}
                       {nextDay.exercise_count > 0 && ` · ${nextDay.exercise_count} exercises`}
                     </span>
                   </div>

@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import RoutineBuilder from './RoutineBuilder';
+import RoutineDetail from './RoutineDetail';
+import { formatRepRange, repRangeOf, judgeReps, supersetLabel } from '../utils/repRange';
 import CardioWorkout from './CardioWorkout';
 import ProgramsHub from './ProgramsHub';
 import WaterWidget from './WaterWidget';
@@ -471,6 +473,7 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
   const [loading, setLoading] = useState(false);
   const [showRoutineBuilder, setShowRoutineBuilder] = useState(false);
   const [editingRoutine, setEditingRoutine] = useState(null);
+  const [viewingRoutineId, setViewingRoutineId] = useState(null);
   const [showCardio, setShowCardio] = useState(false);
   const [showMeditation, setShowMeditation] = useState(false);
   const [showFreeLiftModal, setShowFreeLiftModal] = useState(false);
@@ -482,6 +485,8 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
   const [routineProgramMap, setRoutineProgramMap] = useState({}); // routineId → [programNames]
 
   const openEditRoutine = async (routineId) => {
+    // Never edit a routine mid-workout (Patch 001).
+    if (activeWorkout && String(activeWorkout.workout?.routine_id) === String(routineId)) return;
     try {
       const res = await fetch(`${API_BASE}/routines/${routineId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -611,6 +616,9 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
       let res;
       const today = new Date();
       const dateStr = today.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      // workout_date is a bare DATE: send the user's local calendar day, not the
+      // UTC one (toISOString shifted evening workouts to tomorrow).
+      const localDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
       if (routineId === null) {
         let finalTitle;
@@ -623,7 +631,7 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({
-            workout_date: today.toISOString().split('T')[0],
+            workout_date: localDate,
             workout_title: finalTitle,
             workout_type: preloadCardio ? 'cardio' : 'open',
           }),
@@ -632,7 +640,7 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
         res = await fetch(`${API_BASE}/routines/${routineId}/start-workout`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ workout_date: today.toISOString().split('T')[0] }),
+          body: JSON.stringify({ workout_date: localDate }),
         });
       }
       const data = await res.json();
@@ -857,12 +865,15 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
             logged_sets: ex.logged_sets || [],
             cardio_segments: cardioSegmentsByExercise[ex.id] || [],
             target_sets: ex.template?.target_sets,
-            target_reps: ex.template?.target_reps,
+            target_reps_min: ex.template?.target_reps_min,
+            target_reps_max: ex.template?.target_reps_max,
             target_weight: ex.template?.target_weight,
             exercise_notes: ex.exercise_notes
           })),
         workout_notes: workoutNotes || '',
         previous_workout_notes: activeWorkout.previous_overall_notes || null,
+        previous_workout_date: activeWorkout.last_workout_date || null,
+        workout_date: activeWorkout.workout.workout_date || null,
         routine_id: activeWorkout.workout.routine_id || null,
         overload: activeWorkout.workout.routine_id
           ? computeOverloadSuggestions(
@@ -871,8 +882,10 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
                 exercise_name: ex.exercise_name,
                 category: ex.category,
                 logged_sets: ex.logged_sets || [],
+                previous_sets: ex.last_performance?.sets_completed || [],
                 target_sets: ex.template?.target_sets,
-                target_reps: ex.template?.target_reps,
+                target_reps_min: ex.template?.target_reps_min,
+                target_reps_max: ex.template?.target_reps_max,
                 target_weight: ex.template?.target_weight,
                 overload_strategy: ex.template?.overload_strategy,
                 overload_increment: ex.template?.overload_increment,
@@ -1013,14 +1026,14 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
 
           {workoutSummary.workout_notes && (
             <div className="summary-workout-notes">
-              <h4>Workout Notes</h4>
+              <h4>Workout Notes{workoutSummary.workout_date && ` · ${formatWorkoutDate(workoutSummary.workout_date)}`}</h4>
               <p style={{color: '#fff', whiteSpace: 'pre-wrap'}}>{workoutSummary.workout_notes}</p>
             </div>
           )}
 
           {workoutSummary.previous_workout_notes && (
             <div className="summary-workout-notes" style={{marginTop: '10px', borderLeft: '3px solid #888'}}>
-              <h4>Previous Workout Notes</h4>
+              <h4>Previous Workout Notes{workoutSummary.previous_workout_date && ` · ${formatWorkoutDate(workoutSummary.previous_workout_date)}`}</h4>
               <p style={{color: '#fff', whiteSpace: 'pre-wrap'}}>{workoutSummary.previous_workout_notes}</p>
             </div>
           )}
@@ -1101,6 +1114,37 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
       default:             return list;
     }
   };
+
+  // Full-page routine builder (create and edit) replaces the hub.
+  if (showRoutineBuilder) {
+    const closeBuilder = () => { setShowRoutineBuilder(false); setEditingRoutine(null); };
+    return (
+      <div className="workout-container">
+        <RoutineBuilder
+          key={editingRoutine?.id ?? 'new'}
+          existingRoutine={editingRoutine}
+          onClose={closeBuilder}
+          onSaved={() => { closeBuilder(); fetchRoutines(); }}
+          onDeleted={() => { closeBuilder(); setViewingRoutineId(null); fetchRoutines(); }}
+        />
+      </div>
+    );
+  }
+
+  if (viewingRoutineId) {
+    return (
+      <div className="workout-container">
+        <RoutineDetail
+          routineId={viewingRoutineId}
+          activeWorkout={activeWorkout}
+          starting={loading}
+          onBack={() => setViewingRoutineId(null)}
+          onEdit={(routine) => { setEditingRoutine(routine); setShowRoutineBuilder(true); }}
+          onStart={(id) => { setViewingRoutineId(null); startWorkout(id); }}
+        />
+      </div>
+    );
+  }
 
   if (hubView === 'programs') {
     return (
@@ -1241,7 +1285,11 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
               return (
                 <div key={routine.id} className="routine-card">
                   <div className="routine-card-top">
-                    <h3>{routine.name}</h3>
+                    <h3>
+                      <button type="button" className="routine-card-title-btn" onClick={() => setViewingRoutineId(routine.id)}>
+                        {routine.name}
+                      </button>
+                    </h3>
                     {programs.length > 0 && (
                       <span
                         className="routine-program-badge"
@@ -1256,6 +1304,9 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
                   <div className="routine-card-actions">
                     <button onClick={() => startWorkout(routine.id)} disabled={loading}>
                       Start Workout
+                    </button>
+                    <button className="routine-card-edit-btn" onClick={() => setViewingRoutineId(routine.id)}>
+                      View
                     </button>
                     <button className="routine-card-edit-btn" onClick={() => openEditRoutine(routine.id)}>
                       Edit
@@ -1288,25 +1339,6 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
         />
       )}
 
-      {showRoutineBuilder && (
-        <RoutineBuilder
-          existingRoutine={editingRoutine}
-          onClose={() => {
-            setShowRoutineBuilder(false);
-            setEditingRoutine(null);
-          }}
-          onSaved={() => {
-            setShowRoutineBuilder(false);
-            setEditingRoutine(null);
-            fetchRoutines();
-          }}
-          onDeleted={() => {
-            setShowRoutineBuilder(false);
-            setEditingRoutine(null);
-            fetchRoutines();
-          }}
-        />
-      )}
     </div>
   );
 }
@@ -1329,12 +1361,25 @@ function programWeekFromStart(startDate) {
 const numOrNull = v => (v === null || v === undefined || v === '' ? null : Number(v));
 
 /**
+ * A bare DATE column (workout_date) as a local date string. The API sends it
+ * as "YYYY-MM-DD" or midnight-UTC ISO; parsing either with new Date() shifts it
+ * a day back west of UTC, so only the calendar part is used.
+ */
+function formatWorkoutDate(value) {
+  if (!value) return '';
+  const d = new Date(`${String(value).slice(0, 10)}T00:00:00`);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString();
+}
+
+/**
  * Per-exercise progressive overload suggestions for the end-of-workout screen.
  *
  * An exercise is eligible when its effective strategy isn't 'none': its own
  * routine_exercises.overload_strategy, else (program workouts) the program's.
- * It gets a suggestion only if every target set, rep and weight was hit — each
- * exercise is judged on its own. The increment is the exercise's own, else the
+ * It gets a suggestion only when the top of its rep range was reached two
+ * sessions running: this session and the previous one from this routine
+ * (last_performance) each logged every target set at reps ≥ target_reps_max
+ * and at the target weight. Each exercise is judged on its own. The increment is the exercise's own, else the
  * program's, else a sensible default. Custom schedules look up the current
  * program week in overload_week_targets and fall back to overload_increment.
  */
@@ -1342,7 +1387,7 @@ function computeOverloadSuggestions(exercises, program) {
   const suggestions = [];
 
   for (const ex of exercises) {
-    if (ex.category === 'Cardio' || !ex.target_sets || !ex.target_reps) continue;
+    if (ex.category === 'Cardio' || !ex.target_sets || !(ex.target_reps_max || ex.target_reps_min)) continue;
 
     const own = ex.overload_strategy && ex.overload_strategy !== 'none' ? ex.overload_strategy : null;
     const inherited = program?.strategy && program.strategy !== 'none' ? program.strategy : null;
@@ -1350,18 +1395,20 @@ function computeOverloadSuggestions(exercises, program) {
     if (!strategy) continue;
 
     const targetSets = parseInt(ex.target_sets, 10);
-    const targetReps = parseInt(ex.target_reps, 10);
+    const repsMin = parseInt(ex.target_reps_min ?? ex.target_reps_max, 10);
+    const repsMax = parseInt(ex.target_reps_max ?? ex.target_reps_min, 10);
     const targetWeight = numOrNull(ex.target_weight);
     // Straight sets only. EMOM / Tabata / AMRAP sets record intervals and
     // rounds (often at no weight), so they can't be judged against set targets.
     const sets = (ex.logged_sets || []).filter(st => !st.set_type || st.set_type === 'normal');
+    // last_performance rows use { reps, weight }.
+    const previous = (ex.previous_sets || []).map(st => ({ reps_completed: st.reps, weight_used: st.weight }));
 
-    if (sets.length < targetSets) continue;
-    const allHit = sets.every(s =>
-      parseInt(s.reps_completed, 10) >= targetReps &&
-      (targetWeight == null || parseFloat(s.weight_used) >= targetWeight)
+    const topOfRangeHit = list => list.length >= targetSets && list.every(st =>
+      parseInt(st.reps_completed, 10) >= repsMax &&
+      (targetWeight == null || parseFloat(st.weight_used) >= targetWeight)
     );
-    if (!allHit) continue;
+    if (!topOfRangeHit(sets) || !topOfRangeHit(previous)) continue;
 
     // Increment: exercise → program → default. A custom schedule overrides
     // with this week's entry when there is one.
@@ -1384,7 +1431,9 @@ function computeOverloadSuggestions(exercises, program) {
       week,
       source: own ? 'exercise' : 'program',
       new_sets: strategy === 'sets' ? targetSets + step : targetSets,
-      new_reps: strategy === 'reps' ? targetReps + step : targetReps,
+      // A reps bump shifts the whole range: 10–12 + 1 → 11–13.
+      new_reps_min: strategy === 'reps' ? repsMin + step : repsMin,
+      new_reps_max: strategy === 'reps' ? repsMax + step : repsMax,
       new_weight: strategy === 'weight' ? (targetWeight || 0) + step : targetWeight,
     });
   }
@@ -1430,7 +1479,8 @@ function OverloadSuggestionCard({ routineId, suggestions, onDone }) {
           exercise_id: ex.exercise_id,
           order_index: ex.order_index,
           target_sets: bump ? bump.new_sets : ex.target_sets,
-          target_reps: bump ? bump.new_reps : ex.target_reps,
+          target_reps_min: bump ? bump.new_reps_min : ex.target_reps_min,
+          target_reps_max: bump ? bump.new_reps_max : ex.target_reps_max,
           target_weight: bump ? bump.new_weight : ex.target_weight,
           superset_group: ex.superset_group,
           notes: ex.notes,
@@ -1452,7 +1502,9 @@ function OverloadSuggestionCard({ routineId, suggestions, onDone }) {
   };
 
   const describe = (s) => {
-    const to = s.mode === 'weight' ? `${s.new_weight} lbs` : s.mode === 'reps' ? `${s.new_reps} reps` : `${s.new_sets} sets`;
+    const to = s.mode === 'weight' ? `${s.new_weight} lbs`
+      : s.mode === 'reps' ? `${formatRepRange(s.new_reps_min, s.new_reps_max)} reps`
+      : `${s.new_sets} sets`;
     return `+${s.step} ${OVERLOAD_UNITS[s.mode]} → ${to}`;
   };
 
@@ -1822,7 +1874,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
 
     const defaultReps = loggedSets.length > 0
       ? loggedSets[loggedSets.length - 1].reps_completed
-      : currentExercise.template?.target_reps || '';
+      : currentExercise.template?.target_reps_max || currentExercise.template?.target_reps_min || '';
 
     setSetForm({ reps: defaultReps, weight: defaultWeight, rpe: '' });
   }, [currentExerciseIdx, loggedSets.length, currentExercise.id]);
@@ -1869,7 +1921,8 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
         logged_sets: [],
         template: {
           target_sets: targets.sets ? parseInt(targets.sets) : null,
-          target_reps: targets.reps ? parseInt(targets.reps) : null,
+          target_reps_min: targets.reps ? parseInt(targets.reps) : null,
+          target_reps_max: targets.reps ? parseInt(targets.reps) : null,
           target_weight: targets.weight && !['BW', '0', '-'].includes(targets.weight.toString().toUpperCase()) 
             ? parseFloat(targets.weight) 
             : null
@@ -1916,7 +1969,8 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
           exercise_id: ex.exercise_id,
           order_index: ex.order_index,
           target_sets: ex.target_sets,
-          target_reps: ex.target_reps,
+          target_reps_min: ex.target_reps_min,
+          target_reps_max: ex.target_reps_max,
           target_weight: ex.target_weight,
           superset_group: ex.superset_group,
           notes: ex.notes
@@ -1926,7 +1980,8 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
           exercise_id: ex.exercise_id,
           order_index: nextIndex++,
           target_sets: ex.template?.target_sets || null,
-          target_reps: ex.template?.target_reps || null,
+          target_reps_min: ex.template?.target_reps_min || null,
+          target_reps_max: ex.template?.target_reps_max || null,
           target_weight: ex.template?.target_weight || null
         }));
 
@@ -1965,7 +2020,8 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
           goal_lap_distance: targets.lapDistance ? parseFloat(targets.lapDistance) : null,
         } : {
           target_sets: targets.sets ? parseInt(targets.sets) : null,
-          target_reps: targets.reps ? parseInt(targets.reps) : null,
+          target_reps_min: targets.reps ? parseInt(targets.reps) : null,
+          target_reps_max: targets.reps ? parseInt(targets.reps) : null,
           target_weight: targets.weight && !['BW', '0', '-'].includes(targets.weight.toString().toUpperCase())
             ? parseFloat(targets.weight) : null,
         })
@@ -1998,7 +2054,8 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
             goal_lap_distance: targets.lapDistance ? parseFloat(targets.lapDistance) : null,
           } : {
             target_sets: targets.sets ? parseInt(targets.sets) : null,
-            target_reps: targets.reps ? parseInt(targets.reps) : null,
+            target_reps_min: targets.reps ? parseInt(targets.reps) : null,
+            target_reps_max: targets.reps ? parseInt(targets.reps) : null,
             target_weight: targets.weight && !['BW', '0', '-'].includes(targets.weight.toString().toUpperCase())
               ? parseFloat(targets.weight) : null,
           }
@@ -2077,12 +2134,15 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
       });
 
       if (res.ok) {
+        // id kept so the set can be corrected in place (Patch 001).
+        const saved = await res.json().catch(() => ({}));
         // Single state update with both set and notes
         const updated = [...exercises];
         if (!updated[currentExerciseIdx].logged_sets) {
           updated[currentExerciseIdx].logged_sets = [];
         }
         updated[currentExerciseIdx].logged_sets.push({
+          id: saved.id,
           set_number: setNumber,
           reps_completed: parseInt(setForm.reps),
           weight_used: parseFloat(weightValue),
@@ -2104,10 +2164,30 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
       return;
     }
 
+    // Supersets: log A → B (→ C) → rest. Rest only after the last exercise of
+    // the round; until then go straight to the next member with sets left.
+    const flow = supersetMembers.length >= 2 ? nextInSuperset(setNumber) : null;
+
     // Start rest timer - timestamp-based so it survives navigation/unmount.
     // The user's override wins; otherwise the routine's cooldown_seconds, then 60s.
+    // In a superset that is the last exercise of the round (the one just logged).
     const restEnabled = currentExercise.rest_timer_enabled !== false; // default true
     const restDuration = cooldownOverride ?? baseCooldownFor(currentExercise);
+
+    if (flow) {
+      if (flow.rest && restEnabled) {
+        setActiveWorkout(prev => ({
+          ...prev,
+          workout: { ...prev.workout, rest_ends_at: new Date(Date.now() + restDuration * 1000).toISOString() }
+        }));
+      }
+      if (flow.nextIdx !== currentExerciseIdx) {
+        setTimeout(() => goToExerciseIdx(flow.nextIdx), flow.rest ? 750 : 400);
+      } else {
+        setSetForm({ ...setForm, reps: '', rpe: '' });
+      }
+      return;
+    }
 
     if (restEnabled) {
       setActiveWorkout(prev => ({
@@ -2125,6 +2205,105 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
       setSetForm({ ...setForm, reps: '', rpe: '' });
     }
   };
+
+  // ── Supersets (Patch 001) ──
+  // Members share template.superset_group; workout order is the round order.
+  const supersetGroup = currentExercise.template?.superset_group ?? null;
+  const supersetMembers = supersetGroup == null ? [] : exercises
+    .map((ex, idx) => ({ ex, idx }))
+    .filter(({ ex }) => ex.template?.superset_group === supersetGroup);
+
+  /**
+   * Where to go after logging set `setNumber` of the current exercise:
+   * the next member (later in order) with sets left — no rest — or, at the
+   * end of the round, rest and return to the first member with sets left.
+   * Once every member is done, move to the exercise after the group.
+   */
+  const nextInSuperset = (setNumber) => {
+    const remaining = ({ ex, idx }) => {
+      const done = idx === currentExerciseIdx ? setNumber : (ex.logged_sets?.length || 0);
+      return done < (parseInt(ex.template?.target_sets, 10) || 3);
+    };
+    const later = supersetMembers.find(m => m.idx > currentExerciseIdx && remaining(m));
+    if (later) return { rest: false, nextIdx: later.idx };
+    const first = supersetMembers.find(remaining);
+    if (first) return { rest: true, nextIdx: first.idx };
+    const lastIdx = Math.max(...supersetMembers.map(m => m.idx));
+    return { rest: true, nextIdx: lastIdx < exercises.length - 1 ? lastIdx + 1 : currentExerciseIdx };
+  };
+
+  const goToExerciseIdx = (idx) => {
+    setNoteInput('');
+    setEditingNotes(false);
+    setEditingSet(null);
+    setCurrentExerciseIdx(idx);
+  };
+
+  // ── In-workout set correction (Patch 001) ──
+  // One logged row at a time: { key, reps, weight, rpe, saving, error }.
+  const [editingSet, setEditingSet] = useState(null);
+
+  const startEditSet = (set, idx) => {
+    if (!set.id) return;   // not saved yet / unknown id
+    setEditingSet({
+      key: idx,
+      reps: String(set.reps_completed ?? ''),
+      weight: String(set.weight_used ?? ''),
+      rpe: set.rpe == null ? '' : String(set.rpe),
+      saving: false,
+      error: '',
+    });
+  };
+
+  const saveEditSet = async (set, idx) => {
+    const reps = parseInt(editingSet.reps, 10);
+    const weightRaw = String(editingSet.weight).trim().toUpperCase();
+    const weight = ['', 'BW', '-'].includes(weightRaw) ? 0 : parseFloat(weightRaw);
+    const rpe = String(editingSet.rpe).trim() === '' ? null : parseInt(editingSet.rpe, 10);
+    if (!Number.isInteger(reps) || reps < 0) { setEditingSet(e => ({ ...e, error: 'Reps must be a whole number' })); return; }
+    if (!Number.isFinite(weight) || weight < 0) { setEditingSet(e => ({ ...e, error: 'Weight must be 0 or more' })); return; }
+    if (rpe !== null && (!Number.isInteger(rpe) || rpe < 1 || rpe > 10)) { setEditingSet(e => ({ ...e, error: 'RPE must be 1–10' })); return; }
+
+    setEditingSet(e => ({ ...e, saving: true, error: '' }));
+    try {
+      const res = await fetch(`${API_BASE}/workouts/sets/${set.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('ripfit_token')}` },
+        body: JSON.stringify({ reps, weight, rpe }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Save failed');
+      const saved = await res.json();
+      const exId = currentExercise.id;
+      setActiveWorkout(prev => ({
+        ...prev,
+        exercises: prev.exercises.map(ex => ex.id === exId
+          ? {
+              ...ex,
+              logged_sets: (ex.logged_sets || []).map((st, i) => i === idx
+                ? { ...st, reps_completed: saved.reps_completed, weight_used: parseFloat(saved.weight_used), rpe: saved.rpe }
+                : st),
+            }
+          : ex),
+      }));
+      setEditingSet(null);
+    } catch (err) {
+      setEditingSet(e => (e ? { ...e, saving: false, error: err.message } : e));
+    }
+  };
+
+  useEffect(() => { setEditingSet(null); }, [currentExercise.id]);
+
+  // Tapping anywhere outside the row being corrected cancels the edit.
+  const editingSetRef = useRef(null);
+  const isEditingSet = !!editingSet;
+  useEffect(() => {
+    if (!isEditingSet) return;
+    const onPointerDown = (e) => {
+      if (editingSetRef.current && !editingSetRef.current.contains(e.target)) setEditingSet(null);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [isEditingSet]);
 
   const skipRest = () => {
     setActiveWorkout(prev => ({
@@ -2229,10 +2408,11 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
       body: JSON.stringify({ workout_exercise_id: exId, set_number, reps_completed: reps, weight_used: weight, set_type: setType }),
     });
     if (!res.ok) throw new Error('Failed to log set');
+    const saved = await res.json().catch(() => ({}));
     setActiveWorkout(prev => ({
       ...prev,
       exercises: prev.exercises.map(ex => ex.id === exId
-        ? { ...ex, logged_sets: [...(ex.logged_sets || []), { set_number, reps_completed: reps, weight_used: weight, rpe: null, set_type: setType }] }
+        ? { ...ex, logged_sets: [...(ex.logged_sets || []), { id: saved.id, set_number, reps_completed: reps, weight_used: weight, rpe: null, set_type: setType }] }
         : ex),
     }));
   };
@@ -2511,9 +2691,43 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
         Exercise {currentExerciseIdx + 1} of {exercises.length}
       </div>
 
+      {/* Superset: every member's name, target and progress at once; tap to
+          switch. The full card below is the current member's. */}
+      {supersetMembers.length >= 2 && (
+        <div className="aw-superset-strip" role="group" aria-label={`Superset ${supersetLabel(supersetGroup)}`}>
+          {supersetMembers.map(({ ex, idx }, i) => {
+            const reps = repRangeOf(ex.template);
+            const done = ex.logged_sets?.length || 0;
+            const target = ex.template?.target_sets;
+            return (
+              <button
+                key={ex.id}
+                type="button"
+                className={`aw-superset-member ${idx === currentExerciseIdx ? 'active' : ''}`}
+                onClick={() => goToExerciseIdx(idx)}
+                aria-current={idx === currentExerciseIdx ? 'true' : undefined}
+              >
+                <span className="aw-superset-tag">
+                  <span className="ss-badge">{supersetLabel(supersetGroup)}</span>
+                  {String.fromCharCode(65 + i)}
+                </span>
+                <span className="aw-superset-name">{ex.exercise_name}</span>
+                <span className="aw-superset-target">
+                  {[target ? `${target} × ${reps || '?'}` : reps, ex.template?.target_weight ? `@ ${parseFloat(ex.template.target_weight)}` : null].filter(Boolean).join(' ')}
+                  <span className="aw-superset-done"> · {done}/{target || '?'}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <div className={`current-exercise ${tempoGlow ? 'tempo-glow-on' : ''}`}>
         <div className="exercise-header">
-          <h3>{currentExercise.exercise_name}</h3>
+          <h3>
+            {supersetMembers.length >= 2 && <span className="ss-badge">{supersetLabel(supersetGroup)}</span>}
+            {currentExercise.exercise_name}
+          </h3>
           <div className="aw-ex-actions">
             <button type="button" className="aw-ex-action" onClick={skipCurrentExercise}
               title="Skip Exercise" aria-label="Skip Exercise">⊘</button>
@@ -2552,14 +2766,15 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
           // ── Strength exercise target display ──
           currentExercise.template && (
             <div className="template-info">
-              <strong>Target:</strong> {currentExercise.template.target_sets} sets × {currentExercise.template.target_reps} reps @ {currentExercise.template.target_weight} lbs
+              <strong>Target:</strong> {currentExercise.template.target_sets} sets × {repRangeOf(currentExercise.template)} reps
+              {currentExercise.template.target_weight != null && ` @ ${currentExercise.template.target_weight} lbs`}
             </div>
           )
         )}
 
         {currentExercise.last_performance && (
           <div className="last-performance">
-            <strong>Last time ({new Date(workout.last_workout_date).toLocaleDateString()}):</strong>
+            <strong>Last time ({formatWorkoutDate(workout.last_workout_date)}):</strong>
             {currentExercise.last_performance.exercise_notes?.startsWith('Substituted for') && (
               <p style={{fontSize: '0.85em', color: '#ff9800', margin: '4px 0'}}>
                 ↔️ {currentExercise.last_performance.exercise_notes.split('\n')[0]}
@@ -2569,7 +2784,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
               {currentExercise.last_performance.sets_completed.map((set, idx) => {
                 const template = currentExercise.template;
                 const underperformed = template && (
-                  parseInt(set.reps) < parseInt(template.target_reps || 0) || 
+                  judgeReps(set.reps, template.target_reps_min, template.target_reps_max) === 'missed' ||
                   parseFloat(set.weight) < parseFloat(template.target_weight || 0)
                 );
                 const highRPE = set.rpe && parseInt(set.rpe) >= 10;
@@ -2742,13 +2957,57 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
             ) : (
               loggedSets.map((set, idx) => {
                 const highRPE = set.rpe && parseInt(set.rpe) >= 10;
-                const targetReps = currentExercise.template?.target_reps;
-                const targetWeight = currentExercise.template?.target_weight;
-                const underReps = targetReps && set.reps_completed < parseInt(targetReps);
+                const tmpl = currentExercise.template;
+                const targetWeight = tmpl?.target_weight;
+                const underReps = judgeReps(set.reps_completed, tmpl?.target_reps_min, tmpl?.target_reps_max) === 'missed';
                 const underWeight = targetWeight && parseFloat(set.weight_used) < parseFloat(targetWeight);
                 const underperformed = underReps || underWeight;
+
+                if (editingSet?.key === idx) {
+                  // Inline correction: reps, weight, RPE. Escape or Cancel discards.
+                  return (
+                    <div
+                      key={idx}
+                      ref={editingSetRef}
+                      className="set-entry set-entry-editing"
+                      onKeyDown={e => { if (e.key === 'Escape') setEditingSet(null); if (e.key === 'Enter') saveEditSet(set, idx); }}
+                    >
+                      <span className="set-edit-label">Set {set.set_number}</span>
+                      <label>Reps
+                        <input type="number" inputMode="numeric" autoFocus value={editingSet.reps}
+                          onChange={e => setEditingSet(s => ({ ...s, reps: e.target.value }))} />
+                      </label>
+                      <label>Weight
+                        <input type="text" inputMode="decimal" value={editingSet.weight}
+                          onChange={e => setEditingSet(s => ({ ...s, weight: e.target.value }))} />
+                      </label>
+                      <label>RPE
+                        <input type="number" inputMode="numeric" min="1" max="10" value={editingSet.rpe}
+                          onChange={e => setEditingSet(s => ({ ...s, rpe: e.target.value }))} />
+                      </label>
+                      <div className="set-edit-actions">
+                        <button type="button" className="set-edit-save" onClick={() => saveEditSet(set, idx)} disabled={editingSet.saving}>
+                          {editingSet.saving ? 'Saving…' : 'Save'}
+                        </button>
+                        <button type="button" className="set-edit-cancel" onClick={() => setEditingSet(null)} disabled={editingSet.saving}>
+                          Cancel
+                        </button>
+                      </div>
+                      {editingSet.error && <p className="set-edit-error">{editingSet.error}</p>}
+                    </div>
+                  );
+                }
+
                 return (
-                  <div key={idx} className={`set-entry ${highRPE ? 'rpe-warning' : underperformed ? 'under-target' : ''}`}>
+                  <div
+                    key={idx}
+                    className={`set-entry ${set.id ? 'set-entry-editable' : ''} ${highRPE ? 'rpe-warning' : underperformed ? 'under-target' : ''}`}
+                    role={set.id ? 'button' : undefined}
+                    tabIndex={set.id ? 0 : undefined}
+                    title={set.id ? 'Tap to correct this set' : undefined}
+                    onClick={() => startEditSet(set, idx)}
+                    onKeyDown={e => { if (e.key === 'Enter') startEditSet(set, idx); }}
+                  >
                     Set {set.set_number}: {set.reps_completed} reps × {set.weight_used === 0 ? 'BW' : `${set.weight_used} lbs`}
                     {set.rpe && ` @ RPE ${set.rpe}`}
                     {highRPE && ' ⚠️'}
@@ -2962,7 +3221,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
             <h3>Workout Notes</h3>
             {workout.previous_overall_notes && (
               <div className="previous-notes" style={{marginBottom: '12px'}}>
-                <strong>Previous workout notes:</strong>
+                <strong>Previous workout notes{workout.last_workout_date && ` (${formatWorkoutDate(workout.last_workout_date)})`}:</strong>
                 <pre style={{marginTop: '6px', whiteSpace: 'pre-wrap', fontSize: '0.9em'}}>{workout.previous_overall_notes}</pre>
               </div>
             )}
@@ -3218,6 +3477,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
                 >
                   <div className="exercise-info">
                     <strong>
+                      {ex.template?.superset_group != null && <span className="ss-badge">{supersetLabel(ex.template.superset_group)}</span>}
                       {ex.exercise_name}
                       {ex.exercise_notes && <span className="notes-indicator" title="Has notes">📝</span>}
                     </strong>
@@ -3558,19 +3818,22 @@ function AddExerciseModal({ onAdd, onClose }) {
                 <>
                   <input
                     type="number"
+                    inputMode="numeric"
                     placeholder="Target Sets"
                     value={targets.sets}
                     onChange={(e) => setTargets({ ...targets, sets: e.target.value })}
                   />
                   <input
                     type="number"
+                    inputMode="numeric"
                     placeholder="Target Reps"
                     value={targets.reps}
                     onChange={(e) => setTargets({ ...targets, reps: e.target.value })}
                   />
                   <input
                     type="text"
-                    placeholder="Weight (BW, 0, - for bodyweight)"
+                    inputMode="decimal"
+                    placeholder="Weight (0 or blank = BW)"
                     value={targets.weight}
                     onChange={(e) => setTargets({ ...targets, weight: e.target.value })}
                   />
@@ -3599,7 +3862,7 @@ function ChangeExerciseModal({ onChange, onClose, currentExercise }) {
   const [showEquipmentFilters, setShowEquipmentFilters] = useState(false);
   const [targets, setTargets] = useState({
     sets: currentExercise?.template?.target_sets || '',
-    reps: currentExercise?.template?.target_reps || '',
+    reps: currentExercise?.template?.target_reps_max || currentExercise?.template?.target_reps_min || '',
     weight: ''
   });
 
@@ -3729,7 +3992,7 @@ function ChangeExerciseModal({ onChange, onClose, currentExercise }) {
             <p><strong>Replacing: {currentExercise?.exercise_name}</strong></p>
             {currentExercise?.template && (
               <div className="original-targets" style={{background: '#f5f5f5', padding: '8px 12px', borderRadius: '4px', marginBottom: '12px', fontSize: '0.9em', color: '#555'}}>
-                <strong>Original targets:</strong> {currentExercise.template.target_sets || '?'} sets × {currentExercise.template.target_reps || '?'} reps @ {currentExercise.template.target_weight ? `${currentExercise.template.target_weight} lbs` : 'BW'}
+                <strong>Original targets:</strong> {currentExercise.template.target_sets || '?'} sets × {repRangeOf(currentExercise.template) || '?'} reps @ {currentExercise.template.target_weight ? `${currentExercise.template.target_weight} lbs` : 'BW'}
               </div>
             )}
             <p><strong>Replacing with: {selectedExercise.name}</strong></p>
@@ -3739,19 +4002,22 @@ function ChangeExerciseModal({ onChange, onClose, currentExercise }) {
               <div className="target-fields">
                 <input
                   type="number"
+                  inputMode="numeric"
                   placeholder="Sets"
                   value={targets.sets}
                   onChange={(e) => setTargets({ ...targets, sets: e.target.value })}
                 />
                 <input
                   type="number"
+                  inputMode="numeric"
                   placeholder="Reps"
                   value={targets.reps}
                   onChange={(e) => setTargets({ ...targets, reps: e.target.value })}
                 />
                 <input
                   type="text"
-                  placeholder="Weight (or BW)"
+                  inputMode="decimal"
+                  placeholder="Weight (0 or blank = BW)"
                   value={targets.weight}
                   onChange={(e) => setTargets({ ...targets, weight: e.target.value })}
                 />

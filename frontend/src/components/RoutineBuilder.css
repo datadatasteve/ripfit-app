@@ -1,29 +1,27 @@
-.routine-builder-overlay {
+/* ── Full-page builder (Patch 001) ─────────────────────────────────────────
+   Rendered in place of the hub. .routine-builder-layer is the same page as a
+   full-screen layer for callers that must stay mounted (Exercise Browser). */
+.routine-builder-layer {
   position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  inset: 0;
   z-index: 100;
-  padding: 20px;
+  overflow-y: auto;
+  background: var(--bg-primary);
 }
 
-.routine-builder {
-  background: var(--bg-primary);
+.routine-builder-page {
   color: var(--text-primary);
-  border-radius: 10px;
   width: 100%;
-  max-width: 600px;
-  max-height: 85vh;
-  overflow-y: auto;
-  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--space-md) var(--space-md) 0;
+  box-sizing: border-box;
 }
 
 .routine-builder-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: var(--space-md);
   margin-bottom: 16px;
 }
 
@@ -31,12 +29,144 @@
   margin: 0;
 }
 
-.routine-builder-close {
+.rb-back {
+  min-height: 40px;
+  padding: 0 var(--space-sm);
   background: none;
   border: none;
-  font-size: 1.1em;
+  color: var(--color-primary);
+  font-size: var(--font-size-sm);
   cursor: pointer;
+}
+
+/* Desktop: routine exercises (config) left, exercise picker right.
+   Mobile: one scrolling column, list first. */
+.rb-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: var(--space-lg);
+  align-items: start;
+}
+
+.rb-panel {
+  min-width: 0;
+}
+
+.rb-picker {
+  position: sticky;
+  top: var(--space-md);
+}
+
+.rb-panel-title {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-base);
+}
+
+.rb-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.rb-select-toggle {
+  min-height: 36px;
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.rb-select-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  margin-bottom: var(--space-sm);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+}
+
+.rb-select-count {
+  flex: 1;
+  font-size: var(--font-size-sm);
   color: var(--text-secondary);
+}
+
+.rb-ss-btn {
+  min-height: 36px;
+  padding: 0 var(--space-md);
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: var(--text-inverse);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.rb-ss-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rb-ss-btn-secondary {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.rb-select-check {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.routine-builder-exercise-row.is-selected {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.routine-builder-exercise-row.in-superset {
+  border-left: 3px solid var(--color-primary);
+  padding-left: var(--space-sm);
+}
+
+/* SS1 / SS2 … — shared by builder, routine detail and active workout. */
+.ss-badge {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary);
+  color: var(--text-inverse);
+  font-size: 0.72rem;
+  font-weight: var(--font-weight-semibold);
+  vertical-align: middle;
+}
+
+.rb-sticky-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  margin-top: var(--space-md);
+  padding: var(--space-sm) 0 var(--space-md);
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border-color);
+}
+
+@media (max-width: 900px) {
+  .rb-columns {
+    grid-template-columns: 1fr;
+  }
+  .rb-picker {
+    position: static;
+    order: -1;
+  }
 }
 
 .routine-builder-form-top {
@@ -150,7 +280,7 @@
   border: 1px solid var(--border-color);
   border-radius: 6px;
   margin-bottom: 16px;
-  max-height: 160px;
+  max-height: 50vh;
   overflow-y: auto;
 }
 
@@ -239,17 +369,36 @@
 
 .routine-builder-exercise-targets {
   display: flex;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  padding-left: 42px;
+}
+
+.rb-target {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+.rb-reps-range {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .routine-builder-exercise-targets input {
-  width: 56px;
+  width: 64px;
+  min-height: 40px;
   padding: 5px 6px;
   border-radius: 4px;
   border: 1px solid var(--border-color);
   background: var(--bg-secondary);
   color: var(--text-primary);
-  font-size: 0.85em;
+  font-size: 0.9em;
+  box-sizing: border-box;
 }
 
 .routine-builder-remove {
@@ -482,7 +631,11 @@
 .rbx-error { color: var(--color-danger); }
 
 @media (max-width: 768px) {
-  .routine-builder-exercise-extras {
+  .routine-builder-exercise-extras,
+  .routine-builder-exercise-targets {
     padding-left: 0;
+  }
+  .routine-builder-exercise-targets input {
+    width: 56px;
   }
 }

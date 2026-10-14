@@ -5,6 +5,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
   Cell, ReferenceLine,
 } from 'recharts';
+import { formatRepRange, judgeReps } from '../utils/repRange';
 import './WorkoutDetailPage.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
@@ -176,26 +177,38 @@ function TargetsChart({ exercises, typeColor }) {
   const [metric, setMetric] = useState('sets');
   const [chartType, setChartType] = useState('Bar');
 
+  // Single-number targets: below = missed, equal = hit, above = exceeded.
+  const judgeNumber = (logged, target) =>
+    target == null ? null : logged < target ? 'missed' : logged === target ? 'hit' : 'exceeded';
+
   const METRICS = [
     {
       key: 'sets',
       label: 'Sets',
-      targetKey: 'target_sets',
+      targetFn: ex => (ex.target_sets != null ? parseFloat(ex.target_sets) : null),
       loggedFn: ex => Array.isArray(ex.sets) ? ex.sets.length : 0,
     },
     {
+      // Reps: the LOWEST set against the rep range (bug #7 — plotting the best
+      // set showed 12/12/9 against 12 as "hit"). Bar height is the range top;
+      // the tooltip shows the full range.
       key: 'reps',
       label: 'Reps',
-      targetKey: 'target_reps',
+      targetFn: ex => (ex.target_reps_max ?? ex.target_reps_min) != null ? parseFloat(ex.target_reps_max ?? ex.target_reps_min) : null,
+      targetLabelFn: ex => formatRepRange(ex.target_reps_min, ex.target_reps_max),
+      judgeFn: (ex, logged) => judgeReps(logged, ex.target_reps_min, ex.target_reps_max),
       loggedFn: ex => {
-        const vals = (ex.sets || []).map(s => s.reps ?? 0).filter(v => v > 0);
-        return vals.length ? Math.max(...vals) : 0;
+        // Straight sets only — timer sets log intervals, often at 0 reps.
+        const vals = (ex.sets || [])
+          .filter(s => !s.set_type || s.set_type === 'normal')
+          .map(s => s.reps).filter(v => v != null);
+        return vals.length ? Math.min(...vals) : 0;
       },
     },
     {
       key: 'weight',
       label: 'Weight',
-      targetKey: 'target_weight',
+      targetFn: ex => (ex.target_weight != null ? parseFloat(ex.target_weight) : null),
       loggedFn: ex => {
         const vals = (ex.sets || []).map(s => s.weight ?? 0).filter(v => v > 0);
         return vals.length ? Math.max(...vals) : 0;
@@ -208,11 +221,15 @@ function TargetsChart({ exercises, typeColor }) {
     .filter(ex => ex.category !== 'Cardio')
     .map(ex => {
       const loggedVal = m.loggedFn(ex);
+      const target = m.targetFn(ex);
+      const logged = loggedVal != null && loggedVal !== undefined ? loggedVal : null;
       return {
         name: ex.exercise_name,
         shortName: ex.exercise_name.length > 14 ? ex.exercise_name.slice(0,14)+'…' : ex.exercise_name,
-        target: ex[m.targetKey] != null ? parseFloat(ex[m.targetKey]) : null,
-        logged: loggedVal != null && loggedVal !== undefined ? loggedVal : null,
+        target,
+        targetLabel: m.targetLabelFn ? m.targetLabelFn(ex) : target,
+        logged,
+        status: target == null || logged == null ? null : (m.judgeFn ? m.judgeFn(ex, logged) : judgeNumber(logged, target)),
       };
     })
     .filter(d => d.target != null || (d.logged != null && d.logged > 0));
@@ -248,13 +265,13 @@ function TargetsChart({ exercises, typeColor }) {
               return (
                 <div style={TOOLTIP_STYLE} className="wdp-tooltip">
                   <p style={{ margin: '0 0 4px', fontWeight: 600 }}>{d?.name}</p>
-                  {d?.target != null && <p style={{ margin: '2px 0', color: 'var(--text-secondary)' }}>Target: {d.target}</p>}
+                  {d?.target != null && <p style={{ margin: '2px 0', color: 'var(--text-secondary)' }}>Target: {d.targetLabel}</p>}
                   {d?.logged != null && (() => {
                     let loggedColor = 'var(--text-primary)';
                     let loggedSuffix = '';
-                    if (hasTargets && d.target != null) {
-                      if (d.logged < d.target) { loggedColor = '#ef4444'; loggedSuffix = ' ✗ missed'; }
-                      else if (d.logged === d.target) { loggedColor = '#3498db'; loggedSuffix = ' ✓ hit'; }
+                    if (hasTargets && d.status) {
+                      if (d.status === 'missed') { loggedColor = '#ef4444'; loggedSuffix = ' ✗ missed'; }
+                      else if (d.status === 'hit') { loggedColor = '#3498db'; loggedSuffix = ' ✓ hit'; }
                       else { loggedColor = '#22c55e'; loggedSuffix = ' ↑ exceeded'; }
                     }
                     return (
@@ -302,9 +319,9 @@ function TargetsChart({ exercises, typeColor }) {
           {chartType === 'Bar' ? (
             <Bar dataKey="logged" name="Logged" radius={[3,3,0,0]} fill="#22c55e">
               {data.map((entry, i) => {
-                if (!hasTargets || entry.target == null) return <Cell key={i} fill="#22c55e" />;
-                if (entry.logged < entry.target)  return <Cell key={i} fill="#ef4444" />;
-                if (entry.logged === entry.target) return <Cell key={i} fill="#3498db" />;
+                if (!hasTargets || !entry.status) return <Cell key={i} fill="#22c55e" />;
+                if (entry.status === 'missed') return <Cell key={i} fill="#ef4444" />;
+                if (entry.status === 'hit') return <Cell key={i} fill="#3498db" />;
                 return <Cell key={i} fill="#22c55e" />;
               })}
             </Bar>
@@ -318,9 +335,9 @@ function TargetsChart({ exercises, typeColor }) {
               dot={(props) => {
                 const { cx, cy, payload } = props;
                 let fill = '#22c55e';
-                if (hasTargets && payload.target != null) {
-                  if (payload.logged < payload.target) fill = '#ef4444';
-                  else if (payload.logged === payload.target) fill = '#3498db';
+                if (hasTargets && payload.status) {
+                  if (payload.status === 'missed') fill = '#ef4444';
+                  else if (payload.status === 'hit') fill = '#3498db';
                 }
                 return <circle key={props.index} cx={cx} cy={cy} r={5} fill={fill} stroke="none" />;
               }}
@@ -454,7 +471,7 @@ export default function WorkoutDetailPage({ workoutId, workoutType, onBack }) {
         )}
       </div>
 
-      {data.overall_notes && <div className="wdp-notes-block"><span className="wdp-notes-label">Workout Notes</span><p className="wdp-notes-text">{data.overall_notes}</p></div>}
+      {data.overall_notes && <div className="wdp-notes-block"><span className="wdp-notes-label">Workout Notes · {fmtDate(data.workout_date || data.session_date)}</span><p className="wdp-notes-text">{data.overall_notes}</p></div>}
       {data.pre_session_notes && <div className="wdp-notes-block"><span className="wdp-notes-label">Pre-session</span><p className="wdp-notes-text">{data.pre_session_notes}</p></div>}
       {data.mid_session_notes && <div className="wdp-notes-block"><span className="wdp-notes-label">Mid-session</span><p className="wdp-notes-text">{data.mid_session_notes}</p></div>}
       {data.post_session_notes && <div className="wdp-notes-block"><span className="wdp-notes-label">Post-session</span><p className="wdp-notes-text">{data.post_session_notes}</p></div>}

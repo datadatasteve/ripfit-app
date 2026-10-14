@@ -1,5 +1,6 @@
 // frontend/src/components/StatsCenter.jsx
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { formatRepRange } from '../utils/repRange';
 import {
   LineChart, Line, BarChart, Bar, ScatterChart, Scatter,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -873,13 +874,15 @@ function StrengthTab({ programId }) {
           <div className="sc-table-wrapper">
             <table className="sc-table">
               <thead>
-                <tr><th>Date</th><th>Sets</th><th>Avg Reps</th><th>Max Weight</th><th>Volume</th><th>Est. 1RM</th></tr>
+                <tr><th>Date</th><th>Sets</th><th>Target Reps</th><th>Reps Logged</th><th>Avg Reps</th><th>Max Weight</th><th>Volume</th><th>Est. 1RM</th></tr>
               </thead>
               <tbody>
                 {exData.per_session.map((s, i) => (
                   <tr key={i}>
                     <td>{fmtDate(s.workout_date)}</td>
                     <td>{s.sets}</td>
+                    <td>{formatRepRange(s.target_reps_min, s.target_reps_max) || '—'}</td>
+                    <td>{formatRepRange(s.min_reps, s.max_reps) || '—'}</td>
                     <td>{s.avg_reps}</td>
                     <td>{s.max_weight} lbs</td>
                     <td>{s.volume?.toLocaleString()}</td>
@@ -964,10 +967,21 @@ function StrengthTab({ programId }) {
             {filtered.map(ex => (
               <div key={ex.exercise_id} className="sc-ex-row" onClick={() => openExercise(ex)}>
                 <div className="sc-ex-row-main">
-                  <span className="sc-ex-name">{ex.exercise_name}</span>
+                  <span className="sc-ex-name">
+                    {ex.exercise_name}
+                    {ex.stagnant && (
+                      <span
+                        className="sc-stagnant-flag"
+                        title={`Last 3 sessions topped out at or below ${ex.target_reps_min} reps — the bottom of the ${formatRepRange(ex.target_reps_min, ex.target_reps_max)} range`}
+                      >
+                        ● Stagnant
+                      </span>
+                    )}
+                  </span>
                   <span className="sc-ex-cat">{ex.category}</span>
                 </div>
                 <div className="sc-ex-row-stats">
+                  {ex.target_reps_min != null && <span>Target {formatRepRange(ex.target_reps_min, ex.target_reps_max)} reps</span>}
                   <span>{ex.sessions_logged} sessions</span>
                   <span>{ex.max_weight} lbs max</span>
                   <span>Est. 1RM: {ex.estimated_1rm}</span>

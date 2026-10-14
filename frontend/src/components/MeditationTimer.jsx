@@ -287,7 +287,7 @@ function PresetList({ presets, activePreset, onLoad, onEdit, onRename, onDelete 
   const commitRename = () => {
     const next = draftName.trim();
     if (!next) { setError('Name can’t be empty.'); return; }
-    if (next !== renaming && presets.some(p => p.name === next)) { setError('A preset with that name exists.'); return; }
+    if (presets.some(p => p.name !== renaming && p.name.toLowerCase() === next.toLowerCase())) { setError('A preset with that name exists.'); return; }
     onRename(renaming, next);
     setRenaming(null);
   };
@@ -298,7 +298,7 @@ function PresetList({ presets, activePreset, onLoad, onEdit, onRename, onDelete 
       <ul className="mt-preset-list">
         <li className={`mt-preset-item ${!activePreset ? 'active' : ''}`}>
           <button type="button" className="mt-preset-name" onClick={() => onLoad(DEFAULT_PRESET_VALUE)}>
-            Default <span className="mt-preset-sub">Meditation + Coming Out</span>
+            Default <span className="mt-preset-sub">{mmss(DEFAULT_SEGMENTS.reduce((a, s) => a + s.seconds, 0))}</span>
           </button>
         </li>
         {presets.map(p => (
@@ -453,6 +453,7 @@ export default function MeditationTimer({ session, setSession, onClose }) {
   const [presetName, setPresetName] = useState('');
   const [activePreset, setActivePreset] = useState('');
   const [newPresetName, setNewPresetName] = useState('');
+  const [presetSaveError, setPresetSaveError] = useState('');
   const [saveState, setSaveState] = useState('');   // '' | 'saving' | 'saved' | 'error'
 
   // Re-render while running so the clock stays live. Time itself always comes
@@ -523,7 +524,15 @@ export default function MeditationTimer({ session, setSession, onClose }) {
   const handleSavePreset = () => {
     const name = newPresetName.trim();
     if (!name) return;
-    const next = [...presets.filter(p => p.name !== name), { name, segments: storableSegments(segments) }];
+    // Names are unique per user (case-insensitive). Saving under the name of
+    // the preset currently loaded/being edited is the overwrite path (Edit).
+    const clash = presets.find(p => p.name.toLowerCase() === name.toLowerCase());
+    if (clash && clash.name !== activePreset) {
+      setPresetSaveError(`A preset named "${clash.name}" already exists.`);
+      return;
+    }
+    setPresetSaveError('');
+    const next = [...presets.filter(p => p.name !== (clash?.name ?? name)), { name, segments: storableSegments(segments) }];
     setPresets(next);
     savePresets(next);
     setActivePreset(name);
@@ -838,12 +847,14 @@ export default function MeditationTimer({ session, setSession, onClose }) {
           type="text"
           placeholder="Save as preset (e.g. Morning TM)"
           value={newPresetName}
-          onChange={e => setNewPresetName(e.target.value)}
+          onChange={e => { setNewPresetName(e.target.value); setPresetSaveError(''); }}
+          aria-invalid={presetSaveError ? 'true' : undefined}
         />
         <button className="mt-btn mt-btn-sm" onClick={handleSavePreset} disabled={!newPresetName.trim()}>
           Save
         </button>
       </div>
+      {presetSaveError && <p className="mt-error" role="alert">{presetSaveError}</p>}
 
       <SoundSettings settings={sound} onChange={updateSound} />
 

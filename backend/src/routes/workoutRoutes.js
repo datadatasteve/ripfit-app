@@ -29,6 +29,7 @@ router.post('/', authenticate, workoutController.logWorkout);
 router.get('/', authenticate, workoutController.getWorkouts);
 
 router.post('/:workoutId/sets', authenticate, workoutController.logWorkoutSet);
+router.patch('/sets/:setId', authenticate, workoutController.updateWorkoutSet);
 router.put('/:workoutId/finish', authenticate, workoutController.finishWorkout);
 router.put('/:workoutId/cancel', authenticate, workoutController.cancelWorkout);
 router.put('/:workoutId/notes', authenticate, workoutController.updateWorkoutNotes);

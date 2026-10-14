@@ -10,10 +10,10 @@ const DEFAULT_COOLDOWN = 60;
  * Shared with ActiveWorkout so the button label and the rest timer agree.
  */
 export function baseCooldownFor(exercise) {
+  // ?? on the routine value: a deliberate 0s rest (set in the routine builder)
+  // must stay 0 rather than fall through to the 60s default.
   return exercise?.template?.cooldown_seconds
-    || exercise?.cooldown_seconds
-    || exercise?.rest_timer_seconds
-    || DEFAULT_COOLDOWN;
+    ?? (exercise?.cooldown_seconds || exercise?.rest_timer_seconds || DEFAULT_COOLDOWN);
 }
 
 function mmss(totalSeconds) {

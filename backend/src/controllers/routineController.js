@@ -18,7 +18,8 @@ const { pool } = require('../config/database');
  *       exercise_id: 45,
  *       order_index: 1,
  *       target_sets: 3,
- *       target_reps: 8,
+ *       target_reps_min: 8,
+ *       target_reps_max: 10,
  *       target_weight: 185,
  *       superset_group: null,
  *       notes: "Focus on form"
@@ -45,7 +46,7 @@ Return - Frontend gets: template (what routine says) + last_performance (what us
 // with delete-and-reinsert, so any column missing from this list was silently
 // reset to NULL on each save (cooldown_seconds and training_type were).
 const ROUTINE_EXERCISE_COLUMNS = [
-  'target_sets', 'target_reps', 'target_weight', 'superset_group', 'superset_order', 'notes',
+  'target_sets', 'target_reps_min', 'target_reps_max', 'target_weight', 'superset_group', 'superset_order', 'notes',
   'cooldown_seconds', 'training_type', 'training_duration',
   'overload_strategy', 'overload_increment', 'overload_schedule', 'overload_week_targets',
   'tempo_eccentric', 'tempo_pause', 'tempo_concentric',
@@ -70,8 +71,10 @@ const toWholeOrNull = v => {
 function normaliseRoutineExerciseField(column, value) {
   switch (column) {
     case 'target_sets':
-    case 'target_reps':
+    case 'target_reps_min':
+    case 'target_reps_max':
     case 'target_weight':
+    case 'superset_group':
     case 'overload_increment':
       return toPositiveOrNull(value);
     case 'cooldown_seconds':
@@ -102,6 +105,23 @@ function normaliseRoutineExerciseField(column, value) {
 }
 
 /**
+ * Rep range pair: a lone min or max becomes a single target (min = max), and
+ * max below min is rejected. Only touches the payload when either key was sent,
+ * so callers that omit both keep the stored range.
+ */
+function withRepRange(ex) {
+  if (!('target_reps_min' in ex) && !('target_reps_max' in ex)) return ex;
+  let min = toPositiveOrNull(ex.target_reps_min);
+  let max = toPositiveOrNull(ex.target_reps_max);
+  if (min === null) min = max;
+  if (max === null) max = min;
+  if (min !== null && (!Number.isInteger(min) || !Number.isInteger(max) || max < min)) {
+    throw new Error('Rep range must be whole numbers with max ≥ min');
+  }
+  return { ...ex, target_reps_min: min, target_reps_max: max };
+}
+
+/**
  * Inserts one routine_exercises row.
  *
  * `previous` is the row this exercise had before a delete-and-reinsert update.
@@ -111,6 +131,7 @@ function normaliseRoutineExerciseField(column, value) {
  * Sending a key explicitly — including null — always wins.
  */
 async function insertRoutineExercise(client, routineId, ex, previous = null) {
+  ex = withRepRange(ex);
   const values = [routineId, ex.exercise_id, ex.order_index];
   const exprs = ['$1', '$2', '$3'];
   const bind = (v) => { values.push(v); exprs.push(`$${values.length}`); };
@@ -247,7 +268,7 @@ const getRoutineById = async (req, res) => {
     // Get exercises with details
     const exercisesResult = await pool.query(
       `SELECT 
-        re.id, re.order_index, re.target_sets, re.target_reps, 
+        re.id, re.order_index, re.target_sets, re.target_reps_min, re.target_reps_max,
         re.target_weight, re.superset_group, re.notes,
         re.cooldown_seconds, re.training_type,
         re.overload_strategy, re.overload_increment, re.overload_schedule, re.overload_week_targets,
@@ -410,7 +431,7 @@ const startWorkoutFromRoutine = async (req, res) => {
 
     // Get routine template exercises
     const templateResult = await client.query(
-      `SELECT re.exercise_id, re.order_index, re.target_sets, re.target_reps, 
+      `SELECT re.exercise_id, re.order_index, re.target_sets, re.target_reps_min, re.target_reps_max,
               re.target_weight, re.superset_group, re.notes, re.cooldown_seconds,
               re.overload_strategy, re.overload_increment, re.overload_schedule, re.overload_week_targets,
               re.tempo_eccentric, re.tempo_pause, re.tempo_concentric,
@@ -488,11 +509,11 @@ const startWorkoutFromRoutine = async (req, res) => {
       const exerciseResult = await client.query(
         `INSERT INTO workout_exercises (
           workout_id, exercise_id, order_index, exercise_notes,
-          target_sets, target_reps, target_weight
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+          target_sets, target_reps_min, target_reps_max, target_weight
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING *`,
         [workout.id, ex.exercise_id, ex.order_index, ex.notes,
-         ex.target_sets || null, ex.target_reps || null, ex.target_weight || null]
+         ex.target_sets || null, ex.target_reps_min || null, ex.target_reps_max || null, ex.target_weight || null]
       );
 
       workoutExercises.push({
@@ -504,7 +525,8 @@ const startWorkoutFromRoutine = async (req, res) => {
         video_url_female: ex.video_url_female,
         template: {
           target_sets: ex.target_sets,
-          target_reps: ex.target_reps,
+          target_reps_min: ex.target_reps_min,
+          target_reps_max: ex.target_reps_max,
           target_weight: ex.target_weight,
           superset_group: ex.superset_group,
           cooldown_seconds: ex.cooldown_seconds,

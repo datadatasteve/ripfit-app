@@ -1730,3 +1730,71 @@
     min-height: 36px;
   }
 }
+
+/* Routine card title opens the routine detail page (Patch 001). */
+.routine-card .routine-card-title-btn { background: none; border: none; padding: 0; margin: 0; font: inherit; color: inherit; cursor: pointer; text-align: left; box-shadow: none; }
+.routine-card .routine-card-title-btn:hover { background: none; color: var(--color-primary); }
+
+/* ── Superset strip (Patch 001) ──────────────────────────────────────────
+   All members' names + targets visible at once; tap to switch. Stacks on
+   mobile, runs horizontally on desktop. */
+.aw-superset-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.aw-superset-member {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas: "tag name" "tag target";
+  column-gap: 8px;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--color-primary);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+.aw-superset-member.active { background: var(--bg-elevated); border-color: var(--color-primary); box-shadow: var(--shadow-sm); }
+.aw-superset-tag { grid-area: tag; font-weight: 600; font-size: 0.85rem; white-space: nowrap; }
+.aw-superset-name { grid-area: name; font-weight: 600; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aw-superset-target { grid-area: target; font-size: 0.8rem; color: var(--text-secondary); }
+.aw-superset-done { color: var(--text-tertiary); }
+@media (min-width: 769px) {
+  .aw-superset-strip { flex-direction: row; overflow-x: auto; }
+  .aw-superset-member { flex: 1 1 0; min-width: 200px; }
+}
+
+/* ── In-workout set correction (Patch 001) ── */
+.set-entry-editable { cursor: pointer; }
+.set-entry-editable:hover { border-color: var(--color-primary); }
+.set-entry-editing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  border-color: var(--color-primary);
+}
+.set-entry-editing label { display: flex; flex-direction: column; gap: 2px; font-size: 0.75rem; color: var(--text-secondary); margin: 0; }
+.set-entry-editing input {
+  width: 70px;
+  min-height: 40px;
+  padding: 4px 6px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+.set-edit-label { align-self: center; font-weight: 600; }
+.set-edit-actions { display: flex; gap: 6px; }
+.set-edit-save, .set-edit-cancel { min-height: 40px; padding: 0 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
+.set-edit-save { border: none; background: var(--color-primary); color: var(--text-inverse); }
+.set-edit-cancel { border: 1px solid var(--border-color); background: transparent; color: var(--text-primary); }
+.set-edit-error { width: 100%; margin: 0; color: var(--color-danger); font-size: 0.8rem; }

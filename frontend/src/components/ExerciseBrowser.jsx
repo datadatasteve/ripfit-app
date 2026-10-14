@@ -207,7 +207,8 @@ export default function ExerciseBrowser({ activeWorkout, setActiveWorkout }) {
         exercise_id: ex.exercise_id,
         order_index: ex.order_index,
         target_sets: ex.target_sets,
-        target_reps: ex.target_reps,
+        target_reps_min: ex.target_reps_min,
+        target_reps_max: ex.target_reps_max,
         target_weight: ex.target_weight,
         superset_group: ex.superset_group,
         notes: ex.notes
@@ -223,7 +224,9 @@ export default function ExerciseBrowser({ activeWorkout, setActiveWorkout }) {
               exercise_id: selectedExercise.id,
               order_index: nextIndex,
               target_sets: routineAddForm.sets ? parseInt(routineAddForm.sets) : null,
-              target_reps: routineAddForm.reps ? parseInt(routineAddForm.reps) : null,
+              // Quick-add takes a single rep target (min = max).
+              target_reps_min: routineAddForm.reps ? parseInt(routineAddForm.reps) : null,
+              target_reps_max: routineAddForm.reps ? parseInt(routineAddForm.reps) : null,
               target_weight: routineAddForm.weight ? parseFloat(routineAddForm.weight) : null
             }
           ]
@@ -255,7 +258,8 @@ export default function ExerciseBrowser({ activeWorkout, setActiveWorkout }) {
           exercise_id: selectedExercise.id,
           order_index: (activeWorkout.exercises?.length || 0) + 1,
           target_sets: addForm.sets ? parseInt(addForm.sets) : null,
-          target_reps: addForm.reps ? parseInt(addForm.reps) : null,
+          target_reps_min: addForm.reps ? parseInt(addForm.reps) : null,
+          target_reps_max: addForm.reps ? parseInt(addForm.reps) : null,
           target_weight: addForm.weight ? parseFloat(addForm.weight) : null
         })
       });
@@ -277,7 +281,8 @@ export default function ExerciseBrowser({ activeWorkout, setActiveWorkout }) {
             is_ad_hoc: true, // flags this for the end-of-workout "save to routine?" prompt
             template: {
               target_sets: newWorkoutExercise.target_sets,
-              target_reps: newWorkoutExercise.target_reps,
+              target_reps_min: newWorkoutExercise.target_reps_min,
+              target_reps_max: newWorkoutExercise.target_reps_max,
               target_weight: newWorkoutExercise.target_weight
             },
             logged_sets: []
@@ -543,18 +548,21 @@ export default function ExerciseBrowser({ activeWorkout, setActiveWorkout }) {
                     <div className="add-to-workout-fields">
                       <input
                         type="number"
+                        inputMode="numeric"
                         placeholder="Sets"
                         value={routineAddForm.sets}
                         onChange={e => setRoutineAddForm({ ...routineAddForm, sets: e.target.value })}
                       />
                       <input
                         type="number"
+                        inputMode="numeric"
                         placeholder="Reps"
                         value={routineAddForm.reps}
                         onChange={e => setRoutineAddForm({ ...routineAddForm, reps: e.target.value })}
                       />
                       <input
                         type="number"
+                        inputMode="decimal"
                         step="0.5"
                         placeholder="Weight"
                         value={routineAddForm.weight}
@@ -585,18 +593,21 @@ export default function ExerciseBrowser({ activeWorkout, setActiveWorkout }) {
                 <div className="add-to-workout-fields">
                   <input
                     type="number"
+                        inputMode="numeric"
                     placeholder="Sets"
                     value={addForm.sets}
                     onChange={e => setAddForm({ ...addForm, sets: e.target.value })}
                   />
                   <input
                     type="number"
+                        inputMode="numeric"
                     placeholder="Reps"
                     value={addForm.reps}
                     onChange={e => setAddForm({ ...addForm, reps: e.target.value })}
                   />
                   <input
                     type="number"
+                        inputMode="decimal"
                     step="0.5"
                     placeholder="Weight"
                     value={addForm.weight}
@@ -735,11 +746,9 @@ export default function ExerciseBrowser({ activeWorkout, setActiveWorkout }) {
             exercise_id: selectedExercise.id,
             name: selectedExercise.name,
             category: selectedExercise.category,
-            target_sets: '',
-            target_reps: '',
-            target_weight: '',
             notes: ''
           }]}
+          layer
           onClose={() => setShowRoutineBuilder(false)}
           onSaved={() => setShowRoutineBuilder(false)}
         />

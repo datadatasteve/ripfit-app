@@ -871,3 +871,15 @@
 .sc-med-muted {
   color: var(--text-tertiary);
 }
+
+/* Rep-range stagnation flag on the strength exercise list (Patch 001). */
+.sc-stagnant-flag {
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--color-warning) 18%, transparent);
+  color: var(--color-warning);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}

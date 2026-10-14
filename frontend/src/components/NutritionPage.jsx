@@ -1,5 +1,6 @@
 // frontend/src/components/NutritionPage.jsx
 import { useState, useEffect, useCallback, useRef } from 'react';
+import BarcodeScanner from './BarcodeScanner';
 import { GlassSVG, BottleSVG, WATER_PRESETS_ALL, waterStorageKey, WATER_GOAL_KEY, WATER_PRESET_KEY, readWater, writeWater, readGoal, writeGoal, readPreset } from './WaterWidget';
 import './NutritionPage.css';
 
@@ -275,6 +276,7 @@ function FoodSearchModal({ mealType, mealDate, onClose, onAdded }) {
   const [servingUnit, setServingUnit] = useState('g');
   const [adding, setAdding] = useState(false);
   const [tab, setTab] = useState('search'); // 'search' | 'custom'
+  const [showScanner, setShowScanner] = useState(false);
   const searchRef = useRef(null);
   const debounceRef = useRef(null);
 
@@ -420,6 +422,10 @@ function FoodSearchModal({ mealType, mealDate, onClose, onAdded }) {
 
         {tab === 'search' && (
           <>
+            {/* Camera starts only on this tap (Patch 001). */}
+            <button type="button" className="nutri-scan-btn" onClick={() => setShowScanner(true)}>
+              ▦ Scan Barcode
+            </button>
             <input
               ref={searchRef}
               className="nutri-search-input"
@@ -534,6 +540,24 @@ function FoodSearchModal({ mealType, mealDate, onClose, onAdded }) {
           </div>
         )}
       </div>
+
+      {showScanner && (
+        <div onClick={e => e.stopPropagation()}>
+          <BarcodeScanner
+            mealType={mealType}
+            mealDate={mealDate}
+            mealLabel={MEAL_LABELS[mealType]}
+            onClose={() => setShowScanner(false)}
+            onLogged={() => { setShowScanner(false); onAdded(); onClose(); }}
+            onManualSearch={() => {
+              setShowScanner(false);
+              setTab('search');
+              setSelected(null);
+              setTimeout(() => searchRef.current?.focus(), 0);
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -559,6 +559,56 @@ const logWorkoutSet = async (req, res) => {
   }
 };
 
+/**
+ * Correct a logged set (in-workout mistake fix).
+ * PATCH /api/v1/workouts/sets/:setId
+ * Body: { reps, weight, rpe } — any subset; rpe null clears it.
+ */
+const updateWorkoutSet = async (req, res) => {
+  const { setId } = req.params;
+  const user_id = req.user.userId;
+  const { reps, weight, rpe } = req.body;
+
+  const sets = [];
+  const values = [];
+  const bind = (column, value) => { values.push(value); sets.push(`${column} = $${values.length}`); };
+
+  if (reps !== undefined) {
+    const n = Number(reps);
+    if (!Number.isInteger(n) || n < 0) return res.status(400).json({ error: 'reps must be a whole number of 0 or more' });
+    bind('reps_completed', n);
+  }
+  if (weight !== undefined) {
+    const n = Number(weight);
+    if (weight === null || weight === '' || !Number.isFinite(n) || n < 0) return res.status(400).json({ error: 'weight must be 0 or more' });
+    bind('weight_used', n);
+  }
+  if (rpe !== undefined) {
+    const n = rpe === null || rpe === '' ? null : Number(rpe);
+    if (n !== null && (!Number.isInteger(n) || n < 1 || n > 10)) return res.status(400).json({ error: 'rpe must be a whole number from 1 to 10' });
+    bind('rpe', n);
+  }
+  if (sets.length === 0) return res.status(400).json({ error: 'Nothing to update' });
+
+  try {
+    values.push(setId, user_id);
+    const result = await pool.query(
+      `UPDATE workout_sets ws SET ${sets.join(', ')}
+       FROM workout_exercises we, workouts w
+       WHERE ws.id = $${values.length - 1}
+         AND we.id = ws.workout_exercise_id
+         AND w.id = we.workout_id AND w.user_id = $${values.length}
+       RETURNING ws.*`,
+      values
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Set not found' });
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Update set error:', error);
+    res.status(500).json({ error: 'Failed to update set' });
+  }
+};
+
 const finishWorkout = async (req, res) => {
   const { workoutId } = req.params;
   const user_id = req.user.userId;
@@ -587,8 +637,9 @@ const finishWorkout = async (req, res) => {
     if (workout.program_id && workout.program_routine_id) {
       await pool.query(
         `INSERT INTO program_workouts (program_id, program_routine_id, workout_id, completed_date)
-         VALUES ($1, $2, $3, CURRENT_DATE)
+         VALUES ($1, $2, $3, (SELECT workout_date FROM workouts WHERE id = $3))
          ON CONFLICT DO NOTHING`,
+        // The workout's own (local) date, not the server's UTC CURRENT_DATE.
         [workout.program_id, workout.program_routine_id, workoutId]
       );
     }
@@ -673,7 +724,10 @@ const deleteExerciseFromWorkout = async (req, res) => {
 // Add exercises to workout
 const addExerciseToWorkout = async (req, res) => {
   const { workoutId } = req.params;
-  const { exercise_id, order_index, exercise_notes, target_sets, target_reps, target_weight } = req.body;
+  const { exercise_id, order_index, exercise_notes, target_sets, target_weight } = req.body;
+  // A lone min or max is a single target.
+  const repsMin = req.body.target_reps_min || req.body.target_reps_max || null;
+  const repsMax = req.body.target_reps_max || req.body.target_reps_min || null;
   const user_id = req.user.userId;
 
   try {
@@ -687,9 +741,9 @@ const addExerciseToWorkout = async (req, res) => {
     }
 
     const result = await pool.query(
-      `INSERT INTO workout_exercises (workout_id, exercise_id, order_index, exercise_notes, target_sets, target_reps, target_weight)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [workoutId, exercise_id, order_index, exercise_notes || null, target_sets || null, target_reps || null, target_weight || null]
+      `INSERT INTO workout_exercises (workout_id, exercise_id, order_index, exercise_notes, target_sets, target_reps_min, target_reps_max, target_weight)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [workoutId, exercise_id, order_index, exercise_notes || null, target_sets || null, repsMin, repsMax, target_weight || null]
     );
 
     res.status(201).json(result.rows[0]);
@@ -810,14 +864,15 @@ const getWorkoutDetail = async (req, res) => {
     const exercisesResult = await pool.query(
       `SELECT
         we.id, we.exercise_id, we.order_index, we.exercise_notes,
-        we.target_sets, we.target_reps, we.target_weight,
+        we.target_sets, we.target_reps_min, we.target_reps_max, we.target_weight,
         e.name AS exercise_name, e.category,
         json_agg(
           json_build_object(
             'set_number', ws.set_number,
             'reps', ws.reps_completed,
             'weight', ws.weight_used,
-            'rpe', ws.rpe
+            'rpe', ws.rpe,
+            'set_type', ws.set_type
           ) ORDER BY ws.set_number
         ) FILTER (WHERE ws.id IS NOT NULL) AS sets
        FROM workout_exercises we
@@ -1116,6 +1171,7 @@ const findOrCreateExercise = async (req, res) => {
 };
 
 module.exports = {
+  updateWorkoutSet,
   searchExercises,
   getExerciseById,
   browseExercises,

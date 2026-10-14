@@ -242,7 +242,12 @@ async function getStrengthStats(req, res) {
         SUM(ws.reps_completed * ws.weight_used)::INTEGER AS volume,
         ROUND(AVG(ws.rpe)::NUMERIC, 1) AS avg_rpe,
         -- Estimated 1RM for this session
-        ROUND(MAX(ws.weight_used * (1 + ws.reps_completed::NUMERIC / 30))::NUMERIC, 1) AS est_1rm
+        ROUND(MAX(ws.weight_used * (1 + ws.reps_completed::NUMERIC / 30))::NUMERIC, 1) AS est_1rm,
+        -- Rep range targets vs straight-set reps (timer sets log intervals, not reps)
+        MAX(we.target_reps_min) AS target_reps_min,
+        MAX(we.target_reps_max) AS target_reps_max,
+        MIN(ws.reps_completed) FILTER (WHERE ws.set_type IS NULL OR ws.set_type = 'normal') AS min_reps,
+        MAX(ws.reps_completed) FILTER (WHERE ws.set_type IS NULL OR ws.set_type = 'normal') AS max_reps
       FROM workouts w
       JOIN workout_exercises we ON w.id = we.workout_id
       JOIN exercises e ON we.exercise_id = e.id
@@ -265,16 +270,16 @@ async function getStrengthStats(req, res) {
         COALESCE(wr.name, 'Free Lift') AS routine_name,
         COUNT(ws.id)::INTEGER AS total_sets,
         COUNT(CASE WHEN we.target_weight IS NOT NULL AND ws.weight_used < we.target_weight THEN 1 END)::INTEGER AS sets_below_weight,
-        COUNT(CASE WHEN we.target_reps IS NOT NULL AND ws.reps_completed < we.target_reps THEN 1 END)::INTEGER AS sets_below_reps,
+        COUNT(CASE WHEN we.target_reps_min IS NOT NULL AND ws.reps_completed < we.target_reps_min THEN 1 END)::INTEGER AS sets_below_reps,
         COUNT(CASE WHEN we.target_weight IS NOT NULL AND ws.weight_used > we.target_weight THEN 1 END)::INTEGER AS sets_above_weight,
-        COUNT(CASE WHEN we.target_reps IS NOT NULL AND ws.reps_completed > we.target_reps THEN 1 END)::INTEGER AS sets_above_reps,
+        COUNT(CASE WHEN we.target_reps_max IS NOT NULL AND ws.reps_completed > we.target_reps_max THEN 1 END)::INTEGER AS sets_above_reps,
         COUNT(CASE WHEN we.target_sets IS NOT NULL THEN 1 END)::INTEGER AS sets_with_targets
       FROM workouts w
       JOIN workout_exercises we ON w.id = we.workout_id
       JOIN workout_sets ws ON we.id = ws.workout_exercise_id
       LEFT JOIN workout_routines wr ON w.routine_id = wr.id
       WHERE w.user_id = $1 AND w.status = 'completed'
-        AND (we.target_weight IS NOT NULL OR we.target_reps IS NOT NULL OR we.target_sets IS NOT NULL)
+        AND (we.target_weight IS NOT NULL OR we.target_reps_min IS NOT NULL OR we.target_sets IS NOT NULL)
         ${programId === 'all' ? 'AND w.program_id IS NOT NULL' : programId ? 'AND w.program_id = $2' : ''}
       GROUP BY w.id, w.workout_date, wr.name
       HAVING COUNT(ws.id) > 0
@@ -300,8 +305,28 @@ async function getStrengthStats(req, res) {
       };
     }).filter(r => r.flag !== null);
 
+    // Rep range per exercise: the latest session's target, plus a stagnation
+    // flag when the last 3 sessions with a target never got past the bottom of
+    // the range (see repStagnation).
+    const sessionsByExercise = new Map();
+    for (const row of timeSeries.rows) {
+      const list = sessionsByExercise.get(row.exercise_id) || [];
+      list.push(row);
+      sessionsByExercise.set(row.exercise_id, list);
+    }
+    const exercises = exerciseSummary.rows.map(ex => {
+      const sessions = sessionsByExercise.get(ex.exercise_id) || [];
+      const latestTarget = [...sessions].reverse().find(r => r.target_reps_min != null);
+      return {
+        ...ex,
+        target_reps_min: latestTarget?.target_reps_min ?? null,
+        target_reps_max: latestTarget?.target_reps_max ?? null,
+        stagnant: repStagnation(sessions),
+      };
+    });
+
     res.json({
-      exercises: exerciseSummary.rows,
+      exercises,
       time_series: timeSeries.rows,
       flagged_workouts: flagged,
     });
@@ -309,6 +334,22 @@ async function getStrengthStats(req, res) {
     console.error('getStrengthStats error:', err);
     res.status(500).json({ error: 'Failed to fetch strength stats' });
   }
+}
+
+/**
+ * True when the most recent STAGNATION_SESSIONS sessions (oldest → newest
+ * input) that carry a rep target each topped out at or below target_reps_min.
+ * A session that reached target_reps_max doesn't count, so a single target
+ * (min = max) that is hit exactly is progress, not stagnation.
+ */
+const STAGNATION_SESSIONS = 3;
+function repStagnation(sessions) {
+  const targeted = sessions.filter(r => r.target_reps_min != null && r.max_reps != null);
+  if (targeted.length < STAGNATION_SESSIONS) return false;
+  return targeted.slice(-STAGNATION_SESSIONS).every(r => {
+    const best = Number(r.max_reps);
+    return best <= Number(r.target_reps_min) && best < Number(r.target_reps_max ?? r.target_reps_min);
+  });
 }
 
 // ── GET /api/v1/stats/cardio ───────────────────────────────────────────────
@@ -607,12 +648,15 @@ async function getExerciseStats(req, res) {
         COUNT(ws.id)::INTEGER AS sets,
         ROUND(AVG(ws.reps_completed)::NUMERIC, 1) AS avg_reps,
         MAX(ws.reps_completed) AS max_reps,
+        MIN(ws.reps_completed) AS min_reps,
         ROUND(AVG(ws.weight_used)::NUMERIC, 1) AS avg_weight,
         MAX(ws.weight_used) AS max_weight,
         MIN(ws.weight_used) AS min_weight,
         SUM(ws.reps_completed * ws.weight_used)::INTEGER AS volume,
         ROUND(AVG(ws.rpe)::NUMERIC, 1) AS avg_rpe,
-        ROUND(MAX(ws.weight_used * (1 + ws.reps_completed::NUMERIC / 30))::NUMERIC, 1) AS est_1rm
+        ROUND(MAX(ws.weight_used * (1 + ws.reps_completed::NUMERIC / 30))::NUMERIC, 1) AS est_1rm,
+        MAX(we.target_reps_min) AS target_reps_min,
+        MAX(we.target_reps_max) AS target_reps_max
       FROM workouts w
       JOIN workout_exercises we ON w.id = we.workout_id
       JOIN workout_sets ws ON we.id = ws.workout_exercise_id

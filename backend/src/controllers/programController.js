@@ -255,7 +255,7 @@ const startProgramWorkout = async (req, res) => {
 
     // Use existing routine start logic — get template exercises
     const templateResult = await client.query(
-      `SELECT re.exercise_id, re.order_index, re.target_sets, re.target_reps,
+      `SELECT re.exercise_id, re.order_index, re.target_sets, re.target_reps_min, re.target_reps_max,
               re.target_weight, re.superset_group, re.notes, re.cooldown_seconds,
               re.overload_strategy, re.overload_increment, re.overload_schedule, re.overload_week_targets,
               re.tempo_eccentric, re.tempo_pause, re.tempo_concentric,
@@ -305,9 +305,9 @@ const startProgramWorkout = async (req, res) => {
     for (const ex of templateResult.rows) {
       const lastPerf = lastWorkoutData?.exercises.find(le => le.exercise_id === ex.exercise_id);
       const exResult = await client.query(
-        `INSERT INTO workout_exercises (workout_id, exercise_id, order_index, exercise_notes, target_sets, target_reps, target_weight)
-         VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-        [workout.id, ex.exercise_id, ex.order_index, ex.notes, ex.target_sets || null, ex.target_reps || null, ex.target_weight || null]
+        `INSERT INTO workout_exercises (workout_id, exercise_id, order_index, exercise_notes, target_sets, target_reps_min, target_reps_max, target_weight)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+        [workout.id, ex.exercise_id, ex.order_index, ex.notes, ex.target_sets || null, ex.target_reps_min || null, ex.target_reps_max || null, ex.target_weight || null]
       );
       workoutExercises.push({
         ...exResult.rows[0],
@@ -316,8 +316,10 @@ const startProgramWorkout = async (req, res) => {
         equipment_type: ex.equipment_type,
         video_url_male: ex.video_url_male,
         video_url_female: ex.video_url_female,
-        template: { target_sets: ex.target_sets, target_reps: ex.target_reps,
-                    target_weight: ex.target_weight, cooldown_seconds: ex.cooldown_seconds,
+        template: { target_sets: ex.target_sets,
+                    target_reps_min: ex.target_reps_min, target_reps_max: ex.target_reps_max,
+                    target_weight: ex.target_weight, superset_group: ex.superset_group,
+                    cooldown_seconds: ex.cooldown_seconds,
                     overload_strategy: ex.overload_strategy, overload_increment: ex.overload_increment,
                     overload_schedule: ex.overload_schedule, overload_week_targets: ex.overload_week_targets,
                     tempo_eccentric: ex.tempo_eccentric, tempo_pause: ex.tempo_pause,
@@ -420,7 +422,7 @@ const getProgramProgress = async (req, res) => {
          SELECT ws.workout_exercise_id, COUNT(*) AS qualifying_count
          FROM workout_sets ws
          JOIN workout_exercises we2 ON we2.id = ws.workout_exercise_id
-         WHERE (we2.target_reps IS NULL OR ws.reps_completed >= we2.target_reps)
+         WHERE (we2.target_reps_min IS NULL OR ws.reps_completed >= we2.target_reps_min)
            AND (we2.target_weight IS NULL OR ws.weight_used >= we2.target_weight)
          GROUP BY ws.workout_exercise_id
        ) qualifying ON qualifying.workout_exercise_id = we.id
