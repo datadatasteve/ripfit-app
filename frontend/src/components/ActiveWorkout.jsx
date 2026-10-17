@@ -1119,15 +1119,13 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
   if (showRoutineBuilder) {
     const closeBuilder = () => { setShowRoutineBuilder(false); setEditingRoutine(null); };
     return (
-      <div className="workout-container">
-        <RoutineBuilder
-          key={editingRoutine?.id ?? 'new'}
-          existingRoutine={editingRoutine}
-          onClose={closeBuilder}
-          onSaved={() => { closeBuilder(); fetchRoutines(); }}
-          onDeleted={() => { closeBuilder(); setViewingRoutineId(null); fetchRoutines(); }}
-        />
-      </div>
+      <RoutineBuilder
+        key={editingRoutine?.id ?? 'new'}
+        existingRoutine={editingRoutine}
+        onClose={closeBuilder}
+        onSaved={() => { closeBuilder(); fetchRoutines(); }}
+        onDeleted={() => { closeBuilder(); setViewingRoutineId(null); fetchRoutines(); }}
+      />
     );
   }
 
