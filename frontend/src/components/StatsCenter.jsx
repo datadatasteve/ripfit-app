@@ -804,7 +804,7 @@ function StrengthTab({ programId }) {
         <h3 className="sc-ex-title">{exData.exercise.name}</h3>
         <p className="sc-ex-meta">{exData.exercise.category} · {exData.exercise.equipment_type}</p>
         {exData.exercise.muscles_primary && (
-          <p className="sc-ex-muscles">Primary: {exData.exercise.muscles_primary}</p>
+          <p className="sc-ex-muscles">Primary: {Array.isArray(exData.exercise.muscles_primary) ? exData.exercise.muscles_primary.join(', ') : exData.exercise.muscles_primary}</p>
         )}
 
         <div className="sc-stat-grid">
@@ -915,7 +915,7 @@ function StrengthTab({ programId }) {
         const muscles = [...new Set(
           exercises
             .filter(e => e.muscles_primary)
-            .flatMap(e => e.muscles_primary.split(',').map(m => m.trim()))
+            .flatMap(e => Array.isArray(e.muscles_primary) ? e.muscles_primary : e.muscles_primary.split(',').map(m => m.trim()))
             .filter(Boolean)
         )].sort();
         if (muscles.length === 0) return null;
@@ -1480,7 +1480,7 @@ function RecordsTab({ programId }) {
         <button className="sc-back-btn" onClick={() => { setSelectedExId(null); setExData(null); }}>← Back to Records</button>
         <h3 className="sc-ex-title">{exData.exercise.name}</h3>
         <p className="sc-ex-meta">{exData.exercise.category} · {exData.exercise.equipment_type}</p>
-        {exData.exercise.muscles_primary && <p className="sc-ex-muscles">Primary: {exData.exercise.muscles_primary}</p>}
+        {exData.exercise.muscles_primary && <p className="sc-ex-muscles">Primary: {Array.isArray(exData.exercise.muscles_primary) ? exData.exercise.muscles_primary.join(', ') : exData.exercise.muscles_primary}</p>}
         <div className="sc-stat-grid">
           <StatCard label="Best Est. 1RM" value={exData.bests.best_est_1rm ? `${exData.bests.best_est_1rm} lbs` : '—'} />
           <StatCard label="Max Weight" value={exData.bests.max_weight ? `${exData.bests.max_weight} lbs` : '—'} />
