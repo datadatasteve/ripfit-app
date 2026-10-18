@@ -19,7 +19,7 @@ const HOURS = Array.from({ length: 24 }, (_, i) =>
   i === 0 ? '12a' : i < 12 ? `${i}a` : i === 12 ? '12p' : `${i - 12}p`
 );
 
-const TABS = ['Overview', 'Strength', 'Cardio', 'Records', 'Combined', 'History', 'Programs', 'Meditation'];
+const TABS = ['Overview', 'Strength', 'Cardio', 'Records', 'Combined', 'History', 'Programs', 'Meditation']; // v2
 const PROGRAM_SUB_TABS = ['Overview', 'Strength', 'Cardio', 'Records', 'Combined', 'History'];
 
 function token() { return localStorage.getItem('ripfit_token'); }
@@ -89,7 +89,7 @@ function Section({ title, children, controls }) {
 }
 
 // ── Empty state ───────────────────────────────────────────────────────────
-function Empty({ message = 'No data yet. Log some workouts to see stats here.' }) {
+function Empty({ message = 'No data yet. Log some workouts to see stats.' }) {
   return <p className="sc-empty">{message}</p>;
 }
 
