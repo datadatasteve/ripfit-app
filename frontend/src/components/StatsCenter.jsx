@@ -1,4 +1,4 @@
-// frontend/src/components/StatsCenter.jsx
+// frontend/src/components/StatsCenter.jsx - patch 001
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { formatRepRange } from '../utils/repRange';
 import {
