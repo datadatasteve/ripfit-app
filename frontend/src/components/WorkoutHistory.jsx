@@ -118,6 +118,8 @@ export default function WorkoutHistory({ initialWorkoutId, onClearSelected }) {
                     {TYPE_LABELS[entry.type] || entry.type}
                   </span>
                   <span className="history-entry-title">{entry.title}</span>
+                  {entry.status === 'cancelled' && <span className="sc-status-tag cancelled">Cancelled</span>}
+                  {entry.status === 'in_progress' && <span className="sc-status-tag in-progress">In progress</span>}
                 </div>
                 <div className="history-entry-right">
                   <span className="history-entry-date">{formatDate(entry.date)}</span>

@@ -2,6 +2,7 @@
 // Workout Controller
 // ============================================================================
 const { pool } = require('../config/database');
+const { sweepStaleWorkouts, workoutHasActivity, durationSql } = require('../utils/workoutStatus');
 
 // ============================================================================
 // EXERCISE SEARCH & LOOKUP
@@ -390,10 +391,11 @@ const logWorkout = async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    // Create workout
+    // Create workout. This path logs a whole session after the fact (it
+    // requires at least one set per exercise), so it is completed on insert.
     const workoutResult = await client.query(
-      `INSERT INTO workouts (user_id, workout_date, routine_id, overall_notes, start_time)
-       VALUES ($1, $2, $3, $4, NOW())
+      `INSERT INTO workouts (user_id, workout_date, routine_id, overall_notes, start_time, status)
+       VALUES ($1, $2, $3, $4, NOW(), 'completed')
        RETURNING *`,
       [user_id, workout_date, routine_id || null, overall_notes || null]
     );
@@ -484,9 +486,10 @@ const getWorkouts = async (req, res) => {
   const { limit = 10 } = req.query;
 
   try {
+    await sweepStaleWorkouts(pool, user_id);
     const result = await pool.query(
-      `SELECT 
-        w.id, w.workout_date, w.start_time, w.end_time, w.overall_notes,
+      `SELECT
+        w.id, w.workout_date, w.start_time, w.end_time, w.overall_notes, w.status,
         json_agg(
           json_build_object(
             'exercise_id', we.exercise_id,
@@ -609,6 +612,8 @@ const updateWorkoutSet = async (req, res) => {
   }
 };
 
+const NOTHING_LOGGED_MESSAGE = 'Nothing was logged, so this workout was cancelled.';
+
 const finishWorkout = async (req, res) => {
   const { workoutId } = req.params;
   const user_id = req.user.userId;
@@ -617,48 +622,79 @@ const finishWorkout = async (req, res) => {
   // so start/end timestamps are seconds apart and can't describe the session.
   const rawDuration = req.body?.duration_seconds;
   const durationSeconds = Number.isInteger(rawDuration) && rawDuration >= 0 ? rawDuration : null;
+  // Pause lives in the client; the finished total is stored so the shared
+  // duration definition (end - start - paused) can use it.
+  const rawPaused = req.body?.total_paused_seconds;
+  const pausedSeconds = Number.isInteger(rawPaused) && rawPaused >= 0 ? rawPaused : null;
 
+  const client = await pool.connect();
   try {
-    const result = await pool.query(
-      `UPDATE workouts
-       SET end_time = $1, status = 'completed',
-           duration_seconds = COALESCE($4, duration_seconds)
-       WHERE id = $2 AND user_id = $3 RETURNING *`,
-      [new Date().toISOString(), workoutId, user_id, durationSeconds]
-    );
+    await client.query('BEGIN');
 
-    if (result.rows.length === 0) {
+    const existing = await client.query(
+      `UPDATE workouts
+       SET duration_seconds = COALESCE($3, duration_seconds),
+           total_paused_seconds = COALESCE($4, total_paused_seconds),
+           paused_at = NULL
+       WHERE id = $1 AND user_id = $2 RETURNING id`,
+      [workoutId, user_id, durationSeconds, pausedSeconds]
+    );
+    if (existing.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Workout not found' });
     }
 
+    // Finish only completes a workout with something in it. An empty one is
+    // cancelled instead (end_time stays NULL, like any cancel).
+    const hasActivity = await workoutHasActivity(client, workoutId);
+    const result = hasActivity
+      ? await client.query(
+          `UPDATE workouts SET end_time = $1, status = 'completed'
+           WHERE id = $2 RETURNING *`,
+          [new Date().toISOString(), workoutId]
+        )
+      : await client.query(
+          `UPDATE workouts SET status = 'cancelled' WHERE id = $1 RETURNING *`,
+          [workoutId]
+        );
     const workout = result.rows[0];
 
-    // If this workout belongs to a program, record completion
-    if (workout.program_id && workout.program_routine_id) {
-      await pool.query(
+    // Program completion is recorded only for a completed workout.
+    if (hasActivity && workout.program_id && workout.program_routine_id) {
+      await client.query(
         `INSERT INTO program_workouts (program_id, program_routine_id, workout_id, completed_date)
-         VALUES ($1, $2, $3, (SELECT workout_date FROM workouts WHERE id = $3))
-         ON CONFLICT DO NOTHING`,
+         SELECT $1, $2, $3, (SELECT workout_date FROM workouts WHERE id = $3)
+         WHERE NOT EXISTS (SELECT 1 FROM program_workouts WHERE workout_id = $3)`,
         // The workout's own (local) date, not the server's UTC CURRENT_DATE.
         [workout.program_id, workout.program_routine_id, workoutId]
       );
     }
 
+    await client.query('COMMIT');
+    if (!hasActivity) {
+      return res.json({ ...workout, cancelled_empty: true, message: NOTHING_LOGGED_MESSAGE });
+    }
     res.json(workout);
   } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
     console.error('Finish workout error:', error);
     res.status(500).json({ error: 'Failed to finish workout' });
+  } finally {
+    client.release();
   }
 };
 
+// Cancel keeps every logged set and segment and leaves end_time NULL
+// (resume is Phase 0A-2). Nothing is deleted.
 const cancelWorkout = async (req, res) => {
   const { workoutId } = req.params;
   const user_id = req.user.userId;
 
   try {
     const result = await pool.query(
-      `UPDATE workouts SET end_time = $1, status = 'cancelled' WHERE id = $2 AND user_id = $3 RETURNING *`,
-      [new Date().toISOString(), workoutId, user_id]
+      `UPDATE workouts SET status = 'cancelled', paused_at = NULL
+       WHERE id = $1 AND user_id = $2 RETURNING *`,
+      [workoutId, user_id]
     );
 
     if (result.rows.length === 0) {
@@ -793,13 +829,16 @@ const getCombinedHistory = async (req, res) => {
   const isAllPrograms = programId === 'all';
   const pid = (!isAllPrograms && programId) ? parseInt(programId) : null;
   try {
+    // History lists every status (cancelled / in progress are tagged in the
+    // UI); totals elsewhere count completed only.
+    await sweepStaleWorkouts(pool, user_id);
     const strengthResult = await pool.query(
       `SELECT
         w.id,
         COALESCE(w.workout_type, 'strength') AS type,
-        w.workout_date AS date,
+        to_char(w.workout_date, 'YYYY-MM-DD') AS date,
         w.start_time, w.end_time,
-        EXTRACT(EPOCH FROM (w.end_time - w.start_time))::INTEGER AS duration_seconds,
+        ${durationSql('w')} AS duration_seconds,
         COALESCE(w.workout_title, wr.name, 'Open Session') AS title,
         COUNT(DISTINCT we.id) AS exercise_count,
         w.overall_notes, w.status,
@@ -807,7 +846,7 @@ const getCombinedHistory = async (req, res) => {
        FROM workouts w
        LEFT JOIN workout_routines wr ON w.routine_id = wr.id
        LEFT JOIN workout_exercises we ON w.id = we.workout_id
-       WHERE w.user_id = $1 AND w.status != 'cancelled' ${pid ? 'AND w.program_id = $2' : isAllPrograms ? 'AND w.program_id IS NOT NULL' : ''}
+       WHERE w.user_id = $1 ${pid ? 'AND w.program_id = $2' : isAllPrograms ? 'AND w.program_id IS NOT NULL' : ''}
        GROUP BY w.id, wr.name
        ORDER BY w.workout_date DESC, w.start_time DESC`,
       pid ? [user_id, pid] : [user_id]
@@ -817,14 +856,14 @@ const getCombinedHistory = async (req, res) => {
       ? { rows: [] }
       : await pool.query(
       `SELECT
-        id, 'cardio' AS type, session_date AS date,
+        id, 'cardio' AS type, to_char(session_date, 'YYYY-MM-DD') AS date,
         start_time, end_time, duration_seconds,
         cardio_type AS title, distance, distance_unit,
         calories_burned, avg_heart_rate,
         pre_session_notes, mid_session_notes, post_session_notes,
         status, session_rating, session_notes
        FROM cardio_sessions
-       WHERE user_id = $1 AND status != 'cancelled'
+       WHERE user_id = $1
        ORDER BY session_date DESC, start_time DESC`,
       [user_id]
     );
@@ -852,7 +891,8 @@ const getWorkoutDetail = async (req, res) => {
   const user_id = req.user.userId;
   try {
     const workoutResult = await pool.query(
-      `SELECT w.*, COALESCE(w.workout_title, wr.name, 'Open Session') AS routine_name
+      `SELECT w.*, COALESCE(w.workout_title, wr.name, 'Open Session') AS routine_name,
+              ${durationSql('w')} AS duration_seconds
        FROM workouts w
        LEFT JOIN workout_routines wr ON w.routine_id = wr.id
        WHERE w.id = $1 AND w.user_id = $2`,
@@ -899,8 +939,8 @@ const startFreeLift = async (req, res) => {
   }
   try {
     const result = await pool.query(
-      `INSERT INTO workouts (user_id, workout_date, routine_id, start_time, workout_title, workout_type)
-       VALUES ($1, $2, NULL, $3, $4, $5) RETURNING *`,
+      `INSERT INTO workouts (user_id, workout_date, routine_id, start_time, workout_title, workout_type, status)
+       VALUES ($1, $2, NULL, $3, $4, $5, 'in_progress') RETURNING *`,
       [user_id, workout_date, new Date().toISOString(), workout_title || null, workout_type]
     );
     res.status(201).json({
@@ -1035,6 +1075,8 @@ const getPreviousExerciseNotes = async (req, res) => {
   const user_id = req.user.userId;
   const exerciseId = parseInt(req.query.exerciseId, 10);
   const programId = parseInt(req.query.programId, 10) || null;
+  // The workout being logged right now, which must not be its own "previous".
+  const currentWorkoutId = parseInt(req.query.workoutId, 10) || null;
 
   if (!exerciseId) {
     return res.status(400).json({ error: 'exerciseId required' });
@@ -1056,7 +1098,7 @@ const getPreviousExerciseNotes = async (req, res) => {
       scope = 'all';
     }
 
-    const params = [user_id, exerciseId];
+    const params = [user_id, exerciseId, currentWorkoutId];
     let scopeSql = '';
     if (scope === 'program') {
       params.push(programId);
@@ -1078,12 +1120,9 @@ const getPreviousExerciseNotes = async (req, res) => {
        JOIN workouts w ON w.id = we.workout_id
        WHERE w.user_id = $1
          AND we.exercise_id = $2
-         AND w.status = 'completed'
-         -- workouts.status defaults to 'completed' at insert, so an in-progress
-         -- workout already reads as completed. end_time is only set by finish
-         -- (and cancel, which the status check excludes), so this skips the
-         -- workout currently being logged.
-         AND w.end_time IS NOT NULL
+         -- Any prior session containing the exercise, cancelled ones included
+         -- (Phase 0A-1); only the workout currently being logged is skipped.
+         AND w.id IS DISTINCT FROM $3::integer
          ${scopeSql}
        ORDER BY w.workout_date DESC, w.id DESC
        LIMIT 1`,

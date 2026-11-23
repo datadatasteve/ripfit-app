@@ -249,3 +249,22 @@
   color: var(--text-secondary);
   margin-bottom: 8px;
 }
+
+/* Phase 0A-1: cancelled / in-progress banner */
+.wdp-status-banner {
+  margin: 0 0 var(--space-md, 12px);
+  padding: 10px 14px;
+  border-radius: var(--radius-md, 8px);
+  font-size: var(--font-size-sm, 0.9rem);
+  font-weight: 600;
+}
+.wdp-status-banner.cancelled {
+  background: color-mix(in srgb, var(--text-secondary) 14%, transparent);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+.wdp-status-banner.in-progress {
+  background: color-mix(in srgb, var(--color-warning) 16%, transparent);
+  color: var(--text-primary);
+  border: 1px solid var(--color-warning);
+}

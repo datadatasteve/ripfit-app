@@ -2,6 +2,7 @@
 // All admin-only endpoints. Every function checks is_admin before proceeding.
 
 const { pool } = require('../config/database');
+const { durationSql } = require('../utils/workoutStatus');
 const bcrypt = require('bcrypt');
 
 // Middleware-style guard — call at top of each handler
@@ -34,7 +35,7 @@ async function listUsers(req, res) {
         u.created_at,
         u.profile_picture IS NOT NULL AS has_photo,
         u.goals,
-        COUNT(DISTINCT w.id) AS workout_count,
+        COUNT(DISTINCT w.id) FILTER (WHERE w.status = 'completed') AS workout_count,
         COUNT(DISTINCT cs.id) AS cardio_count,
         GREATEST(
           MAX(w.start_time),
@@ -83,7 +84,7 @@ async function getUser(req, res) {
       SELECT w.id, w.workout_date, w.start_time, w.end_time, w.status,
              w.session_rating, w.overall_notes,
              COALESCE(r.name, 'Free Lift') AS routine_name,
-             EXTRACT(EPOCH FROM (w.end_time - w.start_time))::INTEGER AS duration_seconds,
+             ${durationSql('w')} AS duration_seconds,
              COUNT(DISTINCT we.id) AS exercise_count,
              COUNT(ws.id) AS set_count
       FROM workouts w

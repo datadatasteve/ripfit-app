@@ -232,6 +232,17 @@ function App() {
         if (d.is_admin) setIsAdmin(true);
         setUserPrefs(prefsFromProfile(d));
         setPrefsLoaded(true);
+        // Stats bucket by local hour/day in the user's zone: store the
+        // browser's zone when it's unset or has changed.
+        let zone = null;
+        try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { /* very old browser */ }
+        if (zone && d.id && d.timezone !== zone) {
+          fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1'}/users/me/preferences`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
+            body: JSON.stringify({ timezone: zone }),
+          }).catch(() => {});
+        }
       })
       .catch(() => {});
   }, [isLoggedIn]);

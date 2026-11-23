@@ -446,6 +446,17 @@ export default function WorkoutDetailPage({ workoutId, workoutType, onBack }) {
     <div className="wdp-container">
       <button className="wdp-back" onClick={onBack}>← Back</button>
 
+      {data.status === 'cancelled' && (
+        <div className="wdp-status-banner cancelled" role="status">
+          Cancelled. This workout isn't counted in stats or program progress.
+        </div>
+      )}
+      {data.status === 'in_progress' && (
+        <div className="wdp-status-banner in-progress" role="status">
+          In progress. This workout hasn't been finished yet.
+        </div>
+      )}
+
       <div className="wdp-header">
         <div className="wdp-title-row">
           <h2 className="wdp-title">{data.routine_name || data.workout_title || data.cardio_type || 'Workout'}</h2>

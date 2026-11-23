@@ -3,6 +3,7 @@ const pool = require('../config/database');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const { sendVerificationEmail } = require('../utils/emailService');
+const { isValidTimezone } = require('../utils/workoutStatus');
 
 // ── GET /users/me ──────────────────────────────────────────────────────────
 // Returns the current user's profile. Never returns password_hash.
@@ -14,7 +15,8 @@ async function getProfile(req, res) {
          height_cm, weight_kg, date_of_birth, gender,
          units_weight, units_distance, theme_preference, goals,
          initials, email_verified, is_admin, workout_rating_prefs, created_at,
-         reorder_mode, previous_notes_scope, tempo_visual_enabled, tempo_audio_enabled
+         reorder_mode, previous_notes_scope, tempo_visual_enabled, tempo_audio_enabled,
+         timezone
        FROM users WHERE id = $1`,
       [req.user.userId]
     );
@@ -302,6 +304,9 @@ const PREFERENCE_RULES = {
   previous_notes_scope:  v => ['all', 'program', 'non_program'].includes(v),
   tempo_visual_enabled:  v => typeof v === 'boolean',
   tempo_audio_enabled:   v => typeof v === 'boolean',
+  // IANA zone from the browser (Intl...resolvedOptions().timeZone). Used to
+  // bucket stats by local hour/day; NULL means UTC.
+  timezone:              v => isValidTimezone(v),
 };
 
 async function updatePreferences(req, res) {
@@ -322,10 +327,16 @@ async function updatePreferences(req, res) {
   }
 
   try {
+    // Postgres must know the zone too, or every stats query would fail on it.
+    if ('timezone' in req.body) {
+      const known = await pool.query('SELECT 1 FROM pg_timezone_names WHERE name = $1', [req.body.timezone]);
+      if (known.rows.length === 0) return res.status(400).json({ error: 'Invalid value for timezone' });
+    }
+
     values.push(req.user.userId);
     const result = await pool.query(
       `UPDATE users SET ${sets.join(', ')} WHERE id = $${values.length}
-       RETURNING reorder_mode, previous_notes_scope, tempo_visual_enabled, tempo_audio_enabled`,
+       RETURNING reorder_mode, previous_notes_scope, tempo_visual_enabled, tempo_audio_enabled, timezone`,
       values
     );
     res.json(result.rows[0]);

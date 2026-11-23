@@ -3,6 +3,10 @@
 // (authorization enforcement to be added when trainer portal is built).
 
 const { pool } = require('../config/database');
+const { durationSql, userTimezoneSql, localTimeSql, sweepStaleWorkouts } = require('../utils/workoutStatus');
+
+// Only completed workouts count toward any stat (Phase 0A-1).
+const DONE = "status = 'completed'";
 
 // Helper: resolve which user's data to query.
 // For now, trainers aren't enforced — just use the requesting user.
@@ -30,31 +34,34 @@ async function getOverview(req, res) {
   const programCond = pid ? 'AND program_id = $2' : (isAllPrograms ? 'AND program_id IS NOT NULL' : '');
   // cardio_sessions has no program_id column — any program-scoped view (single or 'all') excludes it
   const includeCardio = !pid && !isAllPrograms;
+  // Hour-of-day / day-of-week buckets use the user's own time zone (UTC if unset).
+  const TZ = userTimezoneSql('$1');
 
   try {
     // Weekly frequency (strength + cardio combined)
     // Use workout_date/session_date as fallback if start_time is null
     const weeksCond = weeks < 500
-      ? `AND COALESCE(start_time, workout_date::timestamptz) >= NOW() - ('${parseInt(weeks)} weeks')::INTERVAL`
+      ? `AND workout_date >= CURRENT_DATE - ('${parseInt(weeks)} weeks')::INTERVAL`
       : '';
     const weeksCond2 = weeks < 500
-      ? `AND COALESCE(start_time, session_date::timestamptz) >= NOW() - ('${parseInt(weeks)} weeks')::INTERVAL`
+      ? `AND session_date >= CURRENT_DATE - ('${parseInt(weeks)} weeks')::INTERVAL`
       : '';
 
     const weeklyFreq = await pool.query(`
       SELECT
-        DATE_TRUNC('week', d) AS week_start,
+        to_char(DATE_TRUNC('week', d), 'YYYY-MM-DD') AS week_start,
         COUNT(*) AS count
       FROM (
-        SELECT COALESCE(start_time, workout_date::timestamptz) AS d FROM workouts
-        WHERE user_id = $1 AND COALESCE(workout_type, '') <> 'meditation' AND (status = 'completed' OR (status IS NULL AND end_time IS NOT NULL)) ${weeksCond} ${programCond}
+        -- workout_date / session_date are the user's local calendar day
+        SELECT workout_date::timestamp AS d FROM workouts
+        WHERE user_id = $1 AND COALESCE(workout_type, '') <> 'meditation' AND ${DONE} ${weeksCond} ${programCond}
         ${includeCardio ? `UNION ALL
-        SELECT COALESCE(start_time, session_date::timestamptz) AS d FROM cardio_sessions
-        WHERE user_id = $1 AND status = 'completed' ${weeksCond2}` : ''}
+        SELECT session_date::timestamp AS d FROM cardio_sessions
+        WHERE user_id = $1 AND ${DONE} ${weeksCond2}` : ''}
       ) combined
       WHERE d IS NOT NULL
-      GROUP BY week_start
-      ORDER BY week_start
+      GROUP BY DATE_TRUNC('week', d)
+      ORDER BY DATE_TRUNC('week', d)
     `, params);
 
     // Time-of-day distribution (0-23 hour buckets)
@@ -63,11 +70,13 @@ async function getOverview(req, res) {
         EXTRACT(HOUR FROM d)::INTEGER AS hour,
         COUNT(*) AS count
       FROM (
-        SELECT start_time AS d FROM workouts
-        WHERE user_id = $1 AND COALESCE(workout_type, '') <> 'meditation' AND (status = 'completed' OR (status IS NULL AND end_time IS NOT NULL)) AND start_time IS NOT NULL ${programCond}
+        -- start_time is naive UTC on workouts and timestamptz on cardio_sessions;
+        -- both are converted to the user's own zone before bucketing.
+        SELECT ${localTimeSql('start_time', TZ)} AS d FROM workouts
+        WHERE user_id = $1 AND COALESCE(workout_type, '') <> 'meditation' AND ${DONE} AND start_time IS NOT NULL ${programCond}
         ${includeCardio ? `UNION ALL
-        SELECT start_time AS d FROM cardio_sessions
-        WHERE user_id = $1 AND status = 'completed' AND start_time IS NOT NULL` : ''}
+        SELECT start_time AT TIME ZONE ${TZ} AS d FROM cardio_sessions
+        WHERE user_id = $1 AND ${DONE} AND start_time IS NOT NULL` : ''}
       ) combined
       GROUP BY hour
       ORDER BY hour
@@ -79,11 +88,11 @@ async function getOverview(req, res) {
         EXTRACT(DOW FROM d)::INTEGER AS dow,
         COUNT(*) AS count
       FROM (
-        SELECT COALESCE(start_time, workout_date::timestamptz) AS d FROM workouts
-        WHERE user_id = $1 AND COALESCE(workout_type, '') <> 'meditation' AND (status = 'completed' OR (status IS NULL AND end_time IS NOT NULL)) ${programCond}
+        SELECT COALESCE(${localTimeSql('start_time', TZ)}, workout_date::timestamp) AS d FROM workouts
+        WHERE user_id = $1 AND COALESCE(workout_type, '') <> 'meditation' AND ${DONE} ${programCond}
         ${includeCardio ? `UNION ALL
-        SELECT COALESCE(start_time, session_date::timestamptz) AS d FROM cardio_sessions
-        WHERE user_id = $1 AND status = 'completed'` : ''}
+        SELECT COALESCE(start_time AT TIME ZONE ${TZ}, session_date::timestamp) AS d FROM cardio_sessions
+        WHERE user_id = $1 AND ${DONE}` : ''}
       ) combined
       WHERE d IS NOT NULL
       GROUP BY dow
@@ -92,18 +101,18 @@ async function getOverview(req, res) {
 
     // Duration distribution — strength uses end_time-start_time, cardio has its own column
     const durations = await pool.query(`
-      SELECT
-        EXTRACT(EPOCH FROM (end_time - start_time))::INTEGER AS duration_seconds,
-        'strength' AS type,
-        start_time
-      FROM workouts
-      WHERE user_id = $1 AND COALESCE(workout_type, '') <> 'meditation' AND (status = 'completed' OR status IS NULL)
-        AND end_time IS NOT NULL AND start_time IS NOT NULL
-        AND end_time > start_time ${programCond}
+      SELECT * FROM (
+        SELECT
+          ${durationSql('workouts')} AS duration_seconds,
+          'strength' AS type,
+          start_time AT TIME ZONE 'UTC' AS start_time
+        FROM workouts
+        WHERE user_id = $1 AND COALESCE(workout_type, '') <> 'meditation' AND ${DONE} ${programCond}
+      ) w_dur WHERE duration_seconds > 0
       ${includeCardio ? `UNION ALL
       SELECT duration_seconds, 'cardio' AS type, start_time
       FROM cardio_sessions
-      WHERE user_id = $1 AND status = 'completed'
+      WHERE user_id = $1 AND ${DONE}
         AND duration_seconds IS NOT NULL AND duration_seconds > 0` : ''}
       ORDER BY start_time
     `, params);
@@ -111,15 +120,15 @@ async function getOverview(req, res) {
     // Session rating over time
     const ratings = await pool.query(`
       SELECT
-        workout_date AS date,
+        to_char(workout_date, 'YYYY-MM-DD') AS date,
         session_rating AS rating,
         'strength' AS type,
-        start_time
+        start_time AT TIME ZONE 'UTC' AS start_time
       FROM workouts
-      WHERE user_id = $1 AND COALESCE(workout_type, '') <> 'meditation' AND session_rating IS NOT NULL AND (status = 'completed' OR status IS NULL) ${programCond}
+      WHERE user_id = $1 AND COALESCE(workout_type, '') <> 'meditation' AND session_rating IS NOT NULL AND ${DONE} ${programCond}
       ${includeCardio ? `UNION ALL
       SELECT
-        session_date AS date,
+        to_char(session_date, 'YYYY-MM-DD') AS date,
         session_rating AS rating,
         'cardio' AS type,
         start_time
@@ -136,13 +145,13 @@ async function getOverview(req, res) {
         ROUND(AVG(session_rating)::NUMERIC, 2) AS avg_rating
       FROM (
         SELECT
-          EXTRACT(EPOCH FROM (end_time - start_time))::INTEGER AS dur,
+          ${durationSql('workouts')} AS dur,
           session_rating
         FROM workouts
-        WHERE user_id = $1 AND COALESCE(workout_type, '') <> 'meditation' AND (status = 'completed' OR (status IS NULL AND end_time IS NOT NULL)) ${programCond}
+        WHERE user_id = $1 AND COALESCE(workout_type, '') <> 'meditation' AND ${DONE} ${programCond}
         ${includeCardio ? `UNION ALL
         SELECT duration_seconds AS dur, session_rating FROM cardio_sessions
-        WHERE user_id = $1 AND status = 'completed'` : ''}
+        WHERE user_id = $1 AND ${DONE}` : ''}
       ) all_sessions
     `, params);
 
@@ -398,7 +407,7 @@ async function getCardioStats(req, res) {
         w.workout_date AS session_date,
         w.start_time,
         e.name AS cardio_type,
-        EXTRACT(EPOCH FROM (w.end_time - w.start_time))::INTEGER AS duration_seconds,
+        ${durationSql('w')} AS duration_seconds,
         ROUND(SUM(wcs.distance)::NUMERIC, 2) AS distance,
         MAX(wcs.distance_unit) AS distance_unit,
         ROUND(AVG(wcs.avg_speed)::NUMERIC, 2) AS avg_speed,
@@ -536,8 +545,15 @@ async function getCombinedStats(req, res) {
   const params = pid ? [userId, weeks, pid] : [userId, weeks];
   const programCond = pid ? 'AND w.program_id = $3' : (isAllPrograms ? 'AND w.program_id IS NOT NULL' : '');
   const includeCardio = !pid && !isAllPrograms;
+  // Stats > History asks for cancelled / in-progress sessions too, to list them
+  // tagged. Every other caller (calendar, overview, combined charts) gets
+  // completed sessions only.
+  const includeUnfinished = req.query.include_unfinished === '1';
+  const wStatus = includeUnfinished ? 'TRUE' : "w.status = 'completed'";
+  const csStatus = includeUnfinished ? 'TRUE' : "cs.status = 'completed'";
 
   try {
+    if (includeUnfinished) await sweepStaleWorkouts(pool, userId);
     const combined = await pool.query(`
       SELECT
         date,
@@ -550,27 +566,32 @@ async function getCombinedStats(req, res) {
         distance,
         avg_heart_rate,
         start_time,
-        workout_id
+        workout_id,
+        status
       FROM (
         -- Strength/mixed/open sessions
         SELECT
-          w.workout_date AS date,
+          -- Bare YYYY-MM-DD: pg would otherwise serialise the DATE as a UTC
+          -- timestamp, which the client could not parse (root cause of the
+          -- "Avg Session Duration 0m" chart).
+          to_char(w.workout_date, 'YYYY-MM-DD') AS date,
           COALESCE(w.workout_type, 'strength') AS type,
           COALESCE(w.workout_title, wr.name, 'Open Session') AS title,
-          EXTRACT(EPOCH FROM (w.end_time - w.start_time))::INTEGER AS duration_seconds,
+          ${durationSql('w')} AS duration_seconds,
           w.session_rating,
           SUM(ws.reps_completed * ws.weight_used)::INTEGER AS volume,
           ROUND(MAX(ws.weight_used * (1 + ws.reps_completed::NUMERIC / 30))::NUMERIC, 1) AS est_1rm,
           NULL::NUMERIC AS distance,
           NULL::INTEGER AS avg_heart_rate,
-          w.start_time,
-          w.id AS workout_id
+          w.start_time AT TIME ZONE 'UTC' AS start_time,
+          w.id AS workout_id,
+          w.status
         FROM workouts w
         LEFT JOIN workout_routines wr ON w.routine_id = wr.id
         LEFT JOIN workout_exercises we ON w.id = we.workout_id
         LEFT JOIN workout_sets ws ON we.id = ws.workout_exercise_id
-        WHERE w.user_id = $1 AND w.status = 'completed'
-          AND COALESCE(w.start_time, w.workout_date::timestamptz) >= NOW() - ($2 || ' weeks')::INTERVAL
+        WHERE w.user_id = $1 AND ${wStatus}
+          AND w.workout_date >= CURRENT_DATE - ($2 || ' weeks')::INTERVAL
           ${programCond}
         GROUP BY w.id, wr.name
 
@@ -578,7 +599,7 @@ async function getCombinedStats(req, res) {
 
         -- Cardio sessions
         SELECT
-          cs.session_date AS date,
+          to_char(cs.session_date, 'YYYY-MM-DD') AS date,
           'cardio' AS type,
           cs.cardio_type AS title,
           cs.duration_seconds,
@@ -588,12 +609,13 @@ async function getCombinedStats(req, res) {
           cs.distance,
           cs.avg_heart_rate,
           cs.start_time,
-          cs.id AS workout_id
+          cs.id AS workout_id,
+          cs.status
         FROM cardio_sessions cs
-        WHERE cs.user_id = $1 AND cs.status = 'completed'
-          AND COALESCE(cs.start_time, cs.session_date::timestamptz) >= NOW() - ($2 || ' weeks')::INTERVAL` : ''}
+        WHERE cs.user_id = $1 AND ${csStatus}
+          AND cs.session_date >= CURRENT_DATE - ($2 || ' weeks')::INTERVAL` : ''}
       ) all_sessions
-      ORDER BY COALESCE(start_time, date::timestamptz) DESC
+      ORDER BY date DESC, start_time DESC NULLS LAST
     `, params);
 
     res.json({ sessions: combined.rows });
@@ -796,10 +818,7 @@ async function getMeditationStats(req, res) {
     const sessions = await pool.query(
       `SELECT w.id,
               to_char(w.workout_date, 'YYYY-MM-DD') AS workout_date,
-              COALESCE(
-                w.duration_seconds,
-                GREATEST(0, EXTRACT(EPOCH FROM (w.end_time - w.start_time))::int)
-              ) AS duration_seconds,
+              ${durationSql('w')} AS duration_seconds,
               w.workout_title,
               w.overall_notes
        FROM workouts w

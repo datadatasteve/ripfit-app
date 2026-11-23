@@ -800,14 +800,31 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
       }
     }
     
+    // Pause lives in the client: send the finished total (including a pause
+    // still running) so the server's duration excludes it.
+    const w = activeWorkout.workout;
+    const pausedSeconds = (w.total_paused_seconds || 0) + (w.paused_at
+      ? Math.max(0, Math.floor((Date.now() - new Date(w.paused_at).getTime()) / 1000))
+      : 0);
+
     try {
-      await fetch(`${API_BASE}/workouts/${activeWorkout.workout.id}/finish`, {
+      const finishRes = await fetch(`${API_BASE}/workouts/${activeWorkout.workout.id}/finish`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
-        }
+        },
+        body: JSON.stringify({ total_paused_seconds: pausedSeconds }),
       });
+      if (!finishRes.ok) throw new Error(`finish failed (${finishRes.status})`);
+      const finished = await finishRes.json();
+
+      // Nothing logged: the server cancelled it instead of completing it.
+      if (finished.cancelled_empty) {
+        alert(finished.message || 'Nothing was logged, so this workout was cancelled.');
+        setActiveWorkout(null);
+        return;
+      }
 
       fetchActivePrograms(); // refresh Continue Program cards with post-finish progress
 
@@ -845,7 +862,6 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
       }
 
       // Build summary data before clearing workout (subtract any paused time)
-      const pausedSeconds = activeWorkout.workout.total_paused_seconds || 0;
       const rawMs = Date.now() - new Date(activeWorkout.workout.start_time).getTime();
       const durationSeconds = Math.round(rawMs / 1000 - pausedSeconds);
       setWorkoutSummary({
@@ -899,6 +915,7 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
       setActiveWorkout(null);
     } catch (err) {
       console.error('Failed to finish workout:', err);
+      alert('Could not finish the workout. Check your connection and try again.');
     }
   };
 
@@ -1557,15 +1574,15 @@ const NOTE_SCOPE_OPTIONS = [
 ];
 
 /**
- * Collapsible read-only view of the notes from the most recent completed
- * workout that contained this exercise. Fetched lazily on first expand, and
+ * Collapsible read-only view of the notes from the most recent prior workout
+ * (cancelled ones included) that contained this exercise. Fetched lazily on first expand, and
  * again whenever the scope toggle changes.
  *
  * `scope` is a session-only override owned by WorkoutInProgress (seeded from
  * the user's saved preference); changing it here never saves the preference.
  * "Program" needs a program workout, so it's disabled otherwise.
  */
-function PreviousNotesDropdown({ exerciseId, programId, scope, onScopeChange }) {
+function PreviousNotesDropdown({ exerciseId, workoutId, programId, scope, onScopeChange }) {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -1587,6 +1604,7 @@ function PreviousNotesDropdown({ exerciseId, programId, scope, onScopeChange }) 
     try {
       const tok = localStorage.getItem('ripfit_token');
       const params = new URLSearchParams({ exerciseId: String(exerciseId), scope: withScope });
+      if (workoutId) params.set('workoutId', String(workoutId)); // never show this session as "previous"
       if (withScope === 'program' && programId) params.set('programId', String(programId));
       const res = await fetch(`${API_BASE}/workouts/previous-notes?${params}`, {
         headers: { Authorization: `Bearer ${tok}` },
@@ -2804,6 +2822,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
 
         <PreviousNotesDropdown
           exerciseId={currentExercise.exercise_id}
+          workoutId={workout.workout.id}
           programId={workout.workout.program_id || null}
           scope={notesScope}
           onScopeChange={setNotesScope}

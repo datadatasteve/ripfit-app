@@ -94,6 +94,13 @@ function Empty({ message = 'No data yet. Log some workouts to see stats.' }) {
 }
 
 // ── Loading ───────────────────────────────────────────────────────────────
+/** "Cancelled" / "In progress" chip for history rows; nothing for completed. */
+function StatusTag({ status }) {
+  if (status === 'cancelled') return <span className="sc-status-tag cancelled">Cancelled</span>;
+  if (status === 'in_progress') return <span className="sc-status-tag in-progress">In progress</span>;
+  return null;
+}
+
 function Loading() {
   return <p className="sc-loading">Loading…</p>;
 }
@@ -510,8 +517,9 @@ function OverviewTab({ onSelectWorkout, programId }) {
   // Combined freq + duration data
   const combinedData = weekly_frequency.map(w => {
     const weekSessions = sessions.filter(s => {
-      const sd = new Date(s.date + 'T12:00:00');
-      const wd = new Date(w.week_start);
+      // Both are bare YYYY-MM-DD local dates; parse both as local time.
+      const sd = new Date(String(s.date).slice(0, 10) + 'T12:00:00');
+      const wd = new Date(String(w.week_start).slice(0, 10) + 'T00:00:00');
       const diff = (sd - wd) / (1000 * 60 * 60 * 24);
       return diff >= 0 && diff < 7;
     });
@@ -1753,7 +1761,9 @@ function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout, progra
   useEffect(() => {
     const ctrl = new AbortController();
     setLoading(true);
-    apiFetch(`/combined?weeks=${weeks}${programId ? `&programId=${programId}` : ''}`, 3, ctrl.signal)
+    // include_unfinished: the session log lists cancelled / in-progress
+    // sessions (tagged); the charts below still use completed ones only.
+    apiFetch(`/combined?weeks=${weeks}&include_unfinished=1${programId ? `&programId=${programId}` : ''}`, 3, ctrl.signal)
       .then(setData)
       .catch(e => { if (e.name !== 'AbortError') console.error(e); })
       .finally(() => setLoading(false));
@@ -1774,8 +1784,11 @@ function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout, progra
 
   if (loading) return <Loading />;
 
+  // Charts count completed sessions only; the log below shows every status.
+  const completedSessions = (data?.sessions || []).filter(s => !s.status || s.status === 'completed');
+
   // Rated sessions only — reverse to chronological for chart display
-  const ratedSessions = (data?.sessions || []).filter(s => s.session_rating != null).reverse();
+  const ratedSessions = completedSessions.filter(s => s.session_rating != null).reverse();
   const ratingData = ratedSessions.map(s => ({
     date: fmtDate(s.date),
     rating: parseFloat(s.session_rating),
@@ -1824,7 +1837,7 @@ function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout, progra
   const TT = { background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: 12 };
 
   // Chronological sessions for charts
-  const chronoSessions = [...(data?.sessions || [])].reverse();
+  const chronoSessions = [...completedSessions].reverse();
 
   // Duration over time chart data
   const durationData = chronoSessions
@@ -1998,8 +2011,11 @@ function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout, progra
                     >
                       <td>{fmtDate(s.date)}</td>
                       <td><span className={`history-type-badge ${s.type}`}>{s.type}</span></td>
-                      <td>{s.title}</td>
-                      <td>{fmtDuration(s.duration_seconds)}</td>
+                      <td>
+                        {s.title}
+                        <StatusTag status={s.status} />
+                      </td>
+                      <td>{s.status === 'completed' || !s.status ? fmtDuration(s.duration_seconds) : '—'}</td>
                       <td style={{ color: ratingColor(s.session_rating), fontWeight: s.session_rating != null ? 600 : 400 }}>
                         {s.session_rating != null ? `${s.session_rating} / 5` : '—'}
                       </td>

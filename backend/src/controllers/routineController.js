@@ -453,6 +453,7 @@ const startWorkoutFromRoutine = async (req, res) => {
       `SELECT w.id, w.workout_date, w.overall_notes
        FROM workouts w
        WHERE w.user_id = $1 AND w.routine_id = $2 AND w.workout_date <= $3
+         AND w.status = 'completed'  -- an unfinished or cancelled session is never "last time"
        ORDER BY w.workout_date DESC, w.start_time DESC
        LIMIT 1`,
       [user_id, id, workout_date]
@@ -490,8 +491,8 @@ const startWorkoutFromRoutine = async (req, res) => {
 
     // Create new workout
     const workoutResult = await client.query(
-      `INSERT INTO workouts (user_id, workout_date, routine_id, start_time)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO workouts (user_id, workout_date, routine_id, start_time, status)
+       VALUES ($1, $2, $3, $4, 'in_progress')
        RETURNING *`,
       [user_id, workout_date, id, new Date().toISOString()]
     );
