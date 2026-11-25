@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import RoutineBuilder from './RoutineBuilder';
 import RoutineDetail from './RoutineDetail';
 import { formatRepRange, repRangeOf, judgeReps, supersetLabel } from '../utils/repRange';
@@ -934,7 +934,11 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
             subcategory: ex.subcategory || null,
             order_index: ex.order_index,
             logged_sets: ex.logged_sets || [],
-            cardio_segments: cardioSegmentsByExercise[ex.id] || [],
+            // A Quick Cardio finished with no segment: the server saved the
+            // elapsed time as Segment 1 (Phase 0B-1b); show it in the summary.
+            cardio_segments: finished.saved_segment?.workout_exercise_id === ex.id
+              ? [finished.saved_segment]
+              : (cardioSegmentsByExercise[ex.id] || []),
             target_sets: ex.template?.target_sets,
             target_reps_min: ex.template?.target_reps_min,
             target_reps_max: ex.template?.target_reps_max,
@@ -2450,7 +2454,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
     const rpe = String(editingSet.rpe).trim() === '' ? null : parseInt(editingSet.rpe, 10);
     if (!Number.isInteger(reps) || reps < 0) { setEditingSet(e => ({ ...e, error: 'Reps must be a whole number' })); return; }
     if (!Number.isFinite(weight) || weight < 0) { setEditingSet(e => ({ ...e, error: 'Weight must be 0 or more' })); return; }
-    if (rpe !== null && (!Number.isInteger(rpe) || rpe < 1 || rpe > 10)) { setEditingSet(e => ({ ...e, error: 'RPE must be 1–10' })); return; }
+    if (rpe !== null && (!Number.isInteger(rpe) || rpe < 1 || rpe > 11)) { setEditingSet(e => ({ ...e, error: 'RPE must be 1–11' })); return; }
 
     setEditingSet(e => ({ ...e, saving: true, error: '' }));
     try {
@@ -2584,13 +2588,44 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
   // An exercise-bound timer belongs to one exercise; changing exercise closes it.
   useEffect(() => { setTimerOpen(false); }, [currentExercise.id]);
 
+  // Tempo track rep target (Phase 0B-1b): the reps typed in the set form,
+  // else the exercise's target reps (the top of a range), else until Stop.
+  const tempoTargetReps = (() => {
+    const typed = parseInt(setForm.reps, 10);
+    if (Number.isInteger(typed) && typed > 0) return typed;
+    const t = parseInt(currentExercise.template?.target_reps_max ?? currentExercise.template?.target_reps_min, 10);
+    return Number.isInteger(t) && t > 0 ? t : null;
+  })();
+
   const tempoGuide = useTempoGuide({
     exerciseKey: currentExercise.id,
+    workoutKey: workout.workout.id,
     eccentric: currentExercise.template?.tempo_eccentric,
     pause: currentExercise.template?.tempo_pause,
     concentric: currentExercise.template?.tempo_concentric,
+    targetReps: tempoTargetReps,
     onGlow: setTempoGlow,
   });
+
+  // Tempo track with the Timers (setting, default off; Phase 0B-1b): plays
+  // while an exercise timer is running a work phase, stops on rest, pause,
+  // finish or close. The timer's Start tap has already unlocked the audio.
+  const timerTempoRef = useRef(false);
+  const handleTimerRunState = useCallback(({ running, kind }) => {
+    if (!prefs.tempo_track_with_timers || !tempoGuide.trackAvailable) return;
+    const want = running && kind === 'work';
+    if (want && !timerTempoRef.current) {
+      timerTempoRef.current = true;
+      tempoGuide.startTrack({ withLeadIn: false });
+    } else if (!want && timerTempoRef.current) {
+      timerTempoRef.current = false;
+      tempoGuide.stopTrack();
+    }
+  }, [prefs.tempo_track_with_timers, tempoGuide.trackAvailable, tempoGuide.startTrack, tempoGuide.stopTrack]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!timerOpen && timerTempoRef.current) { timerTempoRef.current = false; tempoGuide.stopTrack(); }
+  }, [timerOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { timerTempoRef.current = false; }, [currentExercise.id]);
 
   /** Writes one timer-produced set (EMOM minute, Tabata interval, AMRAP result). */
   const logTimerSet = async ({ set_number, reps, setType }) => {
@@ -3100,6 +3135,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
             onClose={() => setTimerOpen(false)}
             onLogSet={logTimerSet}
             onAppendNote={appendExerciseNote}
+            onRunState={handleTimerRunState}
           />
         )}
 
@@ -3198,7 +3234,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
                           onChange={e => setEditingSet(s => ({ ...s, weight: e.target.value }))} />
                       </label>
                       <label>RPE
-                        <input type="number" inputMode="numeric" min="1" max="10" value={editingSet.rpe}
+                        <input type="number" inputMode="numeric" min="1" max="11" value={editingSet.rpe}
                           onChange={e => setEditingSet(s => ({ ...s, rpe: e.target.value }))} />
                       </label>
                       <div className="set-edit-actions">

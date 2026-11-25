@@ -138,12 +138,12 @@ function RPEChart({ exercises }) {
         <h3 className="wdp-section-title">RPE by Set</h3>
         <ChartTypeToggle value={chartType} onChange={setChartType} />
       </div>
-      <p className="wdp-chart-hint">Each point = one set. Orange = RPE 9, Red = RPE 10. Hover for exercise avg/min/max.</p>
+      <p className="wdp-chart-hint">Each point = one set. Orange = RPE 9, Red = RPE 10 or 11. Hover for exercise avg/min/max.</p>
       <ResponsiveContainer width="100%" height={260}>
         <ChartWrapper type={chartType} data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
           <XAxis dataKey="label" tick={AXIS_STYLE} angle={-40} textAnchor="end" interval={0} />
-          <YAxis domain={[0, 10]} tick={AXIS_STYLE} />
+          <YAxis domain={[0, 11]} tick={AXIS_STYLE} />
           <ReferenceLine y={9} stroke="#f97316" strokeDasharray="4 2" label={{ value: 'RPE 9', position: 'insideTopRight', fontSize: 10, fill: '#f97316' }} />
           <Tooltip
             contentStyle={TOOLTIP_STYLE}

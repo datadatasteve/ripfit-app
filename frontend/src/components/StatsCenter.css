@@ -925,3 +925,10 @@
   cursor: pointer;
   user-select: none;
 }
+
+/* Stats > Cardio: cardio done inside another workout (Phase 0B-1b) */
+.sc-status-tag.sc-part-of-tag {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+}

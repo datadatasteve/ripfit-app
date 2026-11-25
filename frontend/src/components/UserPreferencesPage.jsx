@@ -583,7 +583,37 @@ export default function UserPreferencesPage({ onBack }) {
                     <option key={n} value={n}>{n === 0 ? 'Off' : n}{n === 3 ? ' (default)' : ''}</option>
                   ))}
                 </select>
-                <p className="prefs-hint">Countdown beeps before the first rep of a tempo set, then a higher "go" beep. Follows the tempo audio and timer sound switches.</p>
+                <p className="prefs-hint">Countdown beeps before the first rep of a tempo set, then a higher "go" beep. Follows the timer Sound switch.</p>
+              </div>
+
+              <div className="prefs-field-group">
+                <label htmlFor="pref-tempo-track">Tempo click track</label>
+                <select
+                  id="pref-tempo-track"
+                  className="prefs-select"
+                  value={prefs.tempo_click_track_enabled === false ? 'off' : 'on'}
+                  onChange={e => savePref({ tempo_click_track_enabled: e.target.value === 'on' })}
+                  disabled={!prefsLoaded}
+                >
+                  <option value="on">On (default)</option>
+                  <option value="off">Off</option>
+                </select>
+                <p className="prefs-hint">Shows a Tempo track button on exercises that have a tempo. It clicks every second of each phase (3-1-2 = 3, 1 and 2 clicks), with a sharper click at each phase change and a high "go" at the top of each rep, until you tap Stop or reach your reps. You can also turn it off for one workout from the exercise's Tempo Guide.</p>
+              </div>
+
+              <div className="prefs-field-group">
+                <label htmlFor="pref-tempo-timers">Play the tempo track with the Timers</label>
+                <select
+                  id="pref-tempo-timers"
+                  className="prefs-select"
+                  value={prefs.tempo_track_with_timers ? 'on' : 'off'}
+                  onChange={e => savePref({ tempo_track_with_timers: e.target.value === 'on' })}
+                  disabled={!prefsLoaded}
+                >
+                  <option value="off">Off (default)</option>
+                  <option value="on">On</option>
+                </select>
+                <p className="prefs-hint">When on, starting an Interval, EMOM, AMRAP or Tabata timer on an exercise with a tempo also starts its click track. It plays during work, stops during rest, and stops when the timer is paused or ends.</p>
               </div>
 
               {prefMsg && <p className={`prefs-msg ${prefMsgType}`}>{prefMsg}</p>}

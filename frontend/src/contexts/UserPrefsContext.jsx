@@ -16,6 +16,8 @@ export const DEFAULT_USER_PREFS = {
   pause_note_minutes: 15,          // shortest pause noted on the workout detail page
   log_set_button_position: 'inline', // 'inline' | 'pinned' (bar above Previous / Next on phones)
   tempo_countdown_beeps: 3,        // tempo lead-in beeps before the first rep; 0 = off (max 5)
+  tempo_click_track_enabled: true, // Tempo track button on exercises with a tempo (migration 034)
+  tempo_track_with_timers: false,  // start the tempo track with the Timers panel's Start (migration 034)
 };
 
 /** Allowed values; the server rejects anything else (migration 033). */

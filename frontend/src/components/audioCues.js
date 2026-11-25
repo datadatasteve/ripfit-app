@@ -37,11 +37,11 @@ function getCtx() {
   return ctx;
 }
 
-/** One sine blip at audio-clock time `t`. Returns the oscillator (stoppable). */
-function tone(ac, t, frequency, duration, volume) {
+/** One blip at audio-clock time `t` (a sine unless `type` says otherwise). Returns the oscillator (stoppable). */
+function tone(ac, t, frequency, duration, volume, type = 'sine') {
   const osc = ac.createOscillator();
   const gain = ac.createGain();
-  osc.type = 'sine';
+  osc.type = type;
   osc.frequency.value = frequency;
   gain.gain.setValueAtTime(0, t);
   gain.gain.linearRampToValueAtTime(volume, t + 0.01);
@@ -86,8 +86,9 @@ export function scheduleCountdownBeeps(count, { intervalMs = LEAD_IN_INTERVAL_MS
     const t0 = ac.currentTime + 0.05;
     const step = intervalMs / 1000;
     const oscs = [];
-    for (let i = 0; i < n; i++) oscs.push(tone(ac, t0 + i * step, frequency, 0.12, 0.22));
-    oscs.push(tone(ac, t0 + n * step, goFrequency, 0.25, 0.3));
+    // Triangle waves (Phase 0B-1b): same pitches, more audible on phone speakers.
+    for (let i = 0; i < n; i++) oscs.push(tone(ac, t0 + i * step, frequency, 0.14, 0.4, 'triangle'));
+    oscs.push(tone(ac, t0 + n * step, goFrequency, 0.28, 0.45, 'triangle'));
     return () => oscs.forEach(o => { try { o.stop(); } catch { /* already done */ } });
   } catch {
     return () => {};
@@ -99,17 +100,134 @@ export function primeAudio() {
   getCtx();
 }
 
+// ── Clicks and click tracks (Phase 0B-1b; Phase 3-2 reuses them) ───────────
+// Square waves in the 1 to 2 kHz range: phone speakers reproduce that band
+// well, unlike the quiet 800 Hz sine ticks used before (0.08 gain, 50 ms),
+// which were close to inaudible on a phone. The timer Sound switch
+// (ripfit_timer_audio) silences every click.
+
+export const CLICK_SOUNDS = Object.freeze({
+  /** Every second inside a phase. */
+  tick:   { frequency: 1047, duration: 0.035, volume: 0.28, type: 'square' },
+  /** First second of a phase (phase change). */
+  accent: { frequency: 1568, duration: 0.06,  volume: 0.36, type: 'square' },
+  /** Top of each rep ("go"). Longer and higher, so it can't be mistaken. */
+  go:     { frequency: 2093, duration: 0.14,  volume: 0.4,  type: 'square' },
+});
+
+function scheduleClick(ac, t, sound) {
+  const s = CLICK_SOUNDS[sound] || CLICK_SOUNDS.tick;
+  return tone(ac, t, s.frequency, s.duration, s.volume, s.type);
+}
+
+/** One click now ('tick' | 'accent' | 'go'). Silent when timer audio is off. */
+export function playClick(sound = 'tick') {
+  if (!isTimerAudioEnabled()) return;
+  try {
+    const ac = getCtx();
+    if (ac) scheduleClick(ac, ac.currentTime, sound);
+  } catch {
+    /* audio is a nicety */
+  }
+}
+
+/**
+ * The beats of one tempo rep: one click per second of every phase, in order.
+ * The first second of the first phase is the "go"; the first second of each
+ * later phase is an accent; every other second is a tick. Phases of 0 s are
+ * skipped. `phaseSeconds` is e.g. [3, 1, 2] for a 3-1-2 tempo (any number of
+ * phases, so a four-part tempo works the same way).
+ * Returns { beats: [{ at, sound, phase, second }], cycleSeconds }.
+ */
+export function tempoClickBeats(phaseSeconds) {
+  const beats = [];
+  let at = 0;
+  let phaseNo = 0;
+  (phaseSeconds || []).forEach((raw, idx) => {
+    const sec = Math.max(0, Math.round(Number(raw) || 0));
+    if (sec === 0) return;
+    for (let i = 0; i < sec; i++) {
+      beats.push({ at: at + i, sound: i === 0 ? (phaseNo === 0 ? 'go' : 'accent') : 'tick', phase: idx, second: i });
+    }
+    at += sec;
+    phaseNo++;
+  });
+  return { beats, cycleSeconds: at };
+}
+
+/**
+ * Schedules a repeating click pattern on the shared audio clock.
+ *   beats        [{ at, sound }] within one cycle (seconds from the cycle start)
+ *   cycleSeconds length of one cycle
+ *   cycles       how many cycles (Infinity = until cancelled)
+ *   startDelay   seconds before the first cycle (e.g. a lead-in)
+ *   skipFirst    leave out the first beat of the first cycle (a lead-in's own
+ *                "go" beep already marks it)
+ * Clicks are queued a little ahead of time by a short timer (a look-ahead
+ * scheduler), so timing stays exact and a long run doesn't queue thousands of
+ * nodes. Muting the Sound switch mid-run silences later clicks. Call from a
+ * tap (or after primeAudio() in one) so iOS lets the audio start.
+ * Returns { cancel(), startAt } where startAt is performance.now()-based ms of
+ * the first cycle's start (for keeping a display in step).
+ */
+export function scheduleClickPattern({ beats, cycleSeconds, cycles = Infinity, startDelay = 0, skipFirst = false }) {
+  const noop = { cancel: () => {}, startAt: performance.now() + startDelay * 1000 };
+  if (!beats?.length || !(cycleSeconds > 0)) return noop;
+  let ac;
+  try { ac = getCtx(); } catch { ac = null; }
+  const startAt = performance.now() + startDelay * 1000;
+  if (!ac) return { ...noop, startAt };
+
+  const t0 = ac.currentTime + 0.05 + startDelay;
+  const LOOKAHEAD = 0.35;            // seconds queued ahead
+  const oscs = new Set();
+  let cycle = 0;
+  let beatIdx = skipFirst ? 1 : 0;
+  let done = false;
+
+  const pump = () => {
+    if (done) return;
+    const horizon = ac.currentTime + LOOKAHEAD;
+    while (cycle < cycles) {
+      if (beatIdx >= beats.length) { cycle++; beatIdx = 0; continue; }
+      const when = t0 + cycle * cycleSeconds + beats[beatIdx].at;
+      if (when > horizon) break;
+      if (when >= ac.currentTime - 0.02 && isTimerAudioEnabled()) {
+        try {
+          const o = scheduleClick(ac, when, beats[beatIdx].sound);
+          oscs.add(o);
+          o.onended = () => oscs.delete(o);
+        } catch { /* skip this click */ }
+      }
+      beatIdx++;
+    }
+    if (cycle >= cycles) { done = true; clearInterval(timer); }
+  };
+
+  const timer = setInterval(pump, 50);
+  pump();
+  return {
+    startAt,
+    cancel: () => {
+      done = true;
+      clearInterval(timer);
+      oscs.forEach(o => { try { o.stop(); } catch { /* already done */ } });
+      oscs.clear();
+    },
+  };
+}
+
 // ── Tempo guide ticks (Feature 8d) ─────────────────────────────────────────
-// Both go through playBeep, so the global timer Sound toggle silences them too.
+// The single-rep guide (Start Rep) uses the same audible clicks as the track.
 
 /** Once per second during a tempo phase countdown. */
 export function playTempoTick() {
-  playBeep({ frequency: 800, duration: 0.05, volume: 0.08 });
+  playClick('tick');
 }
 
 /** Once when moving from one tempo phase to the next. */
 export function playTempoTransition() {
-  playBeep({ frequency: 1050, duration: 0.08, volume: 0.1 });
+  playClick('accent');
 }
 
 // ── Meditation bowl (Feature 9f) ───────────────────────────────────────────

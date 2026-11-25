@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { playBeep, isTimerAudioEnabled, setTimerAudioEnabled } from './audioCues';
+import { playBeep, isTimerAudioEnabled, setTimerAudioEnabled, primeAudio } from './audioCues';
 import './WorkoutTimers.css';
 
 const DEFAULT_COOLDOWN = 60;
@@ -254,7 +254,7 @@ function useCountdown(phases, { onPhaseEnd, onComplete }) {
  * end. Block mode (no exercise yet): work is collected and handed to
  * onBlockComplete, which runs the "attach an exercise?" step.
  */
-function TimerRunner({ mode, exerciseName, blockMode, setsBefore = 0, onClose, onLogSet, onAppendNote, onBlockComplete }) {
+function TimerRunner({ mode, exerciseName, blockMode, setsBefore = 0, onClose, onLogSet, onAppendNote, onBlockComplete, onRunState }) {
   const [cfg, setCfg] = useState({ work: 30, rest: 30, rounds: 8, reps: 10, minutes: 10, movement: '' });
   const [phases, setPhases] = useState(null);
   const [hasStarted, setHasStarted] = useState(false);
@@ -303,10 +303,23 @@ function TimerRunner({ mode, exerciseName, blockMode, setsBefore = 0, onClose, o
   });
 
   const current = phases?.[timer.phaseIdx];
+
+  // Run state for the tempo track tie-in (Phase 0B-1b): running or not, and
+  // whether the current phase is work or rest. Nothing here changes the timer.
+  const runStateRef = useRef(onRunState);
+  runStateRef.current = onRunState;
+  const isRunning = timer.running && !timer.finished;
+  const phaseKind = current?.kind || null;
+  useEffect(() => {
+    runStateRef.current?.({ running: isRunning, kind: phaseKind, mode });
+  }, [isRunning, phaseKind, timer.phaseIdx, mode]);
+  useEffect(() => () => runStateRef.current?.({ running: false, kind: null, mode }), [mode]);
+
   const totalRounds = mode === 'tabata' ? 8 : mode === 'interval' ? cfg.rounds : mode === 'emom' ? cfg.minutes : 1;
   const amrapElapsed = mode === 'amrap' && phases ? cfg.minutes * 60 - timer.remaining : 0;
 
   const startTimer = () => {
+    primeAudio();   // unlock audio inside the tap (iOS), for beeps and a tempo track
     setBaseRef.current = setsBefore;
     timer.armStart();
     setPhases(buildPhases(mode, cfg));   // new list → engine resets and starts
@@ -524,7 +537,7 @@ function TimerRunner({ mode, exerciseName, blockMode, setsBefore = 0, onClose, o
           {!timer.finished && (
             timer.running
               ? <button className="wt-btn" onClick={timer.pause}>Pause</button>
-              : <button className="wt-btn wt-btn-primary" onClick={hasStarted ? timer.start : startTimer}>
+              : <button className="wt-btn wt-btn-primary" onClick={hasStarted ? () => { primeAudio(); timer.start(); } : startTimer}>
                   {hasStarted ? 'Resume' : 'Start'}
                 </button>
           )}
@@ -665,7 +678,7 @@ function BlockAttach({ summary, onAttach, onSkip }) {
  * Inline timer inside the exercise card (5d): a mode selector that collapses
  * into the chosen timer. `blockMode` runs it without an exercise (5e).
  */
-export function InlineTimer({ exerciseName, blockMode = false, setsBefore = 0, onClose, onLogSet, onAppendNote, onBlockComplete }) {
+export function InlineTimer({ exerciseName, blockMode = false, setsBefore = 0, onClose, onLogSet, onAppendNote, onBlockComplete, onRunState }) {
   const [mode, setMode] = useState(null);
 
   if (!mode) {
@@ -705,6 +718,7 @@ export function InlineTimer({ exerciseName, blockMode = false, setsBefore = 0, o
         onLogSet={onLogSet}
         onAppendNote={onAppendNote}
         onBlockComplete={onBlockComplete}
+        onRunState={onRunState}
       />
     </div>
   );

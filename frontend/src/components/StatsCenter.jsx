@@ -123,6 +123,16 @@ function Empty({ message = 'No data yet. Log some workouts to see stats.' }) {
 // ── Loading ───────────────────────────────────────────────────────────────
 /** "Cancelled" / "In progress" chip for history rows; nothing for completed. */
 /** A cancelled session with nothing logged (hidden from History by default). */
+/** History's Volume / Distance cell: lifting volume, cardio distance, or both. */
+function sessionVolumeDistance(s) {
+  const dist = s.distance != null && Number(s.distance) > 0
+    ? `${Number(s.distance)}${s.distance_unit ? ` ${s.distance_unit}` : ''}`
+    : null;
+  if (s.volume && dist) return `${s.volume.toLocaleString()} · ${dist}`;
+  if (s.volume) return s.volume.toLocaleString();
+  return dist || '—';
+}
+
 function isEmptyCancelled(s) {
   return s.status === 'cancelled' && s.has_activity === false;
 }
@@ -1191,12 +1201,21 @@ function CardioTab({ onSelectWorkout, initialDrillType, onDrillChange, programId
                     onClick={() => onSelectWorkout && onSelectWorkout({
                       workout_id: s.session_id,
                       id: s.session_id,
-                      // A cardio_sessions row, or a workouts row with a cardio exercise.
-                      type: 'cardio',
+                      // A cardio_sessions row, or a workouts row with a cardio
+                      // exercise: the whole workout opens (its own type).
+                      type: s.source === 'workout' && s.workout_type ? s.workout_type : 'cardio',
                       source: s.source,
                     })}
+                    title={s.source === 'workout' && s.workout_type && s.workout_type !== 'cardio' ? 'Open the whole workout' : undefined}
                   >
-                    <td>{fmtDate(s.session_date)}</td>
+                    <td>
+                      {fmtDate(s.session_date)}
+                      {/* Cardio done inside a strength / open / mixed workout:
+                          only its cardio part is counted here (Phase 0B-1b). */}
+                      {s.source === 'workout' && s.workout_type && s.workout_type !== 'cardio' && (
+                        <span className="sc-status-tag sc-part-of-tag">in a workout</span>
+                      )}
+                    </td>
                     <td>{fmtDuration(s.duration_seconds)}</td>
                     <td>{s.distance ? `${s.distance} ${s.distance_unit || ''}` : '—'}</td>
                     <td>{s.avg_speed ?? '—'}</td>
@@ -1994,6 +2013,9 @@ function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout, progra
         const filtered = data.sessions.filter(s => {
           if (!showCancelled && isEmptyCancelled(s)) return false;
           if (typeFilter === 'all') return true;
+          // Cardio also lists workouts with cardio logged inside them
+          // (Open / Strength / Mixed), still labelled with their own type.
+          if (typeFilter === 'cardio') return s.type === 'cardio' || s.has_cardio === true;
           return s.type === typeFilter;
         });
 
@@ -2075,7 +2097,7 @@ function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout, progra
                       <td style={{ color: ratingColor(s.session_rating), fontWeight: s.session_rating != null ? 600 : 400 }}>
                         {s.session_rating != null ? `${s.session_rating} / 5` : '—'}
                       </td>
-                      <td>{s.volume ? s.volume.toLocaleString() : s.distance ? `${s.distance}` : '—'}</td>
+                      <td>{sessionVolumeDistance(s)}</td>
                     </tr>
                   ))}
                 </tbody>
