@@ -849,16 +849,27 @@
 }
 
 /* Barcode scan entry point in the food search (Patch 001). */
+.nutri-search-row {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border-color);
+}
+.nutri-search-row .nutri-search-input {
+  flex: 1;
+  min-width: 0;
+  border-bottom: none;
+}
 .nutri-scan-btn {
-  display: block;
-  width: calc(100% - 32px);
+  flex: 0 0 auto;
   min-height: 44px;
-  margin: 12px 16px 4px;
+  margin: 6px 8px;
+  padding: 0 14px;
   border: 1px dashed var(--color-primary);
   border-radius: var(--radius-md);
   background: transparent;
   color: var(--color-primary);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
   cursor: pointer;
 }

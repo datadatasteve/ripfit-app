@@ -2565,6 +2565,15 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
 
   // ── Timers, timer blocks and tempo ──────────────────────────────────────
   const { prefs } = useUserPrefs();
+  // Log Set position (Phase 0B-1): 'pinned' puts Complete Set in a bar above
+  // Previous / Next on phones. While a set field has focus (keypad up) the
+  // button goes back inline, so the bar never sits over a field or the keypad.
+  const [setFieldFocused, setSetFieldFocused] = useState(false);
+  // Re-pin a moment after the field loses focus: tapping Complete Set blurs
+  // the field first, and the button must not move away mid-tap.
+  const repinTimerRef = useRef(null);
+  useEffect(() => () => clearTimeout(repinTimerRef.current), []);
+  const logPinned = prefs.log_set_button_position === 'pinned' && !setFieldFocused;
   // "Last session notes" scope: seeded from the saved preference, then a
   // session-only override (never written back).
   const [notesScope, setNotesScope] = useState(prefs.previous_notes_scope || 'all');
@@ -2824,7 +2833,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
   }
 
   return (
-    <div className="workout-container aw-in-progress">
+    <div className={`workout-container aw-in-progress ${prefs.log_set_button_position === 'pinned' ? 'aw-log-pinned-room' : ''}`}>
       {/* Mobile only: screen-edge glow for the tempo guide. Always mounted so
           it can fade out rather than vanish. */}
       <div className={`aw-tempo-screen-glow ${tempoGlow ? 'on' : ''}`} aria-hidden="true" />
@@ -3027,7 +3036,19 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
             }))}
           />
         ) : (
-          <div className={`set-form ${isResting ? 'resting' : ''}`}>
+          <div
+            className={`set-form ${isResting ? 'resting' : ''}`}
+            onFocus={e => {
+              if (e.target.tagName !== 'INPUT') return;
+              clearTimeout(repinTimerRef.current);
+              setSetFieldFocused(true);
+            }}
+            onBlur={e => {
+              if (e.target.tagName !== 'INPUT') return;
+              clearTimeout(repinTimerRef.current);
+              repinTimerRef.current = setTimeout(() => setSetFieldFocused(false), 400);
+            }}
+          >
             <h4>Log Set {loggedSets.length + 1}</h4>
             <div className="form-row">
               <input
@@ -3062,7 +3083,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
             </div>
             {tempoGuide.tempoLine}
             {tempoGuide.guideView}
-            <div className="aw-log-row">
+            <div className={`aw-log-row ${logPinned ? 'pinned' : ''}`}>
               <button onClick={handleLogSet} className="log-set-btn">Complete Set</button>
               {tempoGuide.startRepButton}
             </div>

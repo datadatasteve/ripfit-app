@@ -1198,3 +1198,23 @@
   padding: 24px;
   color: var(--text-secondary);
 }
+
+/* ── Notes text never overflows its box (Phase 0B-1) ───────────────────── */
+/* Long unbroken text (a URL, a run of characters) used to push past the
+   card edge on phones. Line breaks typed by the user are kept. */
+.wdp-notes-text,
+.wdp-ex-notes,
+.summary-notes,
+.summary-workout-notes p,
+.previous-notes,
+.current-notes-log,
+.aw-prev-notes-body,
+.sc-med-notes,
+.exercise-notes-section,
+.exercise-notes-input {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
+  max-width: 100%;
+  min-width: 0;
+}

@@ -7,7 +7,7 @@ import './UserPreferencesPage.css';
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import BugReportModal from './BugReportModal';
 import { useTheme } from '../contexts/ThemeContext';
-import { useUserPrefs, AGE_LIMIT_HOURS_OPTIONS, PAUSE_NOTE_MINUTES_OPTIONS } from '../contexts/UserPrefsContext';
+import { useUserPrefs, AGE_LIMIT_HOURS_OPTIONS, PAUSE_NOTE_MINUTES_OPTIONS, TEMPO_COUNTDOWN_BEEPS_OPTIONS } from '../contexts/UserPrefsContext';
 import ProfileCircle from './ProfileCircle';
 import './UserPreferencesPage.css';
 import { usePersistentState } from '../hooks/usePersistentState';
@@ -553,6 +553,37 @@ export default function UserPreferencesPage({ onBack }) {
                   ))}
                 </select>
                 <p className="prefs-hint">Pauses this long are listed on the workout's detail page. Paused time never counts toward duration.</p>
+              </div>
+
+              <div className="prefs-field-group">
+                <label htmlFor="pref-log-set-position">Log Set button position</label>
+                <select
+                  id="pref-log-set-position"
+                  className="prefs-select"
+                  value={prefs.log_set_button_position}
+                  onChange={e => savePref({ log_set_button_position: e.target.value })}
+                  disabled={!prefsLoaded}
+                >
+                  <option value="inline">Inline, under the set fields (default)</option>
+                  <option value="pinned">Pinned to the bottom of the screen</option>
+                </select>
+                <p className="prefs-hint">Pinned applies on phones. While you're typing in a set field the button moves back under the fields, so it never covers them.</p>
+              </div>
+
+              <div className="prefs-field-group">
+                <label htmlFor="pref-tempo-beeps">Tempo lead-in beeps</label>
+                <select
+                  id="pref-tempo-beeps"
+                  className="prefs-select"
+                  value={prefs.tempo_countdown_beeps}
+                  onChange={e => savePref({ tempo_countdown_beeps: Number(e.target.value) })}
+                  disabled={!prefsLoaded}
+                >
+                  {TEMPO_COUNTDOWN_BEEPS_OPTIONS.map(n => (
+                    <option key={n} value={n}>{n === 0 ? 'Off' : n}{n === 3 ? ' (default)' : ''}</option>
+                  ))}
+                </select>
+                <p className="prefs-hint">Countdown beeps before the first rep of a tempo set, then a higher "go" beep. Follows the tempo audio and timer sound switches.</p>
               </div>
 
               {prefMsg && <p className={`prefs-msg ${prefMsgType}`}>{prefMsg}</p>}

@@ -19,7 +19,8 @@ const stripZeros = code => String(code || '').replace(/^0+/, '');
  * ends on a "Search manually" action, so the user is never dead-ended.
  *
  * The camera is only requested once this mounts (i.e. on the Scan tap), never
- * on page load. Desktop (no touch screen) skips the camera entirely.
+ * on page load. Any device with a camera can scan (a laptop webcam too); the
+ * rear camera is preferred where there is one.
  */
 export default function BarcodeScanner({ mealType, mealDate, mealLabel, onClose, onLogged, onManualSearch }) {
   // 'starting' | 'scanning' | 'looking-up' | 'result' | 'not-found' | 'denied' | 'unavailable' | 'error'
@@ -65,14 +66,13 @@ export default function BarcodeScanner({ mealType, mealDate, mealLabel, onClose,
     let cancelled = false;
 
     const start = async () => {
-      const isTouch = window.matchMedia?.('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
-      if (!navigator.mediaDevices?.getUserMedia || !isTouch) {
+      if (!navigator.mediaDevices?.getUserMedia) {
         setPhase('unavailable');
         return;
       }
       let stream;
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
       } catch (err) {
         if (cancelled) return;
         if (err?.name === 'NotAllowedError' || err?.name === 'SecurityError') setPhase('denied');
@@ -197,8 +197,8 @@ export default function BarcodeScanner({ mealType, mealDate, mealLabel, onClose,
           'Allow camera access for this site in your browser settings to scan, or search by name.'
         )}
         {phase === 'unavailable' && fallback(
-          'Scanning needs a phone camera',
-          'No rear camera is available on this device. Search for the food by name instead.'
+          'No camera found',
+          'This device has no camera the browser can use. Search for the food by name instead.'
         )}
         {phase === 'error' && fallback('Scan failed', message)}
 

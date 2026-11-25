@@ -196,7 +196,7 @@ export default function ProgramDetail({ programId, onBack, onEdit, onStartWorkou
           <div className="pd-stat-row">
             <StatChip label="Duration" value={data.duration_weeks ? `${data.duration_weeks}w` : '—'} />
             <StatChip label="Workouts" value={progress?.total_workout_days} />
-            <StatChip label="Done" value={progress?.completed_workouts} />
+            <StatChip label="Completed" value={progress?.completed_workouts} />
             <StatChip label="Complete" value={`${pct}%`}
               color={pct >= 100 ? '#22c55e' : pct >= 50 ? 'var(--color-warning)' : 'var(--color-primary)'} />
             {progress?.avg_target_achievement_pct != null && (
@@ -316,7 +316,7 @@ export default function ProgramDetail({ programId, onBack, onEdit, onStartWorkou
                 </div>
                 <div className="pd-day-actions">
                   {day.completed_date ? (
-                    <span className="pd-day-completed">✓ Done</span>
+                    <span className="pd-day-completed">✓ Completed</span>
                   ) : (
                     data.status === 'active' && onStartWorkout && (
                       <button className="pd-start-day-btn" onClick={() => onStartWorkout(programId, day)}>Start</button>

@@ -25,24 +25,50 @@ const PROGRAM_SUB_TABS = ['Overview', 'Strength', 'Cardio', 'Records', 'Combined
 
 function token() { return localStorage.getItem('ripfit_token'); }
 
-async function apiFetch(path, retries = 3, signal) {
+// Stats responses are kept for a minute and shared between callers, so
+// toggling the Programs pills back and forth (or two sections asking for the
+// same data) costs one request per distinct URL instead of one per click.
+// An aborted caller just stops waiting; the shared request still finishes and
+// fills the cache. Cleared whenever Stats is opened (Phase 0B-1, 429 fix).
+const STATS_CACHE_MS = 60 * 1000;
+const statsCache = new Map();   // path -> { at, promise }
+
+function clearStatsCache() {
+  statsCache.clear();
+}
+
+async function fetchStats(path, retries) {
   for (let attempt = 0; attempt <= retries; attempt++) {
-    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
     const res = await fetch(`${API_BASE}/stats${path}`, {
       headers: { Authorization: `Bearer ${token()}` },
-      signal,
     });
     if (res.status === 429 && attempt < retries) {
       // Exponential backoff: 500ms, 1000ms, 2000ms
-      await new Promise((resolve, reject) => {
-        const t = setTimeout(resolve, 500 * Math.pow(2, attempt));
-        signal?.addEventListener('abort', () => { clearTimeout(t); reject(new DOMException('Aborted', 'AbortError')); });
-      });
+      await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, attempt)));
       continue;
     }
     if (!res.ok) throw new Error(`API error: ${res.status}`);
     return res.json();
   }
+}
+
+async function apiFetch(path, retries = 3, signal) {
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+  let entry = statsCache.get(path);
+  if (!entry || Date.now() - entry.at > STATS_CACHE_MS) {
+    entry = { at: Date.now(), promise: fetchStats(path, retries) };
+    statsCache.set(path, entry);
+    entry.promise.catch(() => { if (statsCache.get(path) === entry) statsCache.delete(path); });
+  }
+  if (!signal) return entry.promise;
+  return new Promise((resolve, reject) => {
+    const onAbort = () => reject(new DOMException('Aborted', 'AbortError'));
+    signal.addEventListener('abort', onAbort, { once: true });
+    entry.promise.then(
+      v => { signal.removeEventListener('abort', onAbort); resolve(v); },
+      e => { signal.removeEventListener('abort', onAbort); reject(e); },
+    );
+  });
 }
 
 // ── Chart type toggle ─────────────────────────────────────────────────────
@@ -2314,6 +2340,8 @@ function MeditationTab() {
 }
 
 export default function StatsCenter({ initialProgramId, onProgramStatsConsumed }) {
+  // Fresh numbers on every visit to Stats; the cache only spans this visit.
+  useState(clearStatsCache);
   // Tab, sub-tab and selections survive a reload (Phase 0B-1).
   const [tab, setTab] = usePersistentState('stats:tab', 'Overview', v => TABS.includes(v));
   const [selectedHistoryId, setSelectedHistoryId] = useState(null);

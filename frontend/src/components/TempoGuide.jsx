@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { playTempoTick, playTempoTransition, primeAudio } from './audioCues';
+import { playTempoTick, playTempoTransition, primeAudio, scheduleCountdownBeeps, LEAD_IN_INTERVAL_MS } from './audioCues';
 import { formatTempo } from './RoutineExerciseExtras';
 import { useUserPrefs } from '../contexts/UserPrefsContext';
 
@@ -47,7 +47,12 @@ export function useTempoGuide({ exerciseKey, eccentric, pause, concentric, onGlo
     .filter(([, sec]) => Number.isFinite(sec) && sec > 0)
     .map(([name, sec]) => ({ name, sec }));
 
+  // Lead-in before the rep (Phase 0B-1): N beeps, then a higher "go" beep
+  // as the first phase starts. 0 = no lead-in.
+  const leadIn = Math.max(0, Math.min(5, Math.round(Number(prefs.tempo_countdown_beeps ?? 3) || 0)));
+
   const timerRef = useRef(null);
+  const cancelAudioRef = useRef(null);
   const glowRef = useRef(false);
   const onGlowRef = useRef(onGlow);
   onGlowRef.current = onGlow;
@@ -61,6 +66,8 @@ export function useTempoGuide({ exerciseKey, eccentric, pause, concentric, onGlo
   const stop = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = null;
+    cancelAudioRef.current?.();
+    cancelAudioRef.current = null;
     setGlow(false);
     setRun(null);
   }, [setGlow]);
@@ -72,11 +79,20 @@ export function useTempoGuide({ exerciseKey, eccentric, pause, concentric, onGlo
     if (timerRef.current) { stop(); return; }   // second tap cancels
     if (phases.length === 0) return;
     primeAudio();
-    const startedAt = Date.now();
+    // Beeps are queued now, inside the tap (iOS needs that); the rep itself
+    // starts when the "go" beep plays. Mute and the Audio ticks switch apply.
+    cancelAudioRef.current = audio ? scheduleCountdownBeeps(leadIn) : null;
+    const startedAt = Date.now() + leadIn * LEAD_IN_INTERVAL_MS;
     let lastTickKey = null;
 
     const step = () => {
       const t = (Date.now() - startedAt) / 1000;
+      if (t < 0) {
+        // Lead-in: count down to the first phase. No glow, no phase ticks.
+        setGlow(false);
+        setRun({ phase: 'Get ready', count: Math.ceil(-t) });
+        return;
+      }
       let acc = 0;
       let k = -1;
       for (let i = 0; i < phases.length; i++) {
@@ -95,7 +111,7 @@ export function useTempoGuide({ exerciseKey, eccentric, pause, concentric, onGlo
       const key = `${k}:${second}`;
       if (audio && key !== lastTickKey) {
         if (k > 0 && second === 0) playTempoTransition();
-        else playTempoTick();
+        else if (!(k === 0 && second === 0 && leadIn > 0)) playTempoTick();   // the "go" beep stands in for it
       }
       lastTickKey = key;
       // Glow: fade in at the phase start, hold, fade out over the last 0.5 s.

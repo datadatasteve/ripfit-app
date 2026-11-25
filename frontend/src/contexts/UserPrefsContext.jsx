@@ -14,7 +14,12 @@ export const DEFAULT_USER_PREFS = {
   timezone: null,                  // IANA zone; null = not set yet (browser zone is used)
   workout_age_limit_hours: 24,     // auto-cancel and resume window (Phase 0A-2)
   pause_note_minutes: 15,          // shortest pause noted on the workout detail page
+  log_set_button_position: 'inline', // 'inline' | 'pinned' (bar above Previous / Next on phones)
+  tempo_countdown_beeps: 3,        // tempo lead-in beeps before the first rep; 0 = off (max 5)
 };
+
+/** Allowed values; the server rejects anything else (migration 033). */
+export const TEMPO_COUNTDOWN_BEEPS_OPTIONS = [0, 1, 2, 3, 4, 5];
 
 /** Allowed values; the server rejects anything else (migration 032). */
 export const AGE_LIMIT_HOURS_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 24, 36, 48];

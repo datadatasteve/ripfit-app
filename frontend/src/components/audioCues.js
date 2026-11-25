@@ -37,25 +37,60 @@ function getCtx() {
   return ctx;
 }
 
+/** One sine blip at audio-clock time `t`. Returns the oscillator (stoppable). */
+function tone(ac, t, frequency, duration, volume) {
+  const osc = ac.createOscillator();
+  const gain = ac.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = frequency;
+  gain.gain.setValueAtTime(0, t);
+  gain.gain.linearRampToValueAtTime(volume, t + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+  osc.connect(gain).connect(ac.destination);
+  osc.start(t);
+  osc.stop(t + duration + 0.05);
+  return osc;
+}
+
 /** Short blip used at interval/round transitions. Silent when timer audio is off. */
 export function playBeep({ frequency = 880, duration = 0.18, volume = 0.25 } = {}) {
   if (!isTimerAudioEnabled()) return;
   try {
     const ac = getCtx();
     if (!ac) return;
-    const osc = ac.createOscillator();
-    const gain = ac.createGain();
-    osc.type = 'sine';
-    osc.frequency.value = frequency;
-    const now = ac.currentTime;
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(volume, now + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-    osc.connect(gain).connect(ac.destination);
-    osc.start(now);
-    osc.stop(now + duration + 0.05);
+    tone(ac, ac.currentTime, frequency, duration, volume);
   } catch {
     /* audio is a nicety — never let it break the timer */
+  }
+}
+
+// ── Countdown lead-in (Phase 0B-1; Phase 3-2 reuses it) ────────────────────
+export const LEAD_IN_INTERVAL_MS = 1000;
+export const LEAD_IN_TONE_HZ = 660;
+export const LEAD_IN_GO_HZ = 990;
+
+/**
+ * Schedules a countdown on the audio clock: `count` beeps one interval apart
+ * at one tone, then a higher "go" beep one interval after the last, i.e. at
+ * count × interval from now (when the movement starts). Everything is queued
+ * at once, inside the user's tap, so iOS (which only starts audio from a
+ * gesture) plays the whole sequence. Silent when the timer Sound switch is
+ * off. Returns a function that cancels whatever hasn't played yet.
+ */
+export function scheduleCountdownBeeps(count, { intervalMs = LEAD_IN_INTERVAL_MS, frequency = LEAD_IN_TONE_HZ, goFrequency = LEAD_IN_GO_HZ } = {}) {
+  const n = Math.max(0, Math.min(5, Math.round(Number(count) || 0)));
+  if (n === 0 || !isTimerAudioEnabled()) return () => {};
+  try {
+    const ac = getCtx();
+    if (!ac) return () => {};
+    const t0 = ac.currentTime + 0.05;
+    const step = intervalMs / 1000;
+    const oscs = [];
+    for (let i = 0; i < n; i++) oscs.push(tone(ac, t0 + i * step, frequency, 0.12, 0.22));
+    oscs.push(tone(ac, t0 + n * step, goFrequency, 0.25, 0.3));
+    return () => oscs.forEach(o => { try { o.stop(); } catch { /* already done */ } });
+  } catch {
+    return () => {};
   }
 }
 

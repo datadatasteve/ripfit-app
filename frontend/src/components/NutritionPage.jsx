@@ -290,7 +290,11 @@ function FoodSearchModal({ mealType, mealDate, onClose, onAdded }) {
   const [customSaving, setCustomSaving] = useState(false);
   const [customMsg, setCustomMsg] = useState('');
 
-  useEffect(() => { searchRef.current?.focus(); }, []);
+  // Autofocus only with a mouse: on a phone it opens the keyboard at once,
+  // which can push the Scan button out of view (audit C1, Phase 0B-1).
+  useEffect(() => {
+    if (!window.matchMedia?.('(pointer: coarse)').matches) searchRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -423,17 +427,20 @@ function FoodSearchModal({ mealType, mealDate, onClose, onAdded }) {
 
         {tab === 'search' && (
           <>
-            {/* Camera starts only on this tap (Patch 001). */}
-            <button type="button" className="nutri-scan-btn" onClick={() => setShowScanner(true)}>
-              ▦ Scan Barcode
-            </button>
-            <input
-              ref={searchRef}
-              className="nutri-search-input"
-              placeholder="Search foods (e.g. chicken breast, banana)…"
-              value={query}
-              onChange={e => { setQuery(e.target.value); setSelected(null); }}
-            />
+            <div className="nutri-search-row">
+              <input
+                ref={searchRef}
+                className="nutri-search-input"
+                placeholder="Search foods (e.g. chicken breast, banana)…"
+                value={query}
+                onChange={e => { setQuery(e.target.value); setSelected(null); }}
+              />
+              {/* Next to search (Phase 0B-1); the camera starts only on this tap. */}
+              <button type="button" className="nutri-scan-btn" onClick={() => setShowScanner(true)}
+                aria-label="Scan a barcode" data-tooltip="Scan a barcode">
+                ▦ Scan
+              </button>
+            </div>
 
             {searching && <p className="nutri-search-status">Searching…</p>}
 

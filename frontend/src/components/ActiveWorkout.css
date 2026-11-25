@@ -1810,3 +1810,23 @@
   color: var(--color-warning, #d97706);
   font-weight: 600;
 }
+
+/* ── Log Set position: pinned (Phase 0B-1) ─────────────────────────────── */
+/* Phones only. The row sits directly above the Previous / Next bar; the
+   container reserves room for both so the last field is never covered. */
+@media (max-width: 768px) {
+  .aw-log-row.pinned {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+    z-index: 989;
+    padding: var(--space-sm);
+    background-color: var(--bg-elevated);
+    border-top: 1px solid var(--border-color);
+  }
+
+  .workout-container.aw-in-progress.aw-log-pinned-room {
+    padding-bottom: calc(160px + env(safe-area-inset-bottom, 0px));
+  }
+}
