@@ -400,7 +400,13 @@ async function getCardioStats(req, res) {
       ORDER BY COALESCE(start_time, session_date::timestamptz) ASC
     `, csParams);
 
-    // workout-based cardio rows (one row per exercise per workout)
+    // workout-based cardio rows (one row per cardio exercise per workout).
+    // Only the cardio portion (Phase 0B-1b): an exercise counts once it has a
+    // logged segment, and its time is the sum of its segments' times. A Quick
+    // Cardio (workout_type 'cardio') whose segments carry no time falls back
+    // to the workout's own duration, which is all cardio. Cardio done inside a
+    // strength / open / mixed workout is included; the row opens that whole
+    // workout (source 'workout', session_id = workout id).
     const wRows = await pool.query(`
       SELECT
         w.id AS session_id,
@@ -408,7 +414,11 @@ async function getCardioStats(req, res) {
         w.workout_date AS session_date,
         w.start_time,
         e.name AS cardio_type,
-        ${durationSql('w')} AS duration_seconds,
+        w.workout_type,
+        COALESCE(
+          SUM(wcs.duration_seconds)::INTEGER,
+          CASE WHEN w.workout_type = 'cardio' THEN ${durationSql('w')} END
+        ) AS duration_seconds,
         ROUND(SUM(wcs.distance)::NUMERIC, 2) AS distance,
         MAX(wcs.distance_unit) AS distance_unit,
         ROUND(AVG(wcs.avg_speed)::NUMERIC, 2) AS avg_speed,
@@ -424,6 +434,9 @@ async function getCardioStats(req, res) {
       LEFT JOIN workout_cardio_segments wcs ON wcs.workout_exercise_id = we.id
       WHERE ${wWhere}
       GROUP BY w.id, w.workout_date, w.start_time, w.end_time, w.session_rating, e.name
+      -- A Quick Cardio counts even without segments (older rows); cardio in
+      -- any other workout counts once a segment is logged.
+      HAVING COUNT(wcs.id) > 0 OR w.workout_type = 'cardio'
       ORDER BY COALESCE(w.start_time, w.workout_date::timestamptz) ASC
     `, wParams);
 
@@ -575,7 +588,9 @@ async function getCombinedStats(req, res) {
         workout_id,
         status,
         has_activity,
-        source
+        source,
+        has_cardio,
+        distance_unit
       FROM (
         -- Strength/mixed/open sessions
         SELECT
@@ -589,13 +604,24 @@ async function getCombinedStats(req, res) {
           w.session_rating,
           SUM(ws.reps_completed * ws.weight_used)::INTEGER AS volume,
           ROUND(MAX(ws.weight_used * (1 + ws.reps_completed::NUMERIC / 30))::NUMERIC, 1) AS est_1rm,
-          NULL::NUMERIC AS distance,
+          -- Cardio logged in this workout (Phase 0B-1b): total segment
+          -- distance when every segment with a distance uses one unit.
+          (SELECT CASE WHEN COUNT(DISTINCT d_wcs.distance_unit) <= 1
+                       THEN ROUND(SUM(d_wcs.distance)::NUMERIC, 2) END
+             FROM workout_cardio_segments d_wcs
+             WHERE d_wcs.workout_id = w.id AND d_wcs.distance IS NOT NULL) AS distance,
           NULL::INTEGER AS avg_heart_rate,
           w.start_time AT TIME ZONE 'UTC' AS start_time,
           w.id AS workout_id,
           w.status,
           ${activitySql('w')} AS has_activity,
-          'workout' AS source
+          'workout' AS source,
+          -- Quick Cardio, or any workout with a cardio segment logged: listed
+          -- under History's Cardio filter whatever its own type.
+          (w.workout_type = 'cardio'
+           OR EXISTS (SELECT 1 FROM workout_cardio_segments hc_wcs WHERE hc_wcs.workout_id = w.id)) AS has_cardio,
+          (SELECT MAX(u_wcs.distance_unit) FROM workout_cardio_segments u_wcs
+             WHERE u_wcs.workout_id = w.id AND u_wcs.distance IS NOT NULL) AS distance_unit
         FROM workouts w
         LEFT JOIN workout_routines wr ON w.routine_id = wr.id
         LEFT JOIN workout_exercises we ON w.id = we.workout_id
@@ -622,7 +648,9 @@ async function getCombinedStats(req, res) {
           cs.id AS workout_id,
           cs.status,
           (COALESCE(cs.duration_seconds, 0) > 0 OR COALESCE(cs.distance, 0) > 0) AS has_activity,
-          'cardio_session' AS source
+          'cardio_session' AS source,
+          TRUE AS has_cardio,
+          cs.distance_unit
         FROM cardio_sessions cs
         WHERE cs.user_id = $1 AND ${csStatus}
           AND cs.session_date >= CURRENT_DATE - ($2 || ' weeks')::INTERVAL` : ''}

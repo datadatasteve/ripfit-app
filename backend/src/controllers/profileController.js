@@ -17,7 +17,8 @@ async function getProfile(req, res) {
          initials, email_verified, is_admin, workout_rating_prefs, created_at,
          reorder_mode, previous_notes_scope, tempo_visual_enabled, tempo_audio_enabled,
          timezone, workout_age_limit_hours, pause_note_minutes,
-         log_set_button_position, tempo_countdown_beeps
+         log_set_button_position, tempo_countdown_beeps,
+         tempo_click_track_enabled, tempo_track_with_timers
        FROM users WHERE id = $1`,
       [req.user.userId]
     );
@@ -316,6 +317,8 @@ const PREFERENCE_RULES = {
   // (0 turns the lead-in off).
   log_set_button_position: v => ['inline', 'pinned'].includes(v),
   tempo_countdown_beeps:   v => Number.isInteger(v) && v >= 0 && v <= 5,
+  tempo_click_track_enabled: v => typeof v === 'boolean',
+  tempo_track_with_timers:   v => typeof v === 'boolean',
 };
 
 async function updatePreferences(req, res) {
@@ -346,7 +349,8 @@ async function updatePreferences(req, res) {
     const result = await pool.query(
       `UPDATE users SET ${sets.join(', ')} WHERE id = $${values.length}
        RETURNING reorder_mode, previous_notes_scope, tempo_visual_enabled, tempo_audio_enabled, timezone,
-                 workout_age_limit_hours, pause_note_minutes, log_set_button_position, tempo_countdown_beeps`,
+                 workout_age_limit_hours, pause_note_minutes, log_set_button_position, tempo_countdown_beeps,
+                 tempo_click_track_enabled, tempo_track_with_timers`,
       values
     );
     res.json(result.rows[0]);

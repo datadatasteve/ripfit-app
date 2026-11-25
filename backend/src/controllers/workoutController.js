@@ -4,8 +4,20 @@
 const { pool } = require('../config/database');
 const {
   sweepStaleWorkouts, workoutHasActivity, durationSql, activitySql,
-  recordSessionEvent, listAttentionWorkouts, openPauseSecondsSql, cancelTimeSql,
+  recordSessionEvent, listAttentionWorkouts, openPauseSecondsSql, cancelTimeSql, NOW_UTC_SQL,
 } = require('../utils/workoutStatus');
+
+// RPE is a whole number from 1 to 11 (11 = beyond max effort; migration 034).
+const RPE_MIN = 1;
+const RPE_MAX = 11;
+const RPE_ERROR = `rpe must be a whole number from ${RPE_MIN} to ${RPE_MAX}`;
+/** null / '' / undefined → { value: null }; a valid RPE → { value }; else { error }. */
+function parseRpe(raw) {
+  if (raw === null || raw === undefined || raw === '') return { value: null };
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < RPE_MIN || n > RPE_MAX) return { error: RPE_ERROR };
+  return { value: n };
+}
 
 // ============================================================================
 // EXERCISE SEARCH & LOOKUP
@@ -385,9 +397,11 @@ const logWorkout = async (req, res) => {
 
   if (!workout_date || !exercises || exercises.length === 0) {
     return res.status(400).json({ 
-      error: 'workout_date and exercises array required' 
+      error: 'workout_date and exercises array required'
     });
   }
+  const badRpe = exercises.some(ex => (Array.isArray(ex?.sets) ? ex.sets : []).some(st => parseRpe(st?.rpe).error));
+  if (badRpe) return res.status(400).json({ error: RPE_ERROR });
 
   const client = await pool.connect();
 
@@ -445,7 +459,7 @@ const logWorkout = async (req, res) => {
             j + 1,
             reps,
             weight,
-            rpe || null,
+            parseRpe(rpe).value,
             rest_seconds || null,
             tempo || null,
             set_type || 'normal',
@@ -548,6 +562,8 @@ const logWorkoutSet = async (req, res) => {
   const { workout_exercise_id, reps_completed, weight_used, rpe } = req.body;
   const setType = LOGGABLE_SET_TYPES.has(req.body.set_type) ? req.body.set_type : 'normal';
   const user_id = req.user.userId;
+  const rpeParsed = parseRpe(rpe);
+  if (rpeParsed.error) return res.status(400).json({ error: rpeParsed.error });
 
   const client = await pool.connect();
   try {
@@ -582,7 +598,7 @@ const logWorkoutSet = async (req, res) => {
                (SELECT COALESCE(MAX(set_number), 0) + 1 FROM workout_sets WHERE workout_exercise_id = $1),
                $2, $3, $4, $5)
        RETURNING *`,
-      [workout_exercise_id, reps_completed, weight_used, rpe || null, setType]
+      [workout_exercise_id, reps_completed, weight_used, rpeParsed.value, setType]
     );
     await client.query('COMMIT');
     res.status(201).json(result.rows[0]);
@@ -620,9 +636,9 @@ const updateWorkoutSet = async (req, res) => {
     bind('weight_used', n);
   }
   if (rpe !== undefined) {
-    const n = rpe === null || rpe === '' ? null : Number(rpe);
-    if (n !== null && (!Number.isInteger(n) || n < 1 || n > 10)) return res.status(400).json({ error: 'rpe must be a whole number from 1 to 10' });
-    bind('rpe', n);
+    const parsed = parseRpe(rpe);
+    if (parsed.error) return res.status(400).json({ error: parsed.error });
+    bind('rpe', parsed.value);
   }
   if (sets.length === 0) return res.status(400).json({ error: 'Nothing to update' });
 
@@ -646,6 +662,40 @@ const updateWorkoutSet = async (req, res) => {
 };
 
 const NOTHING_LOGGED_MESSAGE = 'Nothing was logged, so this workout was cancelled.';
+
+/**
+ * Quick Cardio only (workout_type 'cardio', still in progress, no sets and no
+ * segments): insert one segment on its first cardio exercise holding the
+ * elapsed time (now - start_time - total_paused_seconds). Call after any open
+ * pause has been closed. Does nothing when under one second has elapsed or the
+ * workout has no cardio exercise. Returns the inserted segment or null.
+ */
+async function saveElapsedAsCardioSegment(db, workoutId) {
+  const result = await db.query(
+    `WITH target AS (
+       SELECT w.id AS workout_id, we.id AS workout_exercise_id,
+              GREATEST(0, EXTRACT(EPOCH FROM (${NOW_UTC_SQL} - w.start_time))::INTEGER
+                          - COALESCE(w.total_paused_seconds, 0)) AS secs
+       FROM workouts w
+       JOIN workout_exercises we ON we.workout_id = w.id
+       JOIN exercises e ON e.id = we.exercise_id AND e.category = 'Cardio'
+       WHERE w.id = $1
+         AND w.workout_type = 'cardio'
+         AND w.status = 'in_progress'
+         AND w.start_time IS NOT NULL
+         AND NOT ${activitySql('w')}
+       ORDER BY we.order_index, we.id
+       LIMIT 1
+     )
+     INSERT INTO workout_cardio_segments
+       (workout_exercise_id, workout_id, segment_number, segment_label, duration_seconds, notes)
+     SELECT workout_exercise_id, workout_id, 1, 'Segment', secs, 'Saved from the workout clock at Finish'
+     FROM target WHERE secs >= 1
+     RETURNING *`,
+    [workoutId]
+  );
+  return result.rows[0] || null;
+}
 
 const finishWorkout = async (req, res) => {
   const { workoutId } = req.params;
@@ -677,6 +727,12 @@ const finishWorkout = async (req, res) => {
       `UPDATE workouts SET duration_seconds = COALESCE($2, duration_seconds) WHERE id = $1`,
       [workoutId, durationSeconds]
     );
+
+    // Quick Cardio finished without a logged segment (Phase 0B-1b, owner's
+    // choice): the workout clock's elapsed time, less pauses, is saved as
+    // Segment 1 of its cardio exercise, so the session is completed and shows
+    // in History and Stats > Cardio instead of being cancelled as empty.
+    const savedSegment = await saveElapsedAsCardioSegment(client, workoutId);
 
     // Finish only completes a workout with something in it. An empty one is
     // cancelled instead (end_time stays NULL, like any cancel).
@@ -710,7 +766,7 @@ const finishWorkout = async (req, res) => {
     if (!hasActivity) {
       return res.json({ ...workout, cancelled_empty: true, message: NOTHING_LOGGED_MESSAGE });
     }
-    res.json(workout);
+    res.json(savedSegment ? { ...workout, saved_segment: savedSegment } : workout);
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     console.error('Finish workout error:', error);
