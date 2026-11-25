@@ -2,7 +2,10 @@
 // Workout Controller
 // ============================================================================
 const { pool } = require('../config/database');
-const { sweepStaleWorkouts, workoutHasActivity, durationSql } = require('../utils/workoutStatus');
+const {
+  sweepStaleWorkouts, workoutHasActivity, durationSql, activitySql,
+  recordSessionEvent, listAttentionWorkouts, openPauseSecondsSql, cancelTimeSql,
+} = require('../utils/workoutStatus');
 
 // ============================================================================
 // EXERCISE SEARCH & LOOKUP
@@ -460,6 +463,9 @@ const logWorkout = async (req, res) => {
       [workout.id]
     );
 
+    await recordSessionEvent(client, workout.id, 'started');
+    await recordSessionEvent(client, workout.id, 'finished');
+
     await client.query('COMMIT');
 
     res.status(201).json({
@@ -622,27 +628,28 @@ const finishWorkout = async (req, res) => {
   // so start/end timestamps are seconds apart and can't describe the session.
   const rawDuration = req.body?.duration_seconds;
   const durationSeconds = Number.isInteger(rawDuration) && rawDuration >= 0 ? rawDuration : null;
-  // Pause lives in the client; the finished total is stored so the shared
-  // duration definition (end - start - paused) can use it.
-  const rawPaused = req.body?.total_paused_seconds;
-  const pausedSeconds = Number.isInteger(rawPaused) && rawPaused >= 0 ? rawPaused : null;
+  // Pause is server-side since Phase 0A-2: total_paused_seconds on the row is
+  // the source of truth. The 0A-1 client still sends its own total; it is
+  // accepted and ignored.
 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
     const existing = await client.query(
-      `UPDATE workouts
-       SET duration_seconds = COALESCE($3, duration_seconds),
-           total_paused_seconds = COALESCE($4, total_paused_seconds),
-           paused_at = NULL
-       WHERE id = $1 AND user_id = $2 RETURNING id`,
-      [workoutId, user_id, durationSeconds, pausedSeconds]
+      `SELECT id FROM workouts WHERE id = $1 AND user_id = $2 FOR UPDATE`,
+      [workoutId, user_id]
     );
     if (existing.rows.length === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Workout not found' });
     }
+    // A workout finished while paused: close the pause first.
+    await closeOpenPause(client, workoutId, 'finish');
+    await client.query(
+      `UPDATE workouts SET duration_seconds = COALESCE($2, duration_seconds) WHERE id = $1`,
+      [workoutId, durationSeconds]
+    );
 
     // Finish only completes a workout with something in it. An empty one is
     // cancelled instead (end_time stays NULL, like any cancel).
@@ -658,6 +665,8 @@ const finishWorkout = async (req, res) => {
           [workoutId]
         );
     const workout = result.rows[0];
+    if (hasActivity) await recordSessionEvent(client, workoutId, 'finished');
+    else await recordSessionEvent(client, workoutId, 'cancelled', { empty: true });
 
     // Program completion is recorded only for a completed workout.
     if (hasActivity && workout.program_id && workout.program_routine_id) {
@@ -684,27 +693,46 @@ const finishWorkout = async (req, res) => {
   }
 };
 
-// Cancel keeps every logged set and segment and leaves end_time NULL
-// (resume is Phase 0A-2). Nothing is deleted.
+// Cancel keeps every logged set and segment and leaves end_time NULL, so the
+// workout can be reopened (PUT /:id/reopen). Nothing is deleted. Only an
+// in_progress workout changes: cancelling one that is already cancelled or
+// completed returns it unchanged (no new event, so the resume window isn't
+// restarted and a finished workout can't be cancelled by a stale tab).
 const cancelWorkout = async (req, res) => {
   const { workoutId } = req.params;
   const user_id = req.user.userId;
 
+  const client = await pool.connect();
   try {
-    const result = await pool.query(
-      `UPDATE workouts SET status = 'cancelled', paused_at = NULL
-       WHERE id = $1 AND user_id = $2 RETURNING *`,
+    await client.query('BEGIN');
+    const existing = await client.query(
+      `SELECT * FROM workouts WHERE id = $1 AND user_id = $2 FOR UPDATE`,
       [workoutId, user_id]
     );
-
-    if (result.rows.length === 0) {
+    if (existing.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Workout not found' });
     }
+    if (existing.rows[0].status !== 'in_progress') {
+      await client.query('ROLLBACK');
+      return res.json(existing.rows[0]);
+    }
 
+    // A pause still open counts as paused time up to the cancel.
+    await closeOpenPause(client, workoutId, 'cancel');
+    const result = await client.query(
+      `UPDATE workouts SET status = 'cancelled', paused_at = NULL WHERE id = $1 RETURNING *`,
+      [workoutId]
+    );
+    await recordSessionEvent(client, workoutId, 'cancelled');
+    await client.query('COMMIT');
     res.json(result.rows[0]);
   } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
     console.error('Cancel workout error:', error);
     res.status(500).json({ error: 'Failed to cancel workout' });
+  } finally {
+    client.release();
   }
 };
 
@@ -842,6 +870,7 @@ const getCombinedHistory = async (req, res) => {
         COALESCE(w.workout_title, wr.name, 'Open Session') AS title,
         COUNT(DISTINCT we.id) AS exercise_count,
         w.overall_notes, w.status,
+        ${activitySql('w')} AS has_activity,
         w.session_rating, w.session_notes
        FROM workouts w
        LEFT JOIN workout_routines wr ON w.routine_id = wr.id
@@ -861,7 +890,8 @@ const getCombinedHistory = async (req, res) => {
         cardio_type AS title, distance, distance_unit,
         calories_burned, avg_heart_rate,
         pre_session_notes, mid_session_notes, post_session_notes,
-        status, session_rating, session_notes
+        status, session_rating, session_notes,
+        (COALESCE(duration_seconds, 0) > 0 OR COALESCE(distance, 0) > 0) AS has_activity
        FROM cardio_sessions
        WHERE user_id = $1
        ORDER BY session_date DESC, start_time DESC`,
@@ -923,7 +953,15 @@ const getWorkoutDetail = async (req, res) => {
        ORDER BY we.order_index`,
       [id]
     );
-    res.json({ ...workoutResult.rows[0], exercises: exercisesResult.rows });
+    const history = await sessionHistory(pool, id, user_id);
+    const canReopen = workoutResult.rows[0].status === 'cancelled'
+      && await reopenEligibility(pool, user_id, id);
+    res.json({
+      ...workoutResult.rows[0],
+      exercises: exercisesResult.rows,
+      ...history,
+      can_reopen: canReopen,
+    });
   } catch (err) {
     console.error('Workout detail error:', err);
     res.status(500).json({ error: 'Failed to fetch workout detail' });
@@ -937,12 +975,16 @@ const startFreeLift = async (req, res) => {
   if (!workout_date) {
     return res.status(400).json({ error: 'workout_date required' });
   }
+  const client = await pool.connect();
   try {
-    const result = await pool.query(
+    await client.query('BEGIN');
+    const result = await client.query(
       `INSERT INTO workouts (user_id, workout_date, routine_id, start_time, workout_title, workout_type, status)
        VALUES ($1, $2, NULL, $3, $4, $5, 'in_progress') RETURNING *`,
       [user_id, workout_date, new Date().toISOString(), workout_title || null, workout_type]
     );
+    await recordSessionEvent(client, result.rows[0].id, 'started');
+    await client.query('COMMIT');
     res.status(201).json({
       workout: result.rows[0],
       routine_name: workout_title || 'Open Session',
@@ -951,8 +993,11 @@ const startFreeLift = async (req, res) => {
       previous_overall_notes: null,
     });
   } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
     console.error('Start workout error:', err);
     res.status(500).json({ error: 'Failed to start workout' });
+  } finally {
+    client.release();
   }
 };
 
@@ -1115,6 +1160,7 @@ const getPreviousExerciseNotes = async (req, res) => {
       `SELECT w.id AS workout_id,
               to_char(w.workout_date, 'YYYY-MM-DD') AS workout_date,
               w.workout_title,
+              w.status,
               we.exercise_notes
        FROM workout_exercises we
        JOIN workouts w ON w.id = we.workout_id
@@ -1123,6 +1169,13 @@ const getPreviousExerciseNotes = async (req, res) => {
          -- Any prior session containing the exercise, cancelled ones included
          -- (Phase 0A-1); only the workout currently being logged is skipped.
          AND w.id IS DISTINCT FROM $3::integer
+         -- ...except a cancelled session with nothing for this exercise: no
+         -- set logged and no note (Phase 0A-2). It would hide older notes.
+         AND NOT (
+           w.status = 'cancelled'
+           AND NULLIF(BTRIM(COALESCE(we.exercise_notes, '')), '') IS NULL
+           AND NOT EXISTS (SELECT 1 FROM workout_sets pn_ws WHERE pn_ws.workout_exercise_id = we.id)
+         )
          ${scopeSql}
        ORDER BY w.workout_date DESC, w.id DESC
        LIMIT 1`,
@@ -1130,7 +1183,7 @@ const getPreviousExerciseNotes = async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.json({ workout_id: null, workout_date: null, exercise_notes: null, scope });
+      return res.json({ workout_id: null, workout_date: null, exercise_notes: null, status: null, scope });
     }
 
     res.json({ ...result.rows[0], scope });
@@ -1139,6 +1192,456 @@ const getPreviousExerciseNotes = async (req, res) => {
     res.status(500).json({ error: 'Failed to get previous notes' });
   }
 };
+
+// ============================================================================
+// Session recovery (Phase 0A-2)
+// ============================================================================
+
+/**
+ * Close the pause still open on a workout, if any: add its length to
+ * total_paused_seconds, clear paused_at and write a `resumed` event. `db`
+ * must be the caller's transaction client. Returns the seconds added.
+ */
+async function closeOpenPause(db, workoutId, reason = null) {
+  const result = await db.query(
+    `WITH p AS (
+       SELECT w.id, ${openPauseSecondsSql('w')} AS secs
+       FROM workouts w WHERE w.id = $1 AND w.paused_at IS NOT NULL
+     )
+     UPDATE workouts w
+     SET total_paused_seconds = COALESCE(w.total_paused_seconds, 0) + p.secs,
+         paused_at = NULL
+     FROM p WHERE w.id = p.id
+     RETURNING p.secs`,
+    [workoutId]
+  );
+  if (result.rows.length === 0) return 0;
+  const secs = result.rows[0].secs;
+  await recordSessionEvent(db, workoutId, 'resumed',
+    reason ? { paused_seconds: secs, reason } : { paused_seconds: secs });
+  return secs;
+}
+
+const num = v => (v == null ? v : Number(v));
+
+/**
+ * The active-workout payload, in the shape the start endpoints return
+ * (routine / program / start-free), so the client can hand it straight to
+ * setActiveWorkout. Adds what a start never has: logged_sets and
+ * cardio_segments per exercise, in workout order.
+ */
+async function buildActivePayload(db, workoutId) {
+  const wRes = await db.query(
+    `SELECT w.*, wr.name AS routine_name_join, p.name AS program_name
+     FROM workouts w
+     LEFT JOIN workout_routines wr ON wr.id = w.routine_id
+     LEFT JOIN programs p ON p.id = w.program_id
+     WHERE w.id = $1`,
+    [workoutId]
+  );
+  if (wRes.rows.length === 0) return null;
+  const { routine_name_join, program_name, ...workout } = wRes.rows[0];
+
+  const exRes = await db.query(
+    `SELECT we.*,
+            e.name AS exercise_name, e.category, e.subcategory, e.equipment_type,
+            e.video_url_male, e.video_url_female,
+            re.id AS re_id, re.superset_group, re.cooldown_seconds, re.notes AS re_notes,
+            re.overload_strategy, re.overload_increment, re.overload_schedule, re.overload_week_targets,
+            re.tempo_eccentric, re.tempo_pause, re.tempo_concentric,
+            COALESCE((
+              SELECT json_agg(json_build_object(
+                       'id', ws.id, 'set_number', ws.set_number,
+                       'reps_completed', ws.reps_completed, 'weight_used', ws.weight_used,
+                       'rpe', ws.rpe, 'set_type', ws.set_type)
+                     ORDER BY ws.set_number, ws.id)
+              FROM workout_sets ws WHERE ws.workout_exercise_id = we.id
+            ), '[]'::json) AS logged_sets,
+            COALESCE((
+              SELECT json_agg(wcs.* ORDER BY wcs.segment_number, wcs.id)
+              FROM workout_cardio_segments wcs WHERE wcs.workout_exercise_id = we.id
+            ), '[]'::json) AS cardio_segments
+     FROM workout_exercises we
+     JOIN workouts w ON w.id = we.workout_id
+     JOIN exercises e ON e.id = we.exercise_id
+     LEFT JOIN LATERAL (
+       SELECT r.* FROM routine_exercises r
+       WHERE r.routine_id = w.routine_id AND r.exercise_id = we.exercise_id
+       ORDER BY (r.order_index = we.order_index) DESC, r.order_index
+       LIMIT 1
+     ) re ON TRUE
+     WHERE we.workout_id = $1
+     ORDER BY we.order_index, we.id`,
+    [workoutId]
+  );
+
+  // "Last time": the same rule as the start endpoints (last completed session
+  // of this routine on or before this workout's date).
+  let last = null;
+  if (workout.routine_id) {
+    const lastRes = await db.query(
+      `SELECT w.id, w.workout_date, w.overall_notes FROM workouts w
+       WHERE w.user_id = $1 AND w.routine_id = $2 AND w.workout_date <= $3
+         AND w.status = 'completed' AND w.id <> $4
+       ORDER BY w.workout_date DESC, w.start_time DESC LIMIT 1`,
+      [workout.user_id, workout.routine_id, workout.workout_date, workout.id]
+    );
+    if (lastRes.rows.length > 0) {
+      const lw = lastRes.rows[0];
+      const lastEx = await db.query(
+        `SELECT we.exercise_id, we.exercise_notes,
+                json_agg(json_build_object('set_number', ws.set_number, 'reps', ws.reps_completed,
+                                           'weight', ws.weight_used, 'rpe', ws.rpe) ORDER BY ws.set_number) AS sets_completed
+         FROM workout_exercises we
+         JOIN workout_sets ws ON we.id = ws.workout_exercise_id
+         WHERE we.workout_id = $1
+         GROUP BY we.id, we.exercise_id, we.exercise_notes`,
+        [lw.id]
+      );
+      last = { workout_date: lw.workout_date, overall_notes: lw.overall_notes, exercises: lastEx.rows };
+    }
+  }
+
+  const exercises = exRes.rows.map(row => {
+    const {
+      re_id, superset_group, cooldown_seconds, re_notes,
+      overload_strategy, overload_increment, overload_schedule, overload_week_targets,
+      tempo_eccentric, tempo_pause, tempo_concentric,
+      logged_sets, cardio_segments, ...we
+    } = row;
+    const fromRoutine = re_id != null;
+    return {
+      ...we,
+      target_weight: num(we.target_weight),
+      template: {
+        target_sets: we.target_sets,
+        target_reps_min: we.target_reps_min,
+        target_reps_max: we.target_reps_max,
+        target_weight: num(we.target_weight),
+        superset_group: fromRoutine ? superset_group : null,
+        cooldown_seconds: fromRoutine ? cooldown_seconds : null,
+        notes: fromRoutine ? re_notes : null,
+        overload_strategy: fromRoutine ? overload_strategy : null,
+        overload_increment: fromRoutine ? overload_increment : null,
+        overload_schedule: fromRoutine ? overload_schedule : null,
+        overload_week_targets: fromRoutine ? overload_week_targets : null,
+        tempo_eccentric: fromRoutine ? tempo_eccentric : null,
+        tempo_pause: fromRoutine ? tempo_pause : null,
+        tempo_concentric: fromRoutine ? tempo_concentric : null,
+        goal_duration_seconds: we.goal_duration_seconds,
+        goal_distance: num(we.goal_distance),
+        goal_distance_unit: we.goal_distance_unit,
+        goal_pace: num(we.goal_pace),
+        goal_pace_unit: we.goal_pace_unit,
+        goal_laps: we.goal_laps,
+        goal_lap_distance: num(we.goal_lap_distance),
+      },
+      last_performance: last?.exercises.find(le => le.exercise_id === we.exercise_id) || null,
+      // Added during the session (not from the routine). The quick-cardio
+      // exercise of a standalone cardio session is part of its setup.
+      is_ad_hoc: workout.routine_id ? !fromRoutine : workout.workout_type !== 'cardio',
+      logged_sets: (logged_sets || []).map(st => ({ ...st, weight_used: num(st.weight_used) })),
+      cardio_segments: cardio_segments || [],
+    };
+  });
+
+  return {
+    workout,
+    routine_name: routine_name_join || workout.workout_title || 'Open Session',
+    program_name: program_name || null,
+    program_id: workout.program_id || null,
+    program_routine_id: workout.program_routine_id || null,
+    exercises,
+    last_workout_date: last?.workout_date || null,
+    previous_overall_notes: last?.overall_notes || null,
+  };
+}
+
+/**
+ * GET /api/v1/workouts/active
+ * The user's newest in_progress workout (after the stale sweep) as an
+ * active-workout payload, or { workout: null }.
+ */
+const getActiveWorkout = async (req, res) => {
+  const user_id = req.user.userId;
+  try {
+    await sweepStaleWorkouts(pool, user_id);
+    const rows = await listAttentionWorkouts(pool, user_id, { status: 'in_progress' });
+    if (rows.length === 0) return res.json({ workout: null });
+    const payload = await buildActivePayload(pool, rows[0].id);
+    res.json(payload || { workout: null });
+  } catch (err) {
+    console.error('Get active workout error:', err);
+    res.status(500).json({ error: 'Failed to load the active workout' });
+  }
+};
+
+/**
+ * GET /api/v1/workouts/attention
+ * In-progress workouts plus cancelled ones still inside the user's
+ * workout_age_limit_hours (data for the later reminder UI).
+ */
+const getAttentionWorkouts = async (req, res) => {
+  const user_id = req.user.userId;
+  try {
+    await sweepStaleWorkouts(pool, user_id);
+    const rows = await listAttentionWorkouts(pool, user_id);
+    res.json({
+      workouts: rows.map(r => ({
+        id: r.id,
+        title: r.title,
+        status: r.status,
+        workout_type: r.workout_type,
+        start_time: r.start_time,
+        last_activity_at: r.last_activity_at,
+        paused: r.paused,
+        paused_at: r.paused_at,
+        set_count: r.set_count,
+        cancelled_at: r.cancelled_at,
+      })),
+    });
+  } catch (err) {
+    console.error('Get attention workouts error:', err);
+    res.status(500).json({ error: 'Failed to load workouts' });
+  }
+};
+
+const NOT_IN_PROGRESS = 'This workout is not in progress.';
+
+/**
+ * PUT /api/v1/workouts/:workoutId/pause   and   /resume
+ * Server-side pause. Both are idempotent: pausing a paused workout or
+ * resuming a running one changes nothing and returns the current row.
+ */
+const pauseWorkout = async (req, res) => {
+  const { workoutId } = req.params;
+  const user_id = req.user.userId;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const existing = await client.query(
+      `SELECT * FROM workouts WHERE id = $1 AND user_id = $2 FOR UPDATE`,
+      [workoutId, user_id]
+    );
+    if (existing.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Workout not found' });
+    }
+    const w = existing.rows[0];
+    if (w.status !== 'in_progress') {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: NOT_IN_PROGRESS, workout: w });
+    }
+    if (w.paused_at) {
+      await client.query('ROLLBACK');
+      return res.json(w);
+    }
+    const result = await client.query(
+      `UPDATE workouts SET paused_at = NOW() WHERE id = $1 RETURNING *`,
+      [workoutId]
+    );
+    await recordSessionEvent(client, workoutId, 'paused');
+    await client.query('COMMIT');
+    res.json(result.rows[0]);
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Pause workout error:', err);
+    res.status(500).json({ error: 'Failed to pause workout' });
+  } finally {
+    client.release();
+  }
+};
+
+const resumeWorkout = async (req, res) => {
+  const { workoutId } = req.params;
+  const user_id = req.user.userId;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const existing = await client.query(
+      `SELECT * FROM workouts WHERE id = $1 AND user_id = $2 FOR UPDATE`,
+      [workoutId, user_id]
+    );
+    if (existing.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Workout not found' });
+    }
+    const w = existing.rows[0];
+    if (w.status !== 'in_progress') {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: NOT_IN_PROGRESS, workout: w });
+    }
+    if (!w.paused_at) {
+      await client.query('ROLLBACK');
+      return res.json(w);
+    }
+    await closeOpenPause(client, workoutId);
+    const result = await client.query(`SELECT * FROM workouts WHERE id = $1`, [workoutId]);
+    await client.query('COMMIT');
+    res.json(result.rows[0]);
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Resume workout error:', err);
+    res.status(500).json({ error: 'Failed to resume workout' });
+  } finally {
+    client.release();
+  }
+};
+
+const CURRENT_WORKOUT_OPEN = 'Finish or cancel your current workout first.';
+
+/**
+ * Can this cancelled workout be reopened by its owner right now? Same rule
+ * for PUT /reopen and the detail page's can_reopen.
+ */
+async function reopenEligibility(db, userId, workoutId) {
+  const rows = await listAttentionWorkouts(db, userId, { workoutId, status: 'cancelled' });
+  return rows.length > 0;
+}
+
+/**
+ * PUT /api/v1/workouts/:workoutId/reopen
+ * Resume a cancelled workout: back to in_progress, with the cancel→reopen
+ * gap added to total_paused_seconds so duration excludes it.
+ */
+const reopenWorkout = async (req, res) => {
+  const { workoutId } = req.params;
+  const user_id = req.user.userId;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    // One reopen at a time per user, so two can't both pass the
+    // "no other workout in progress" check.
+    await client.query(`SELECT id FROM users WHERE id = $1 FOR UPDATE`, [user_id]);
+    await sweepStaleWorkouts(client, user_id);
+
+    const existing = await client.query(
+      `SELECT * FROM workouts WHERE id = $1 AND user_id = $2 FOR UPDATE`,
+      [workoutId, user_id]
+    );
+    if (existing.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Workout not found' });
+    }
+    if (existing.rows[0].status !== 'cancelled') {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'Only a cancelled workout can be resumed.' });
+    }
+    if (!(await reopenEligibility(client, user_id, workoutId))) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'This workout is too old to resume.' });
+    }
+    const other = await client.query(
+      `SELECT id FROM workouts WHERE user_id = $1 AND status = 'in_progress' AND id <> $2 LIMIT 1`,
+      [user_id, workoutId]
+    );
+    if (other.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: CURRENT_WORKOUT_OPEN, active_workout_id: other.rows[0].id });
+    }
+
+    const gapRes = await client.query(
+      `SELECT GREATEST(0, FLOOR(EXTRACT(EPOCH FROM ((NOW() AT TIME ZONE 'UTC') - ${cancelTimeSql('w')}))))::INTEGER AS gap
+       FROM workouts w WHERE w.id = $1`,
+      [workoutId]
+    );
+    const gap = gapRes.rows[0].gap;
+    await client.query(
+      `UPDATE workouts
+       SET status = 'in_progress', end_time = NULL, paused_at = NULL,
+           total_paused_seconds = COALESCE(total_paused_seconds, 0) + $2
+       WHERE id = $1`,
+      [workoutId, gap]
+    );
+    await recordSessionEvent(client, workoutId, 'reopened', { gap_seconds: gap });
+    const payload = await buildActivePayload(client, workoutId);
+    await client.query('COMMIT');
+    res.json(payload);
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Reopen workout error:', err);
+    res.status(500).json({ error: 'Failed to resume workout' });
+  } finally {
+    client.release();
+  }
+};
+
+/**
+ * PUT /api/v1/workouts/:workoutId/exercises/order
+ * Body: { order: [workout_exercise_id, ...] } — the full new order.
+ * order_index becomes 1..n in that order.
+ */
+const reorderWorkoutExercises = async (req, res) => {
+  const { workoutId } = req.params;
+  const user_id = req.user.userId;
+  const order = req.body?.order;
+  if (!Array.isArray(order) || order.length === 0 || !order.every(id => Number.isInteger(id) && id > 0)
+      || new Set(order).size !== order.length) {
+    return res.status(400).json({ error: 'order must be a list of workout exercise ids' });
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const check = await client.query(
+      `SELECT we.id FROM workout_exercises we
+       JOIN workouts w ON w.id = we.workout_id
+       WHERE we.workout_id = $1 AND w.user_id = $2`,
+      [workoutId, user_id]
+    );
+    const ids = new Set(check.rows.map(r => r.id));
+    if (ids.size === 0 || ids.size !== order.length || !order.every(id => ids.has(id))) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'order must list every exercise in this workout exactly once' });
+    }
+    await client.query(
+      `UPDATE workout_exercises we SET order_index = o.pos
+       FROM unnest($2::int[]) WITH ORDINALITY AS o(id, pos)
+       WHERE we.id = o.id AND we.workout_id = $1`,
+      [workoutId, order]
+    );
+    await client.query('COMMIT');
+    res.json({ order });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Reorder workout exercises error:', err);
+    res.status(500).json({ error: 'Failed to save exercise order' });
+  } finally {
+    client.release();
+  }
+};
+
+/**
+ * Session history for the detail page: every event in order, and each pause
+ * (paused → the next resumed, or the cancel/finish that ended it) at or above
+ * the owner's pause_note_minutes.
+ */
+async function sessionHistory(db, workoutId, userId) {
+  const evRes = await db.query(
+    `SELECT id, event_type, occurred_at, metadata
+     FROM workout_session_events WHERE workout_id = $1
+     ORDER BY occurred_at, id`,
+    [workoutId]
+  );
+  const thRes = await db.query(`SELECT pause_note_minutes FROM users WHERE id = $1`, [userId]);
+  const thresholdSeconds = (thRes.rows[0]?.pause_note_minutes ?? 15) * 60;
+  const events = evRes.rows;
+  const longPauses = [];
+  let open = null;
+  for (const ev of events) {
+    if (ev.event_type === 'paused') {
+      if (!open) open = ev;
+    } else if (open && ['resumed', 'cancelled', 'auto_cancelled', 'finished'].includes(ev.event_type)) {
+      const seconds = ev.event_type === 'resumed' && Number.isInteger(ev.metadata?.paused_seconds)
+        ? ev.metadata.paused_seconds
+        : Math.max(0, Math.floor((new Date(ev.occurred_at) - new Date(open.occurred_at)) / 1000));
+      if (seconds >= thresholdSeconds) {
+        longPauses.push({ started_at: open.occurred_at, ended_at: ev.occurred_at, seconds });
+      }
+      open = null;
+    }
+  }
+  return { session_events: events, long_pauses: longPauses, pause_note_minutes: thresholdSeconds / 60 };
+}
 
 /**
  * Any logged-in user can flag a problem with an exercise entry.
@@ -1232,4 +1735,10 @@ module.exports = {
   getPreviousExerciseNotes,
   reportExercise,
   findOrCreateExercise,
+  getActiveWorkout,
+  getAttentionWorkouts,
+  pauseWorkout,
+  resumeWorkout,
+  reopenWorkout,
+  reorderWorkoutExercises,
 };

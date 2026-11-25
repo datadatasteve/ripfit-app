@@ -3,7 +3,7 @@
 // (authorization enforcement to be added when trainer portal is built).
 
 const { pool } = require('../config/database');
-const { durationSql, userTimezoneSql, localTimeSql, sweepStaleWorkouts } = require('../utils/workoutStatus');
+const { durationSql, userTimezoneSql, localTimeSql, sweepStaleWorkouts, activitySql } = require('../utils/workoutStatus');
 
 // Only completed workouts count toward any stat (Phase 0A-1).
 const DONE = "status = 'completed'";
@@ -567,7 +567,8 @@ async function getCombinedStats(req, res) {
         avg_heart_rate,
         start_time,
         workout_id,
-        status
+        status,
+        has_activity
       FROM (
         -- Strength/mixed/open sessions
         SELECT
@@ -585,7 +586,8 @@ async function getCombinedStats(req, res) {
           NULL::INTEGER AS avg_heart_rate,
           w.start_time AT TIME ZONE 'UTC' AS start_time,
           w.id AS workout_id,
-          w.status
+          w.status,
+          ${activitySql('w')} AS has_activity
         FROM workouts w
         LEFT JOIN workout_routines wr ON w.routine_id = wr.id
         LEFT JOIN workout_exercises we ON w.id = we.workout_id
@@ -610,7 +612,8 @@ async function getCombinedStats(req, res) {
           cs.avg_heart_rate,
           cs.start_time,
           cs.id AS workout_id,
-          cs.status
+          cs.status,
+          (COALESCE(cs.duration_seconds, 0) > 0 OR COALESCE(cs.distance, 0) > 0) AS has_activity
         FROM cardio_sessions cs
         WHERE cs.user_id = $1 AND ${csStatus}
           AND cs.session_date >= CURRENT_DATE - ($2 || ' weeks')::INTERVAL` : ''}

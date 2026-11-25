@@ -18,6 +18,10 @@ router.post('/start-free', authenticate, workoutController.startFreeLift);
 // Last session's notes for one exercise — must come before /:workoutId routes
 router.get('/previous-notes', authenticate, workoutController.getPreviousExerciseNotes);
 
+// Session recovery (Phase 0A-2). Declared before the /:workoutId routes.
+router.get('/active', authenticate, workoutController.getActiveWorkout);
+router.get('/attention', authenticate, workoutController.getAttentionWorkouts);
+
 // User-submitted exercise issue report
 router.post('/exercises/:id/report', authenticate, workoutController.reportExercise);
 
@@ -34,6 +38,10 @@ router.put('/:workoutId/finish', authenticate, workoutController.finishWorkout);
 router.put('/:workoutId/cancel', authenticate, workoutController.cancelWorkout);
 router.put('/:workoutId/notes', authenticate, workoutController.updateWorkoutNotes);
 router.put('/:workoutId/type', authenticate, workoutController.updateWorkoutType);
+router.put('/:workoutId/pause', authenticate, workoutController.pauseWorkout);
+router.put('/:workoutId/resume', authenticate, workoutController.resumeWorkout);
+router.put('/:workoutId/reopen', authenticate, workoutController.reopenWorkout);
+router.put('/:workoutId/exercises/order', authenticate, workoutController.reorderWorkoutExercises);
 
 router.post('/:workoutId/exercises', authenticate, workoutController.addExerciseToWorkout);
 router.delete('/:workoutId/exercises/:exerciseId', authenticate, workoutController.deleteExerciseFromWorkout);

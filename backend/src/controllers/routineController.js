@@ -2,6 +2,7 @@
 // Routine Controller
 // ============================================================================
 const { pool } = require('../config/database');
+const { recordSessionEvent } = require('../utils/workoutStatus');
 
 // ============================================================================
 // ROUTINE MANAGEMENT
@@ -498,6 +499,7 @@ const startWorkoutFromRoutine = async (req, res) => {
     );
 
     const workout = workoutResult.rows[0];
+    await recordSessionEvent(client, workout.id, 'started');
     const workoutExercises = [];
 
     // Add exercises to new workout

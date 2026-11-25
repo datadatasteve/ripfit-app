@@ -3,7 +3,7 @@ const pool = require('../config/database');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const { sendVerificationEmail } = require('../utils/emailService');
-const { isValidTimezone } = require('../utils/workoutStatus');
+const { isValidTimezone, AGE_LIMIT_HOURS_OPTIONS, PAUSE_NOTE_MINUTES_OPTIONS } = require('../utils/workoutStatus');
 
 // ── GET /users/me ──────────────────────────────────────────────────────────
 // Returns the current user's profile. Never returns password_hash.
@@ -16,7 +16,7 @@ async function getProfile(req, res) {
          units_weight, units_distance, theme_preference, goals,
          initials, email_verified, is_admin, workout_rating_prefs, created_at,
          reorder_mode, previous_notes_scope, tempo_visual_enabled, tempo_audio_enabled,
-         timezone
+         timezone, workout_age_limit_hours, pause_note_minutes
        FROM users WHERE id = $1`,
       [req.user.userId]
     );
@@ -307,6 +307,10 @@ const PREFERENCE_RULES = {
   // IANA zone from the browser (Intl...resolvedOptions().timeZone). Used to
   // bucket stats by local hour/day; NULL means UTC.
   timezone:              v => isValidTimezone(v),
+  // Phase 0A-2: one window for auto-cancel and for resuming a cancelled
+  // workout, and the shortest pause noted on the detail page.
+  workout_age_limit_hours: v => AGE_LIMIT_HOURS_OPTIONS.includes(v),
+  pause_note_minutes:      v => PAUSE_NOTE_MINUTES_OPTIONS.includes(v),
 };
 
 async function updatePreferences(req, res) {
@@ -336,7 +340,8 @@ async function updatePreferences(req, res) {
     values.push(req.user.userId);
     const result = await pool.query(
       `UPDATE users SET ${sets.join(', ')} WHERE id = $${values.length}
-       RETURNING reorder_mode, previous_notes_scope, tempo_visual_enabled, tempo_audio_enabled, timezone`,
+       RETURNING reorder_mode, previous_notes_scope, tempo_visual_enabled, tempo_audio_enabled, timezone,
+                 workout_age_limit_hours, pause_note_minutes`,
       values
     );
     res.json(result.rows[0]);

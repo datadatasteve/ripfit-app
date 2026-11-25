@@ -1,6 +1,6 @@
 // backend/src/controllers/programController.js
 const { pool } = require('../config/database');
-const { durationSql } = require('../utils/workoutStatus');
+const { durationSql, recordSessionEvent } = require('../utils/workoutStatus');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -308,6 +308,7 @@ const startProgramWorkout = async (req, res) => {
     );
 
     const workout = workoutResult.rows[0];
+    await recordSessionEvent(client, workout.id, 'started');
     const workoutExercises = [];
 
     for (const ex of templateResult.rows) {
