@@ -1101,3 +1101,76 @@
     animation: none;
   }
 }
+
+/* ── Resume prompt (Phase 0A-2) ─────────────────────────────────────────── */
+.resume-prompt-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 16px;
+}
+
+.resume-prompt {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  width: 100%;
+  max-width: 420px;
+}
+
+.resume-prompt h3 {
+  margin: 0 0 8px;
+}
+
+.resume-prompt-name {
+  margin: 0 0 4px;
+  font-weight: 600;
+}
+
+.resume-prompt-meta {
+  margin: 0 0 20px;
+  color: var(--text-secondary);
+  font-size: 0.9em;
+}
+
+.resume-prompt-error {
+  color: #ef4444;
+  font-size: 0.9em;
+  margin: 0 0 12px;
+}
+
+.resume-prompt-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.resume-prompt-actions button {
+  flex: 1;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  font-size: 1em;
+  cursor: pointer;
+  border: 1px solid var(--border-color);
+}
+
+.resume-prompt-resume {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary) !important;
+}
+
+.resume-prompt-cancel {
+  background: transparent;
+  color: var(--text-primary);
+}
+
+.resume-prompt-actions button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

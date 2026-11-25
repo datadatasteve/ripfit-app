@@ -95,6 +95,11 @@ function Empty({ message = 'No data yet. Log some workouts to see stats.' }) {
 
 // ── Loading ───────────────────────────────────────────────────────────────
 /** "Cancelled" / "In progress" chip for history rows; nothing for completed. */
+/** A cancelled session with nothing logged (hidden from History by default). */
+function isEmptyCancelled(s) {
+  return s.status === 'cancelled' && s.has_activity === false;
+}
+
 function StatusTag({ status }) {
   if (status === 'cancelled') return <span className="sc-status-tag cancelled">Cancelled</span>;
   if (status === 'in_progress') return <span className="sc-status-tag in-progress">In progress</span>;
@@ -1757,6 +1762,8 @@ function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout, progra
   const [pageSize, setPageSize] = useState(10);
   const [customPageSize, setCustomPageSize] = useState('');
   const [page, setPage] = useState(1);
+  // Cancelled sessions with nothing logged are hidden unless asked for.
+  const [showCancelled, setShowCancelled] = useState(false);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -1944,7 +1951,9 @@ function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout, progra
         ];
         const PAGE_SIZES = [5, 10, 15];
 
+        const hiddenCancelled = data.sessions.filter(isEmptyCancelled).length;
         const filtered = data.sessions.filter(s => {
+          if (!showCancelled && isEmptyCancelled(s)) return false;
           if (typeFilter === 'all') return true;
           return s.type === typeFilter;
         });
@@ -1977,6 +1986,14 @@ function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout, progra
                   </button>
                 ))}
               </div>
+              <label className="sc-show-cancelled">
+                <input
+                  type="checkbox"
+                  checked={showCancelled}
+                  onChange={e => { setShowCancelled(e.target.checked); setPage(1); }}
+                />
+                Show cancelled{!showCancelled && hiddenCancelled > 0 ? ` (${hiddenCancelled})` : ''}
+              </label>
               <select
                 className="sc-select"
                 value={sortBy}

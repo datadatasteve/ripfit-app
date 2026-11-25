@@ -13,6 +13,63 @@ import './ActiveWorkout.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 
+// ── Autosave (Phase 0A-2) ─────────────────────────────────────────────────
+// Notes and exercise order are written about a second after the last change,
+// one pending write per key (the newest body replaces an older unsent one),
+// so typing never bursts against the API rate limit.
+const AUTOSAVE_DEBOUNCE_MS = 1000;
+
+function useAutosave() {
+  const pending = useRef(new Map()); // key → { url, body, onSaved }
+  const timers = useRef(new Map());  // key → timeout id
+
+  const send = (key, keepalive) => {
+    clearTimeout(timers.current.get(key));
+    timers.current.delete(key);
+    const job = pending.current.get(key);
+    if (!job) return Promise.resolve();
+    pending.current.delete(key);
+    return fetch(job.url, {
+      method: 'PUT',
+      // keepalive lets the request outlive a page that is being hidden or
+      // unloaded (phone backgrounded, tab closed, refresh).
+      keepalive,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('ripfit_token')}` },
+      body: JSON.stringify(job.body),
+    })
+      .then(res => {
+        if (!res.ok) throw Object.assign(new Error(`save failed (${res.status})`), { status: res.status });
+        return res.json().catch(() => null);
+      })
+      .then(data => { job.onSaved?.(data); })
+      .catch(err => {
+        // A refused write (4xx) won't succeed later; drop it.
+        if (err.status && err.status < 500) return;
+        // Network or server error: keep it for the next flush unless a newer
+        // write already replaced it.
+        if (!pending.current.has(key)) pending.current.set(key, job);
+      });
+  };
+
+  const schedule = (key, url, body, onSaved, delay = AUTOSAVE_DEBOUNCE_MS) => {
+    pending.current.set(key, { url, body, onSaved });
+    clearTimeout(timers.current.get(key));
+    timers.current.set(key, setTimeout(() => send(key, false), delay));
+  };
+
+  const flush = (key, keepalive = false) => send(key, keepalive);
+  const flushAll = (keepalive = false) =>
+    Promise.all([...pending.current.keys()].map(k => send(k, keepalive)));
+  const cancel = (key) => {
+    clearTimeout(timers.current.get(key));
+    timers.current.delete(key);
+    pending.current.delete(key);
+  };
+  const has = (key) => pending.current.has(key);
+
+  return { schedule, flush, flushAll, cancel, has };
+}
+
 
 // ── Session Rating Widget ─────────────────────────────────────────────────
 // Shown on the post-workout summary screen. Reads user's rating prefs
@@ -1696,6 +1753,9 @@ function PreviousNotesDropdown({ exerciseId, workoutId, programId, scope, onScop
                 <p className="aw-prev-notes-date">
                   {lastDate.toLocaleDateString()}
                   {data.workout_title ? ` — ${data.workout_title}` : ''}
+                  {data.status && data.status !== 'completed' && (
+                    <span className="aw-prev-notes-unfinished" title="From a workout that wasn't finished">Unfinished</span>
+                  )}
                 </p>
               )}
               <pre>{data.exercise_notes}</pre>
@@ -1734,7 +1794,8 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
   const [noteInput, setNoteInput] = useState('');
   const [editingNotes, setEditingNotes] = useState(false);
   const [editNotesText, setEditNotesText] = useState('');
-  const [workoutNotes, setWorkoutNotes] = useState('');
+  // Seeded from the server so a restored workout shows its saved notes.
+  const [workoutNotes, setWorkoutNotes] = useState(() => workout.workout.overall_notes || '');
   const [showHeaderClockSettings, setShowHeaderClockSettings] = useState(false);
   const [showHeaderClock, setShowHeaderClock] = useState(true); // toggle: elapsed clock in header
 
@@ -1758,24 +1819,34 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
     return Math.max(0, rawElapsed - pausedSeconds - currentPauseSeconds);
   };
 
-  const togglePause = () => {
+  // Pause lives on the server (Phase 0A-2), so a restored or second-device
+  // workout shows the right elapsed time. The clock switches at once; the
+  // server's paused_at / total_paused_seconds then replace the local guess.
+  const togglePause = async () => {
+    const workoutId = workout.workout.id;
+    const before = { paused_at: workout.workout.paused_at, total_paused_seconds: workout.workout.total_paused_seconds };
+    const applyPause = (fields) => setActiveWorkout(prev => (
+      prev?.workout?.id === workoutId ? { ...prev, workout: { ...prev.workout, ...fields } } : prev
+    ));
     if (isPaused) {
-      // Resume: fold the just-finished pause into total_paused_seconds
       const pauseDurationSeconds = Math.floor((Date.now() - new Date(workout.workout.paused_at).getTime()) / 1000);
-      setActiveWorkout({
-        ...workout,
-        workout: {
-          ...workout.workout,
-          paused_at: null,
-          total_paused_seconds: (workout.workout.total_paused_seconds || 0) + pauseDurationSeconds
-        }
-      });
+      applyPause({ paused_at: null, total_paused_seconds: (workout.workout.total_paused_seconds || 0) + pauseDurationSeconds });
     } else {
-      // Pause: record the timestamp pause began
-      setActiveWorkout({
-        ...workout,
-        workout: { ...workout.workout, paused_at: new Date().toISOString() }
+      applyPause({ paused_at: new Date().toISOString() });
+    }
+    try {
+      const res = await fetch(`${API_BASE}/workouts/${workoutId}/${isPaused ? 'resume' : 'pause'}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('ripfit_token')}` },
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not update the pause.');
+      applyPause({ paused_at: data.paused_at, total_paused_seconds: data.total_paused_seconds });
+    } catch (err) {
+      applyPause(before);
+      alert(err.message && !err.message.startsWith('Failed to fetch')
+        ? err.message
+        : 'Could not update the pause. Check your connection and try again.');
     }
   };
 
@@ -1800,8 +1871,32 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
   // Rating captured in finish modal so it saves with the workout, not after
   const [pendingRating, setPendingRating] = useState(null);
   const [ratingPrefs, setRatingPrefs] = useState({ label: 'Effort & Vibes', scale: 5, display: 'slider' });
-  // Cardio segments keyed by workout_exercise_id — persists across exercise navigation
-  const [cardioSegmentsByExercise, setCardioSegmentsByExercise] = useState({});
+  // Cardio segments keyed by workout_exercise_id — persists across exercise
+  // navigation. Seeded from (and, after a refocus refetch, replaced by) the
+  // server's segments on each exercise.
+  const segmentsFromExercises = (list) => Object.fromEntries(
+    (list || []).filter(ex => Array.isArray(ex.cardio_segments)).map(ex => [ex.id, ex.cardio_segments])
+  );
+  const [cardioSegmentsByExercise, setCardioSegmentsByExercise] = useState(() => segmentsFromExercises(workout.exercises));
+  useEffect(() => {
+    if (!workout.synced_at) return;
+    setCardioSegmentsByExercise(prev => ({ ...prev, ...segmentsFromExercises(workout.exercises) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workout.synced_at]);
+
+  // ── Note autosave and flush (Phase 0A-2) ──
+  const autosave = useAutosave();
+  const workoutNotesUrl = `${API_BASE}/workouts/${workout.workout.id}/notes`;
+  const exerciseNotesUrl = (exId) => `${API_BASE}/workouts/${workout.workout.id}/exercises/${exId}/notes`;
+
+  const changeWorkoutNotes = (value) => {
+    setWorkoutNotes(value);
+    setWorkoutNotesSaved(false);
+    autosave.schedule('workout-notes', workoutNotesUrl, { overall_notes: value }, () => setWorkoutNotesSaved(true));
+  };
+
+  // Latest values for the flush handlers, which run outside React's render.
+  const flushStateRef = useRef({});
   // User's cooldown override for the current exercise. Owned here rather than in
   // WorkoutTimerBar so the rest timer started by handleLogSet actually uses it.
   const [cooldownOverride, setCooldownOverride] = useState(null);
@@ -1822,6 +1917,66 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
   // Only a change of exercise clears the override. Logging a set replaces the
   // exercise object in activeWorkout but keeps its id, so the override survives.
   useEffect(() => { setCooldownOverride(null); }, [currentExercise.id]);
+
+  flushStateRef.current = {
+    draft: noteInput,
+    exId: currentExercise.id,
+    // While the full-notes editor is open its text is the newest version.
+    notes: editingNotes ? editNotesText : (currentExercise.exercise_notes || ''),
+  };
+
+  /**
+   * A note typed in "Add a note..." but not added yet is saved as a General
+   * line when the page is hidden, unloaded or left, so switching apps or
+   * refreshing can't lose it. While the page stays open it is left alone (so
+   * Log Set can still tag it with the set number).
+   */
+  const commitDraftNote = (keepalive) => {
+    const { draft, exId, notes } = flushStateRef.current;
+    const text = (draft || '').trim();
+    if (!text || !exId) return;
+    const line = `General: ${text}`;
+    const next = notes ? `${notes}\n${line}` : line;
+    flushStateRef.current = { ...flushStateRef.current, draft: '', notes: next };
+    // Same key as the full-notes editor: one write carrying the newest text.
+    autosave.schedule(`exercise-notes:${exId}`, exerciseNotesUrl(exId), { notes: next });
+    autosave.flush(`exercise-notes:${exId}`, keepalive);
+    setActiveWorkout(prev => (prev ? {
+      ...prev,
+      exercises: prev.exercises.map(ex => (ex.id === exId ? { ...ex, exercise_notes: next } : ex)),
+    } : prev));
+    return true;
+  };
+
+  useEffect(() => {
+    const onHide = () => {
+      if (commitDraftNote(true)) setNoteInput('');
+      autosave.flushAll(true);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') onHide();
+      else autosave.flushAll(false); // retry anything a hidden-page flush couldn't send
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', onHide);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', onHide);
+      // Leaving the workout view (another tab, finish, cancel) sends what's left.
+      commitDraftNote(false);
+      autosave.flushAll(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Exercise order (Phase 0A-2): saved so a restored workout keeps it.
+  const saveExerciseOrder = (list) => {
+    autosave.schedule(
+      'exercise-order',
+      `${API_BASE}/workouts/${workout.workout.id}/exercises/order`,
+      { order: list.map(ex => ex.id).filter(id => Number.isInteger(id)) },
+    );
+  };
 
   // Helper function to format notes based on user preference
   const formatNotesForDisplay = (notes, isPrevious = false) => {
@@ -1859,11 +2014,14 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
   const moveExercise = (fromIdx, toIdx) => {
     if (toIdx < 0 || toIdx >= exercises.length) return;
     
-    const reordered = [...exercises];
-    const [moved] = reordered.splice(fromIdx, 1);
-    reordered.splice(toIdx, 0, moved);
-    
+    const spliced = [...exercises];
+    const [moved] = spliced.splice(fromIdx, 1);
+    spliced.splice(toIdx, 0, moved);
+    // order_index follows the new order (the finish summary sorts by it).
+    const reordered = spliced.map((ex, i) => ({ ...ex, order_index: i + 1 }));
+
     setActiveWorkout({ ...workout, exercises: reordered });
+    saveExerciseOrder(reordered);
     
     // Update current index if needed
     if (currentExerciseIdx === fromIdx) {
@@ -2463,6 +2621,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
     const blockLine = `Timer block — ${summary.label} ${formatDurationDisplay(summary.elapsedSeconds)} · ${summary.detail}`;
 
     if (!summary.exercise) {
+      autosave.cancel('workout-notes'); // this write carries the newest text
       const next = workoutNotes ? `${workoutNotes}\n${blockLine}` : blockLine;
       const res = await fetch(`${API_BASE}/workouts/${workout.workout.id}/notes`, {
         method: 'PUT', headers, body: JSON.stringify({ overall_notes: next }),
@@ -2587,7 +2746,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
                 <div style={{ marginTop: '12px' }}>
                   <textarea
                     value={workoutNotes}
-                    onChange={(e) => setWorkoutNotes(e.target.value)}
+                    onChange={(e) => changeWorkoutNotes(e.target.value)}
                     placeholder="Workout notes"
                     rows="3"
                     style={{ width: '100%', padding: '10px', marginBottom: '12px', boxSizing: 'border-box' }}
@@ -3060,31 +3219,29 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
                 <>
                   <textarea
                     value={editNotesText}
-                    onChange={(e) => setEditNotesText(e.target.value)}
+                    onChange={(e) => {
+                      // Autosaved as typed; Save closes the editor, Cancel puts
+                      // the notes back as they were when Edit was tapped.
+                      const value = e.target.value;
+                      setEditNotesText(value);
+                      autosave.schedule(`exercise-notes:${currentExercise.id}`, exerciseNotesUrl(currentExercise.id), { notes: value });
+                    }}
                     rows="4"
                     style={{width: '100%', padding: '8px', marginBottom: '8px'}}
                   />
                   <div style={{display: 'flex', gap: '8px'}}>
                     <button 
                       onClick={async () => {
-                        const token = localStorage.getItem('ripfit_token');
-                        try {
-                          const res = await fetch(`${API_BASE}/workouts/${workout.workout.id}/exercises/${currentExercise.id}/notes`, {
-                            method: 'PUT',
-                            headers: {
-                              'Content-Type': 'application/json',
-                              'Authorization': `Bearer ${token}`
-                            },
-                            body: JSON.stringify({ notes: editNotesText })
-                          });
-                          const data = await res.json();
-                          const updated = [...exercises];
-                          updated[currentExerciseIdx].exercise_notes = data.exercise_notes;
-                          setActiveWorkout({ ...workout, exercises: updated });
-                          setEditingNotes(false);
-                        } catch (err) {
-                          console.error('Failed to update notes:', err);
-                        }
+                        const exId = currentExercise.id;
+                        const text = editNotesText;
+                        autosave.schedule(`exercise-notes:${exId}`, exerciseNotesUrl(exId), { notes: text });
+                        await autosave.flush(`exercise-notes:${exId}`);
+                        if (autosave.has(`exercise-notes:${exId}`)) return; // failed; kept for retry
+                        setActiveWorkout(prev => ({
+                          ...prev,
+                          exercises: prev.exercises.map(ex => (ex.id === exId ? { ...ex, exercise_notes: text } : ex)),
+                        }));
+                        setEditingNotes(false);
                       }}
                       className="save-note-btn"
                     >
@@ -3092,6 +3249,11 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
                     </button>
                     <button 
                       onClick={() => {
+                        const exId = currentExercise.id;
+                        // Autosave may already have sent the edit: send the
+                        // original back.
+                        autosave.schedule(`exercise-notes:${exId}`, exerciseNotesUrl(exId), { notes: currentExercise.exercise_notes || '' });
+                        autosave.flush(`exercise-notes:${exId}`);
                         setEditingNotes(false);
                         setEditNotesText(currentExercise.exercise_notes);
                       }}
@@ -3247,7 +3409,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
             </p>
             <textarea
               value={workoutNotes}
-              onChange={(e) => { setWorkoutNotes(e.target.value); setWorkoutNotesSaved(false); }}
+              onChange={(e) => changeWorkoutNotes(e.target.value)}
               placeholder="How's the workout going? Energy level, overall feel, things to remember..."
               rows="6"
               style={{width: '100%', padding: '10px', marginBottom: '10px'}}
@@ -3255,21 +3417,10 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
             <div style={{display: 'flex', gap: '8px', alignItems: 'stretch'}}>
               <button 
                 onClick={async () => {
-                  const token = localStorage.getItem('ripfit_token');
-                  try {
-                    await fetch(`${API_BASE}/workouts/${workout.workout.id}/notes`, {
-                      method: 'PUT',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                      },
-                      body: JSON.stringify({ overall_notes: workoutNotes })
-                    });
-                    setWorkoutNotesSaved(true);
-                    setShowWorkoutNotes(false);
-                  } catch (err) {
-                    console.error('Failed to save workout notes:', err);
-                  }
+                  // Same write as the autosave, sent now.
+                  autosave.schedule('workout-notes', workoutNotesUrl, { overall_notes: workoutNotes }, () => setWorkoutNotesSaved(true));
+                  await autosave.flush('workout-notes');
+                  if (!autosave.has('workout-notes')) setShowWorkoutNotes(false);
                 }}
                 className="save-note-btn"
                 style={{flex: 1, padding: '12px', fontSize: '1em'}}
@@ -3342,7 +3493,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
                 <h4>Workout Notes</h4>
                 <textarea
                   value={workoutNotes}
-                  onChange={(e) => setWorkoutNotes(e.target.value)}
+                  onChange={(e) => changeWorkoutNotes(e.target.value)}
                   placeholder="How was the workout overall?"
                   rows="3"
                   style={{ width: '100%', padding: '10px', marginBottom: '16px', boxSizing: 'border-box' }}

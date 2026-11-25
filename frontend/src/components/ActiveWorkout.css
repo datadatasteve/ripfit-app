@@ -1798,3 +1798,15 @@
 .set-edit-save { border: none; background: var(--color-primary); color: var(--text-inverse); }
 .set-edit-cancel { border: 1px solid var(--border-color); background: transparent; color: var(--text-primary); }
 .set-edit-error { width: 100%; margin: 0; color: var(--color-danger); font-size: 0.8rem; }
+
+/* Previous-notes source wasn't finished (Phase 0A-2) */
+.aw-prev-notes-unfinished {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 0.8em;
+  background: rgba(245, 158, 11, 0.18);
+  color: var(--color-warning, #d97706);
+  font-weight: 600;
+}

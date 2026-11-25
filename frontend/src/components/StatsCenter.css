@@ -903,3 +903,14 @@
   background: color-mix(in srgb, var(--color-warning) 20%, transparent);
   color: var(--color-warning);
 }
+
+/* "Show cancelled" toggle on History lists (Phase 0A-2) */
+.sc-show-cancelled {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85em;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}

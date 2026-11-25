@@ -11,7 +11,42 @@ import NutritionPage from './components/NutritionPage'
 import Login from './components/Login'
 import { useMeditationEngine, segmentRemaining } from './components/MeditationTimer'
 import { UserPrefsContext, DEFAULT_USER_PREFS, prefsFromProfile } from './contexts/UserPrefsContext'
+import { ActiveWorkoutContext, mergeServerWorkout } from './contexts/ActiveWorkoutContext'
 import './styles/App.css'
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+
+/**
+ * Shown on app load when the user has an unfinished workout (Phase 0A-2).
+ * Nothing restores the workout without the user choosing Resume.
+ */
+function ResumeWorkoutPrompt({ data, busy, error, onResume, onCancel }) {
+  const w = data.workout;
+  const setCount = (data.exercises || []).reduce((n, ex) => n + (ex.logged_sets?.length || 0), 0);
+  const segCount = (data.exercises || []).reduce((n, ex) => n + (ex.cardio_segments?.length || 0), 0);
+  const started = w.start_time
+    ? new Date(w.start_time).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })
+    : null;
+  return (
+    <div className="resume-prompt-overlay" role="dialog" aria-modal="true" aria-labelledby="resume-prompt-title">
+      <div className="resume-prompt">
+        <h3 id="resume-prompt-title">Unfinished workout</h3>
+        <p className="resume-prompt-name">{data.routine_name || w.workout_title || 'Workout'}</p>
+        <p className="resume-prompt-meta">
+          {started && <>Started {started}</>}
+          {` · ${setCount} ${setCount === 1 ? 'set' : 'sets'} logged`}
+          {segCount > 0 && ` · ${segCount} ${segCount === 1 ? 'segment' : 'segments'}`}
+          {w.paused_at && ' · Paused'}
+        </p>
+        {error && <p className="resume-prompt-error">{error}</p>}
+        <div className="resume-prompt-actions">
+          <button type="button" className="resume-prompt-resume" onClick={onResume} disabled={busy}>Resume</button>
+          <button type="button" className="resume-prompt-cancel" onClick={onCancel} disabled={busy}>Cancel workout</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // Shared elapsed-seconds math for the active workout (excludes paused time).
 function getElapsedSeconds(workout) {
@@ -206,6 +241,10 @@ function App() {
   const [activeMeditation, setActiveMeditation] = useState(null);
   const [userPrefs, setUserPrefs] = useState(DEFAULT_USER_PREFS);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
+  // Unfinished workout found on load, waiting for Resume / Cancel.
+  const [resumePrompt, setResumePrompt] = useState(null);
+  const [resumeBusy, setResumeBusy] = useState(false);
+  const [resumeError, setResumeError] = useState('');
 
   // Advances segments, rings bowls and holds the wake lock whichever view is up.
   useMeditationEngine(activeMeditation, setActiveMeditation);
@@ -246,6 +285,89 @@ function App() {
       })
       .catch(() => {});
   }, [isLoggedIn]);
+
+  // On load (after login): is there an unfinished workout? If the call fails,
+  // show nothing and leave the app as it is.
+  useEffect(() => {
+    if (!isLoggedIn) return undefined;
+    const controller = new AbortController();
+    fetch(`${API_BASE}/workouts/active`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('ripfit_token')}` },
+      signal: controller.signal,
+    })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d?.workout) setResumePrompt(d); })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [isLoggedIn]);
+
+  // Open an active-workout payload (resume prompt, or reopening a cancelled
+  // workout from its detail page).
+  const openWorkout = useCallback((payload) => {
+    if (!payload?.workout) return;
+    setWorkoutSummary(null);
+    setActiveWorkout({ ...payload, synced_at: Date.now() });
+    setViewingWorkout(null);
+    setDrawerOpen(false);
+    setCurrentView('workout');
+  }, []);
+
+  const resumeFromPrompt = () => {
+    openWorkout(resumePrompt);
+    setResumePrompt(null);
+  };
+
+  // Same call as the in-workout Cancel. Data is kept; the workout stays
+  // resumable from its detail page.
+  const cancelFromPrompt = async () => {
+    setResumeBusy(true);
+    setResumeError('');
+    try {
+      const res = await fetch(`${API_BASE}/workouts/${resumePrompt.workout.id}/cancel`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('ripfit_token')}` },
+      });
+      if (!res.ok) throw new Error();
+      setResumePrompt(null);
+    } catch {
+      setResumeError('Could not cancel the workout. Check your connection and try again.');
+    } finally {
+      setResumeBusy(false);
+    }
+  };
+
+  // Two devices: when the page becomes visible again with a workout open,
+  // take the server's logged sets, segments and pause state. Notes typed
+  // here and not yet sent stay local (ActiveWorkout flushes them).
+  const activeWorkoutRef = useRef(activeWorkout);
+  activeWorkoutRef.current = activeWorkout;
+  useEffect(() => {
+    if (!isLoggedIn) return undefined;
+    let lastFetch = 0;
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      const current = activeWorkoutRef.current;
+      if (!current?.workout?.id) return;
+      if (Date.now() - lastFetch < 5000) return; // one refetch per refocus burst
+      lastFetch = Date.now();
+      fetch(`${API_BASE}/workouts/active`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('ripfit_token')}` },
+      })
+        .then(r => (r.ok ? r.json() : null))
+        .then(d => {
+          if (!d?.workout) return;
+          setActiveWorkout(prev => (prev?.workout?.id === d.workout.id ? mergeServerWorkout(prev, d) : prev));
+        })
+        .catch(() => {});
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [isLoggedIn]);
+
+  const activeWorkoutValue = useMemo(
+    () => ({ activeWorkoutId: activeWorkout?.workout?.id ?? null, openWorkout }),
+    [activeWorkout?.workout?.id, openWorkout]
+  );
 
   // Optimistic: the UI switches immediately; a failed save rolls back and
   // rethrows so the caller can show an error.
@@ -289,6 +411,7 @@ function App() {
     setUserPrefs(DEFAULT_USER_PREFS);
     setPrefsLoaded(false);
     setDrawerOpen(false);
+    setResumePrompt(null);
   };
 
   const goToWorkouts = () => {
@@ -323,7 +446,17 @@ function App() {
 
   return (
     <UserPrefsContext.Provider value={prefsValue}>
+    <ActiveWorkoutContext.Provider value={activeWorkoutValue}>
     <div className="app">
+      {isLoggedIn && resumePrompt && !activeWorkout && (
+        <ResumeWorkoutPrompt
+          data={resumePrompt}
+          busy={resumeBusy}
+          error={resumeError}
+          onResume={resumeFromPrompt}
+          onCancel={cancelFromPrompt}
+        />
+      )}
       <header className="header">
         <div className="container">
           <nav className="nav">
@@ -469,6 +602,7 @@ function App() {
         </div>
       </footer>
     </div>
+    </ActiveWorkoutContext.Provider>
     </UserPrefsContext.Provider>
   )
 }

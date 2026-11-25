@@ -34,6 +34,8 @@ export default function WorkoutHistory({ initialWorkoutId, onClearSelected }) {
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [detailEntry, setDetailEntry] = useState(null);
+  // Cancelled workouts with nothing logged are hidden unless asked for.
+  const [showCancelled, setShowCancelled] = useState(false);
 
   const token = localStorage.getItem('ripfit_token');
 
@@ -64,11 +66,14 @@ export default function WorkoutHistory({ initialWorkoutId, onClearSelected }) {
     }
   };
 
+  const isEmptyCancelled = e => e.status === 'cancelled' && e.has_activity === false;
+  const visible = showCancelled ? entries : entries.filter(e => !isEmptyCancelled(e));
+  const hiddenCancelled = entries.length - visible.length;
   const filtered = filter === 'all'
-    ? entries
+    ? visible
     : filter === 'cardio'
-      ? entries.filter(e => e.type === 'cardio')
-      : entries.filter(e => e.type !== 'cardio');
+      ? visible.filter(e => e.type === 'cardio')
+      : visible.filter(e => e.type !== 'cardio');
 
   if (detailEntry) {
     return (
@@ -96,6 +101,10 @@ export default function WorkoutHistory({ initialWorkoutId, onClearSelected }) {
             {f.label}
           </button>
         ))}
+        <label className="sc-show-cancelled">
+          <input type="checkbox" checked={showCancelled} onChange={e => setShowCancelled(e.target.checked)} />
+          Show cancelled{!showCancelled && hiddenCancelled > 0 ? ` (${hiddenCancelled})` : ''}
+        </label>
       </div>
 
       {loading && <p className="history-loading">Loading…</p>}

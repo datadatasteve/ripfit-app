@@ -6,6 +6,8 @@ import {
   Cell, ReferenceLine,
 } from 'recharts';
 import { formatRepRange, judgeReps } from '../utils/repRange';
+import { useUserPrefs } from '../contexts/UserPrefsContext';
+import { useActiveWorkoutControls } from '../contexts/ActiveWorkoutContext';
 import './WorkoutDetailPage.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
@@ -401,12 +403,137 @@ function VolumeChart({ exercises, typeColor }) {
   );
 }
 
+// ── Session history (Phase 0A-2) ─────────────────────────────────────────────
+const EVENT_LABELS = {
+  started: 'Started',
+  paused: 'Paused',
+  resumed: 'Resumed',
+  cancelled: 'Cancelled',
+  auto_cancelled: 'Auto-cancelled',
+  reopened: 'Resumed after cancel',
+  finished: 'Finished',
+};
+
+/** Clock time in the user's stored zone (browser zone if unset or invalid). */
+function makeTimeFormatter(timeZone) {
+  const opts = { hour: 'numeric', minute: '2-digit' };
+  try {
+    const f = new Intl.DateTimeFormat('en-US', timeZone ? { ...opts, timeZone } : opts);
+    return ts => f.format(new Date(ts)).toLowerCase();
+  } catch {
+    const f = new Intl.DateTimeFormat('en-US', opts);
+    return ts => f.format(new Date(ts)).toLowerCase();
+  }
+}
+
+function makeDayFormatter(timeZone) {
+  const opts = { month: 'short', day: 'numeric' };
+  try {
+    const f = new Intl.DateTimeFormat('en-US', timeZone ? { ...opts, timeZone } : opts);
+    return ts => f.format(new Date(ts));
+  } catch {
+    return ts => new Date(ts).toLocaleDateString('en-US', opts);
+  }
+}
+
+function fmtMinutes(seconds) {
+  const m = Math.round(seconds / 60);
+  if (m >= 60) {
+    const h = Math.floor(m / 60);
+    const rest = m % 60;
+    return rest ? `${h} h ${rest} min` : `${h} h`;
+  }
+  return `${m} min`;
+}
+
+function eventDetail(ev) {
+  const m = ev.metadata || {};
+  if (ev.event_type === 'resumed') {
+    const parts = [];
+    if (Number.isInteger(m.paused_seconds)) parts.push(`after ${fmtMinutes(m.paused_seconds)}`);
+    if (m.reason === 'finish') parts.push('on finish');
+    if (m.reason === 'cancel') parts.push('on cancel');
+    return parts.join(', ');
+  }
+  if (ev.event_type === 'reopened' && Number.isInteger(m.gap_seconds)) return `${fmtMinutes(m.gap_seconds)} after the cancel, not counted`;
+  if (ev.event_type === 'cancelled' && m.empty) return 'nothing was logged';
+  if (ev.event_type === 'auto_cancelled') return `no activity for ${m.age_limit_hours ?? '?'} h`;
+  if (m.backfilled) return 'from the workout record';
+  return '';
+}
+
+function SessionHistory({ events, longPauses, timeZone }) {
+  const [open, setOpen] = useState(false);
+  const fmtClock = makeTimeFormatter(timeZone);
+  const fmtDay = makeDayFormatter(timeZone);
+  if (!events?.length) return null;
+  const firstDay = fmtDay(events[0].occurred_at);
+  const clockWithDay = ts => (fmtDay(ts) === firstDay ? fmtClock(ts) : `${fmtDay(ts)}, ${fmtClock(ts)}`);
+  return (
+    <div className="wdp-section wdp-session-history">
+      {/* Long pauses are noted even while the history is collapsed. */}
+      {longPauses?.length > 0 && (
+        <ul className="wdp-long-pauses">
+          {longPauses.map((p, i) => (
+            <li key={i}>Paused {fmtMinutes(p.seconds)} at {clockWithDay(p.started_at)}</li>
+          ))}
+        </ul>
+      )}
+      <button type="button" className="wdp-session-toggle" onClick={() => setOpen(o => !o)} aria-expanded={open}>
+        <span className="wdp-section-title">Session history</span>
+        <span aria-hidden="true">{open ? '▾' : '▸'}</span>
+      </button>
+      {open && (
+        <>
+          <ol className="wdp-event-list">
+            {events.map(ev => {
+              const detail = eventDetail(ev);
+              return (
+                <li key={ev.id}>
+                  <span className="wdp-event-time">{clockWithDay(ev.occurred_at)}</span>
+                  <span className="wdp-event-label">{EVENT_LABELS[ev.event_type] || ev.event_type}</span>
+                  {detail && <span className="wdp-event-detail">{detail}</span>}
+                </li>
+              );
+            })}
+          </ol>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function WorkoutDetailPage({ workoutId, workoutType, onBack }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [reopening, setReopening] = useState(false);
+  const [reopenError, setReopenError] = useState('');
   const token = localStorage.getItem('ripfit_token');
+  const { prefs } = useUserPrefs();
+  const { openWorkout } = useActiveWorkoutControls();
+
+  // Resume a cancelled workout (Phase 0A-2): reopen on the server, then open
+  // it as the active workout.
+  const reopen = async () => {
+    setReopening(true);
+    setReopenError('');
+    try {
+      const res = await fetch(`${API_BASE}/workouts/${workoutId}/reopen`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || 'Could not resume this workout.');
+      openWorkout(body);
+    } catch (err) {
+      setReopenError(err.message && !err.message.startsWith('Failed to fetch')
+        ? err.message
+        : 'Could not resume this workout. Check your connection and try again.');
+      setReopening(false);
+    }
+  };
 
   useEffect(() => {
     if (!workoutId) return;
@@ -449,6 +576,14 @@ export default function WorkoutDetailPage({ workoutId, workoutType, onBack }) {
       {data.status === 'cancelled' && (
         <div className="wdp-status-banner cancelled" role="status">
           Cancelled. This workout isn't counted in stats or program progress.
+        </div>
+      )}
+      {!isCardio && data.can_reopen && (
+        <div className="wdp-reopen">
+          <button type="button" className="wdp-reopen-btn" onClick={reopen} disabled={reopening}>
+            {reopening ? 'Resuming…' : 'Resume'}
+          </button>
+          {reopenError && <p className="wdp-reopen-error" role="alert">{reopenError}</p>}
         </div>
       )}
       {data.status === 'in_progress' && (
@@ -533,6 +668,10 @@ export default function WorkoutDetailPage({ workoutId, workoutType, onBack }) {
             {data.max_heart_rate != null && <div className="wdp-cardio-row"><span>Max HR</span><span>{data.max_heart_rate} bpm</span></div>}
           </div>
         </div>
+      )}
+
+      {!isCardio && (
+        <SessionHistory events={data.session_events} longPauses={data.long_pauses} timeZone={prefs.timezone} />
       )}
 
       {!isCardio && <RPEChart exercises={strengthExercises} />}

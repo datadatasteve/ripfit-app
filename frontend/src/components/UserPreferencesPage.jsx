@@ -7,7 +7,7 @@ import './UserPreferencesPage.css';
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import BugReportModal from './BugReportModal';
 import { useTheme } from '../contexts/ThemeContext';
-import { useUserPrefs } from '../contexts/UserPrefsContext';
+import { useUserPrefs, AGE_LIMIT_HOURS_OPTIONS, PAUSE_NOTE_MINUTES_OPTIONS } from '../contexts/UserPrefsContext';
 import ProfileCircle from './ProfileCircle';
 import './UserPreferencesPage.css';
 
@@ -521,6 +521,38 @@ export default function UserPreferencesPage({ onBack }) {
                 onChange={v => savePref({ previous_notes_scope: v })}
                 disabled={!prefsLoaded}
               />
+
+              <div className="prefs-field-group">
+                <label htmlFor="pref-age-limit">Auto-cancel and resume window (hours)</label>
+                <select
+                  id="pref-age-limit"
+                  className="prefs-select"
+                  value={prefs.workout_age_limit_hours}
+                  onChange={e => savePref({ workout_age_limit_hours: Number(e.target.value) })}
+                  disabled={!prefsLoaded}
+                >
+                  {AGE_LIMIT_HOURS_OPTIONS.map(h => (
+                    <option key={h} value={h}>{h}{h === 24 ? ' (default)' : ''}</option>
+                  ))}
+                </select>
+                <p className="prefs-hint">An unfinished workout with no activity for this long is cancelled, and a cancelled workout can be resumed for this long.</p>
+              </div>
+
+              <div className="prefs-field-group">
+                <label htmlFor="pref-pause-note">Note pauses of at least (minutes)</label>
+                <select
+                  id="pref-pause-note"
+                  className="prefs-select"
+                  value={prefs.pause_note_minutes}
+                  onChange={e => savePref({ pause_note_minutes: Number(e.target.value) })}
+                  disabled={!prefsLoaded}
+                >
+                  {PAUSE_NOTE_MINUTES_OPTIONS.map(m => (
+                    <option key={m} value={m}>{m}{m === 15 ? ' (default)' : ''}</option>
+                  ))}
+                </select>
+                <p className="prefs-hint">Pauses this long are listed on the workout's detail page. Paused time never counts toward duration.</p>
+              </div>
 
               {prefMsg && <p className={`prefs-msg ${prefMsgType}`}>{prefMsg}</p>}
 
