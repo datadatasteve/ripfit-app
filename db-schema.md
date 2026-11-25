@@ -5,6 +5,7 @@
 - Updated any time a migration is run or a shell schema change is made
 - When a new feature changes the schema, the implementing chat will list the exact lines to add here
 - **Regenerated in full on 2026-11-22 (Phase 0A-1)** from a local database built from repo migrations 001 through 031. Every column's Notes start with the migration that created it. Types are the real Postgres types (`timestamp` means `timestamp without time zone`).
+- **Updated 2026-11-24 (Phase 0B-1)** for migrations 032 and 033, checked against `backend/scripts/one-off/dump-schema.js` run on a local database built from migrations 001 through 033: every table and column in the database is listed here.
 
 ## Connection
 
@@ -391,6 +392,8 @@ Created in migration 020. Program progress. A row only counts as done when its w
 |completed_date|date|migration 020|
 |created_at|timestamptz|migration 020; default now()|
 
+Indexes: `uq_program_workouts_workout` UNIQUE (workout_id) WHERE workout_id IS NOT NULL (migration 033; one row per workout, duplicates removed keeping the lowest id).
+
 ### programs
 
 Created in migration 018.
@@ -599,8 +602,12 @@ Created in migration 001.
 |tempo_visual_enabled|boolean|migration 026; default false|
 |tempo_audio_enabled|boolean|migration 026; default false|
 |timezone|text|migration 030; IANA zone from the browser; NULL means UTC. Used for hour/day-of-week stats|
+|workout_age_limit_hours|integer not null|migration 032; default 24. Auto-cancel and resume window; one of 1–12, 24, 36, 48|
+|pause_note_minutes|integer not null|migration 032; default 15. Shortest pause noted on the detail page; 5–60 in steps of 5|
+|log_set_button_position|text not null|migration 033; default 'inline'. 'inline' or 'pinned' (bar above Previous / Next on phones)|
+|tempo_countdown_beeps|integer not null|migration 033; default 3. Tempo lead-in beeps before the first rep, 0–5 (0 = off)|
 
-Constraints: `oauth_unique` UNIQUE (oauth_provider, oauth_id); `users_email_key` UNIQUE (email); `users_previous_notes_scope_check` CHECK (((previous_notes_scope)::text = ANY ((ARRAY['all'::character varying, 'program'::character varying, 'non_program'::character varying])::text[]))); `users_reorder_mode_check` CHECK (((reorder_mode)::text = ANY ((ARRAY['drag'::character varying, 'arrows'::character varying])::text[]))); `users_username_key` UNIQUE (username)
+Constraints: `oauth_unique` UNIQUE (oauth_provider, oauth_id); `users_email_key` UNIQUE (email); `users_previous_notes_scope_check` CHECK (((previous_notes_scope)::text = ANY ((ARRAY['all'::character varying, 'program'::character varying, 'non_program'::character varying])::text[]))); `users_reorder_mode_check` CHECK (((reorder_mode)::text = ANY ((ARRAY['drag'::character varying, 'arrows'::character varying])::text[]))); `users_username_key` UNIQUE (username); `users_workout_age_limit_hours_allowed` CHECK (workout_age_limit_hours IN (1,2,3,4,5,6,7,8,9,10,11,12,24,36,48)); `users_pause_note_minutes_allowed` CHECK (pause_note_minutes IN (5,10,15,20,25,30,35,40,45,50,55,60)); `users_log_set_button_position_allowed` CHECK (log_set_button_position IN ('inline','pinned')); `users_tempo_countdown_beeps_allowed` CHECK (tempo_countdown_beeps BETWEEN 0 AND 5)
 
 ### workout_cardio_segments
 
@@ -668,6 +675,20 @@ Created in migration 001.
 |primary_muscles|text[]|migration 018; default '{}'|
 |secondary_muscles|text[]|migration 018; default '{}'|
 |tags|text[]|migration 018; default '{}'|
+
+### workout_session_events
+
+Created in migration 032. One row per lifecycle event of a workout (Phase 0A-2). Rows backfilled by 032 carry `metadata = {"backfilled": true}`.
+
+|Column|Type|Notes|
+|---|---|---|
+|id|serial PK|migration 032|
+|workout_id|integer FK → workouts (cascade) not null|migration 032|
+|event_type|text not null|migration 032; started, paused, resumed, cancelled, auto_cancelled, reopened, finished|
+|occurred_at|timestamptz not null|migration 032; default now()|
+|metadata|jsonb|migration 032; e.g. paused_seconds, reason, gap_seconds, swept_at, age_limit_hours|
+
+Constraints: `workout_session_events_type_allowed` CHECK (event_type IN ('started','paused','resumed','cancelled','auto_cancelled','reopened','finished')). Index: `idx_workout_session_events_workout` (workout_id, occurred_at).
 
 ### workout_sets
 
