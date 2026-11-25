@@ -873,3 +873,25 @@
   white-space: nowrap;
   cursor: pointer;
 }
+
+/* Landing-page Scan (Phase 0B-1b) */
+.nutri-landing-scan { display: flex; flex-direction: column; gap: 6px; margin: 0 0 12px; }
+.nutri-landing-scan-btn {
+  width: 100%;
+  min-height: 48px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: var(--text-inverse);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+.nutri-scan-notice {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  color: var(--color-success);
+  font-size: var(--font-size-sm);
+}

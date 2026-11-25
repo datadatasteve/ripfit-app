@@ -702,6 +702,11 @@ export default function NutritionPage() {
   const [splitInput, setSplitInput] = useState({ breakfast: '33', lunch: '33', dinner: '34', snacks: '0' });
   const [loading, setLoading] = useState(true);
   const [addingToMeal, setAddingToMeal] = useState(null);
+  // Landing-page scanner (Phase 0B-1b): scan first, then Add to meal or Just checking.
+  const [landingScan, setLandingScan] = useState(false);
+  const [scanNotice, setScanNotice] = useState('');
+  const scanNoticeTimer = useRef(null);
+  useEffect(() => () => clearTimeout(scanNoticeTimer.current), []);
 
   const fetchDay = useCallback(async () => {
     setLoading(true);
@@ -816,6 +821,15 @@ export default function NutritionPage() {
         <button aria-label="Next day" data-tooltip="Next day" className="nutri-date-btn" onClick={() => changeDate(1)} disabled={isToday}>›</button>
       </div>
 
+      {/* Scan from the landing page (Phase 0B-1b). The scanner inside each
+          meal's "+ Add" is unchanged. */}
+      <div className="nutri-landing-scan">
+        <button type="button" className="nutri-landing-scan-btn" onClick={() => { setScanNotice(''); setLandingScan(true); }}>
+          ▦ Scan a barcode
+        </button>
+        {scanNotice && <p className="nutri-scan-notice" role="status">{scanNotice}</p>}
+      </div>
+
       {/* Macro summary */}
       <div className="nutri-summary-card">
         <div className="nutri-summary-header">
@@ -911,6 +925,22 @@ export default function NutritionPage() {
             />
           ))}
         </div>
+      )}
+
+      {landingScan && (
+        <BarcodeScanner
+          mode="check"
+          mealDate={date}
+          dateLabel={isToday ? '' : fmtDate(date)}
+          onClose={() => setLandingScan(false)}
+          onLogged={(meal, food) => {
+            setLandingScan(false);
+            fetchDay();
+            setScanNotice(`Added ${food?.name || 'the food'} to ${MEAL_LABELS[meal] || meal}${isToday ? '' : ` (${fmtDate(date)})`}.`);
+            clearTimeout(scanNoticeTimer.current);
+            scanNoticeTimer.current = setTimeout(() => setScanNotice(''), 6000);
+          }}
+        />
       )}
 
       {/* Food search modal */}

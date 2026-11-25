@@ -40,45 +40,138 @@
   cursor: pointer;
 }
 
-.bcs-camera {
-  position: relative;
+.bcs-camera-wrap {
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: var(--space-sm);
 }
 
-.bcs-video {
+/* The live view: 3:4 portrait. The video fills it (cover) and a digital zoom
+   scales it; the decoder reads the same area (see BOX in the component). */
+.bcs-camera {
+  position: relative;
   width: 100%;
   aspect-ratio: 3 / 4;
-  object-fit: cover;
-  border-radius: var(--radius-md);
-  background: #000;
-}
-
-/* Aiming box over the middle of the video. */
-.bcs-reticle {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  aspect-ratio: 3 / 4;
-  pointer-events: none;
-  display: flex;
+  max-height: 62vh;
   overflow: hidden;
   border-radius: var(--radius-md);
+  background: #000;
+  touch-action: manipulation;
 }
-.bcs-reticle::before {
-  content: '';
+.bcs-camera.can-focus { cursor: crosshair; }
+
+.bcs-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform-origin: center center;
+}
+
+/* Aiming box: 84% wide, 40% tall (about 1.6:1, the shape of a UPC/EAN with
+   its margins). Must match BOX in BarcodeScanner.jsx. */
+.bcs-reticle {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+}
+.bcs-reticle span {
   margin: auto;
-  width: 80%;
-  height: 28%;
+  width: 84%;
+  height: 40%;
   border: 3px solid var(--color-success);
   border-radius: var(--radius-md);
   box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35);
+  position: relative;
+}
+.bcs-reticle span::after {
+  /* A faint centre line to aim along. */
+  content: '';
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  top: 50%;
+  height: 2px;
+  background: rgba(255, 80, 80, 0.55);
 }
 
-.bcs-hint { margin: 0; font-size: var(--font-size-sm); color: var(--text-secondary); }
+.bcs-focus-mark {
+  position: absolute;
+  width: 56px;
+  height: 56px;
+  margin: -28px 0 0 -28px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: bcs-focus 1.5s ease-out forwards;
+}
+@keyframes bcs-focus {
+  0% { transform: scale(1.4); opacity: 1; }
+  30% { transform: scale(1); }
+  100% { opacity: 0; }
+}
+
+.bcs-camera-status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: var(--font-size-sm);
+}
+
+.bcs-instruction {
+  margin: 0;
+  text-align: center;
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-base);
+}
+.bcs-subhint { margin: 0; text-align: center; font-size: var(--font-size-sm); color: var(--text-secondary); }
+
+.bcs-zoom { display: flex; align-items: center; gap: var(--space-sm); }
+.bcs-zoom input[type='range'] { flex: 1; min-height: 44px; }
+.bcs-zoom-btn {
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: var(--font-size-lg);
+  cursor: pointer;
+}
+.bcs-zoom-btn:disabled { opacity: 0.4; cursor: default; }
+.bcs-zoom-value { min-width: 3.2em; text-align: right; font-size: var(--font-size-sm); color: var(--text-secondary); }
+
+.bcs-tools { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+.bcs-tools > button { flex: 1 1 45%; }
+.bcs-camera-name { margin: 0; font-size: var(--font-size-xs, 12px); color: var(--text-secondary); text-align: center; }
+.bcs-decoder { margin: 0; font-size: var(--font-size-xs, 12px); color: var(--text-tertiary, var(--text-secondary)); text-align: center; }
+
+.bcs-file { display: none; }
+
+.bcs-type-row { display: flex; flex-direction: column; gap: 4px; }
+.bcs-type-label { font-size: var(--font-size-sm); color: var(--text-secondary); }
+.bcs-type-inputs { display: flex; gap: var(--space-sm); }
+.bcs-type-inputs input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: var(--font-size-base);
+  letter-spacing: 0.04em;
+}
+.bcs-type-btn { flex: 0 0 auto; }
+
+.bcs-meal-choice { display: flex; flex-direction: column; gap: var(--space-sm); margin-top: var(--space-sm); }
+.bcs-meal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-sm); }
 
 .bcs-panel { display: flex; flex-direction: column; gap: var(--space-sm); }
 .bcs-title { margin: 0; }
