@@ -8,7 +8,12 @@ import { createContext, useContext } from 'react';
 export const ActiveWorkoutContext = createContext({
   activeWorkoutId: null,
   openWorkout: () => {},
+  // The open workout was cancelled or finished elsewhere (a 409 from logging,
+  // or a refocus check): tell the user and close the workout view.
+  workoutClosedElsewhere: () => {},
 });
+
+export const WORKOUT_CLOSED_ELSEWHERE = 'This workout was cancelled or finished on another device.';
 
 export function useActiveWorkoutControls() {
   return useContext(ActiveWorkoutContext);

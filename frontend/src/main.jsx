@@ -3,6 +3,9 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import { ThemeProvider } from './contexts/ThemeContext.jsx'
 import './styles/index.css'
+import { installNumberInputGuards } from './utils/numberInputGuards'
+
+installNumberInputGuards()
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

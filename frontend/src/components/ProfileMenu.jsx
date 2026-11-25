@@ -366,7 +366,7 @@ export default function ProfileMenu({ onLogout, onOpenPrefs, onOpenAdmin }) {
                     <label>Height</label>
                     <div className="profile-inline-row">
                       <input
-                        type="number"
+                        type="number" inputMode="decimal" min="0"
                         value={form.height_cm}
                         onChange={e => setForm(f => ({ ...f, height_cm: e.target.value }))}
                         placeholder={form.units_weight === 'lbs' ? 'inches' : 'cm'}
@@ -382,7 +382,7 @@ export default function ProfileMenu({ onLogout, onOpenPrefs, onOpenAdmin }) {
                     <label>Weight</label>
                     <div className="profile-inline-row">
                       <input
-                        type="number"
+                        type="number" inputMode="decimal" min="0"
                         step="0.1"
                         value={form.weight_kg}
                         onChange={e => setForm(f => ({ ...f, weight_kg: e.target.value }))}
@@ -633,6 +633,7 @@ function GoalField({ label, field, details, onChange, type = 'text', placeholder
       <input
         type={type}
         step={step}
+        {...(type === 'number' ? { inputMode: 'decimal', min: '0' } : {})}
         placeholder={placeholder || ''}
         value={details[field] || ''}
         onChange={e => onChange(field, e.target.value)}

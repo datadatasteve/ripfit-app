@@ -1174,3 +1174,27 @@
   opacity: 0.6;
   cursor: default;
 }
+
+/* ── Workout closed on another device (Phase 0B-1) ─────────────────────── */
+.workout-closed-notice {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2100;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100% - 24px);
+  padding: 12px 16px;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+}
+
+.view-loading {
+  padding: 24px;
+  color: var(--text-secondary);
+}

@@ -466,6 +466,17 @@
   margin-bottom: 16px;
 }
 
+/* Combined tab: "Include meditation" (Phase 0B-1) */
+.sc-meditation-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 16px;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
 /* ── Loading / empty ─────────────────────────────────────────────────────── */
 .sc-loading,
 .sc-empty {

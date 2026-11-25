@@ -93,7 +93,7 @@ function SlotHandle({ wi, dow, slot }) {
     data: { kind: 'slot', from: [wi, dow], ...slot },
   });
   return (
-    <button ref={setNodeRef} type="button" className="pb-slot-handle" title="Drag to another day"
+    <button data-tooltip={`Move ${slot.is_rest_day ? 'rest day' : slot.routine_name}`} ref={setNodeRef} type="button" className="pb-slot-handle"
       aria-label={`Move ${slot.is_rest_day ? 'rest day' : slot.routine_name}`} {...listeners} {...attributes}>
       ⠿
     </button>
@@ -330,7 +330,7 @@ export default function ProgramBuilder({ existingProgram, onSaved, onClose, onDe
             <label className="pb-overload-field">
               <span>Increment {overloadStrategy === 'weight' ? '(lbs)' : '(reps)'}</span>
               <input
-                type="number"
+                type="number" inputMode="decimal"
                 step={overloadStrategy === 'weight' ? '0.5' : '1'}
                 min="0"
                 placeholder={overloadStrategy === 'weight' ? '2.5' : '1'}
@@ -354,7 +354,7 @@ export default function ProgramBuilder({ existingProgram, onSaved, onClose, onDe
               {n} weeks
             </button>
           ))}
-          <input className="pb-duration-custom" type="number" min={1} placeholder="Custom"
+          <input className="pb-duration-custom" type="number" inputMode="numeric" min={1} placeholder="Custom"
             value={customDuration}
             onChange={e => { setCustomDuration(e.target.value); handleDurationChange(e.target.value); }} />
         </div>
@@ -439,13 +439,13 @@ export default function ProgramBuilder({ existingProgram, onSaved, onClose, onDe
                             : <span className="pb-slot-name">{slot.routine_name}</span>}
                           {reorderMode === 'arrows' && (
                             <span className="pb-slot-arrows">
-                              <button type="button" onClick={() => moveSlot(wi, dow, -1)} disabled={flat === 0}
-                                aria-label="Move to previous day" title="Move to previous day">↑</button>
-                              <button type="button" onClick={() => moveSlot(wi, dow, 1)} disabled={flat === weeks.length * 7 - 1}
-                                aria-label="Move to next day" title="Move to next day">↓</button>
+                              <button data-tooltip="Move to previous day" type="button" onClick={() => moveSlot(wi, dow, -1)} disabled={flat === 0}
+                                aria-label="Move to previous day">↑</button>
+                              <button data-tooltip="Move to next day" type="button" onClick={() => moveSlot(wi, dow, 1)} disabled={flat === weeks.length * 7 - 1}
+                                aria-label="Move to next day">↓</button>
                             </span>
                           )}
-                          <button className="pb-slot-clear" onClick={() => clearSlot(wi, dow)} aria-label="Clear day">✕</button>
+                          <button data-tooltip="Clear day" className="pb-slot-clear" onClick={() => clearSlot(wi, dow)} aria-label="Clear day">✕</button>
                         </div>
                       )}
                     </CalendarCell>

@@ -172,7 +172,7 @@ export default function BarcodeScanner({ mealType, mealDate, mealLabel, onClose,
       <div className="bcs-sheet">
         <div className="bcs-header">
           <h3>Scan barcode{mealLabel ? ` · ${mealLabel}` : ''}</h3>
-          <button type="button" className="bcs-close" onClick={close} aria-label="Close scanner">✕</button>
+          <button data-tooltip="Close scanner" type="button" className="bcs-close" onClick={close} aria-label="Close scanner">✕</button>
         </div>
 
         {(phase === 'starting' || phase === 'scanning') && (

@@ -8,6 +8,7 @@ import WaterWidget from './WaterWidget';
 import WorkoutTimerBar, { baseCooldownFor, InlineTimer } from './WorkoutTimers';
 import { useTempoGuide } from './TempoGuide';
 import { useUserPrefs } from '../contexts/UserPrefsContext';
+import { useActiveWorkoutControls } from '../contexts/ActiveWorkoutContext';
 import MeditationTimer from './MeditationTimer';
 import './ActiveWorkout.css';
 
@@ -125,7 +126,7 @@ function SessionRatingWidget({ workoutId }) {
       {prefs.display === 'stars' ? (
         <div className="session-rating-stars">
           {ticks.map(v => (
-            <button
+            <button data-tooltip={`Rate ${v} out of ${scale}`}
               key={v}
               className={`star-btn ${rating >= v ? 'active' : ''}`}
               onClick={() => setRating(v)}
@@ -232,6 +233,7 @@ function formatDurationDisplay(totalSecs) {
 // Renders different fields by subcategory, auto-derives the third value
 // when two of duration/distance/pace are provided.
 function CardioSegmentForm({ exercise, workoutId, segments, setSegments, userPaceUnit = 'min/mile', userDistanceUnit = 'mi' }) {
+  const { workoutClosedElsewhere } = useActiveWorkoutControls();
   const subcategory = exercise.subcategory || '';
   const label = cardioSegmentLabel(subcategory);
   const isInterval = subcategory.toLowerCase() === 'interval';
@@ -347,6 +349,8 @@ function CardioSegmentForm({ exercise, workoutId, segments, setSegments, userPac
         `${API_BASE}/workouts/${workoutId}/exercises/${exercise.id}/cardio-segments`,
         { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` }, body: JSON.stringify(body) }
       );
+      if (res.status === 409) { workoutClosedElsewhere(); return; }
+      if (!res.ok) throw new Error(`segment failed (${res.status})`);
       const data = await res.json();
       setSegments(prev => [...prev, data]);
 
@@ -380,13 +384,13 @@ function CardioSegmentForm({ exercise, workoutId, segments, setSegments, userPac
       <div className="form-row">
         {isInterval ? (
           <>
-            <input type="number" placeholder="Rounds / Reps" value={reps} onChange={e => setReps(e.target.value)} />
+            <input type="number" inputMode="numeric" min="0" placeholder="Rounds / Reps" value={reps} onChange={e => setReps(e.target.value)} />
             <input type="text" placeholder="Duration (MM:SS)" value={durationInput} onChange={e => setDurationInput(e.target.value)} onBlur={handleAutoDerive} />
           </>
         ) : isSwimming ? (
           <>
-            <input type="number" placeholder="Laps" value={laps} onChange={e => setLaps(e.target.value)} onBlur={handleAutoDerive} />
-            <input type="number" step="0.1" placeholder="Lap distance (m)" value={lapDistance} onChange={e => setLapDistance(e.target.value)} onBlur={handleAutoDerive} />
+            <input type="number" inputMode="numeric" min="0" placeholder="Laps" value={laps} onChange={e => setLaps(e.target.value)} onBlur={handleAutoDerive} />
+            <input type="number" inputMode="decimal" min="0" step="0.1" placeholder="Lap distance (m)" value={lapDistance} onChange={e => setLapDistance(e.target.value)} onBlur={handleAutoDerive} />
             <input type="text" placeholder="Duration (MM:SS)" value={durationInput} onChange={e => setDurationInput(e.target.value)} onBlur={handleAutoDerive} />
           </>
         ) : (
@@ -399,7 +403,7 @@ function CardioSegmentForm({ exercise, workoutId, segments, setSegments, userPac
               onBlur={handleAutoDerive}
             />
             <input
-              type="number"
+              type="number" inputMode="decimal" min="0"
               step="0.01"
               placeholder={`Distance (${userDistanceUnit})${derived === 'distance' ? ' ← auto' : ''}`}
               value={distance}
@@ -416,7 +420,7 @@ function CardioSegmentForm({ exercise, workoutId, segments, setSegments, userPac
                 style={{ width: '100%' }}
               />
               {paceOverridden && (
-                <button
+                <button aria-label="Clear override, re-derive" data-tooltip="Clear override, re-derive"
                   onClick={() => {
                     setPaceOverridden(false);
                     setPace('');
@@ -431,7 +435,7 @@ function CardioSegmentForm({ exercise, workoutId, segments, setSegments, userPac
                     }
                   }}
                   style={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)', fontSize: '0.7em', padding: '2px 4px', background: 'none', border: '1px solid #888', borderRadius: 3, cursor: 'pointer', color: '#888' }}
-                  title="Clear override, re-derive"
+                 
                 >↺</button>
               )}
             </div>
@@ -451,7 +455,7 @@ function CardioSegmentForm({ exercise, workoutId, segments, setSegments, userPac
       {!isSwimming && (
         <div className="form-row" style={{ marginTop: '8px' }}>
           <input
-            type="number"
+            type="number" min="0"
             inputMode="decimal"
             step="0.1"
             placeholder="Avg speed"
@@ -460,7 +464,7 @@ function CardioSegmentForm({ exercise, workoutId, segments, setSegments, userPac
             title={!avgSpeedManual && avgSpeed ? 'Worked out from distance and duration' : undefined}
           />
           <input
-            type="number"
+            type="number" inputMode="decimal" min="0"
             step="0.1"
             placeholder="Max speed"
             value={maxSpeed}
@@ -691,6 +695,8 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
             workout_date: localDate,
             workout_title: finalTitle,
             workout_type: preloadCardio ? 'cardio' : 'open',
+            // Saved with the row, so it is in this first response (Phase 0B-1).
+            ...(preloadCardio?.goals?.pre_session_notes ? { overall_notes: preloadCardio.goals.pre_session_notes } : {}),
           }),
         });
       } else {
@@ -759,14 +765,6 @@ export default function ActiveWorkout({ activeWorkout, setActiveWorkout, workout
             },
           }];
 
-          // Save pre-session notes if any
-          if (goals.pre_session_notes) {
-            await fetch(`${API_BASE}/workouts/${data.workout.id}/notes`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-              body: JSON.stringify({ overall_notes: goals.pre_session_notes }),
-            }).catch(() => {});
-          }
         }
       }
 
@@ -1785,6 +1783,7 @@ function WorkoutClockButton({ showTime, isPaused, elapsedStr, onToggle }) {
 }
 
 function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCancel, showNavClock, setShowNavClock }) {
+  const { workoutClosedElsewhere } = useActiveWorkoutControls();
   const [currentExerciseIdx, setCurrentExerciseIdx] = useState(0);
   const [setForm, setSetForm] = useState({ reps: '', weight: '', rpe: '' });
   const [showAddExercise, setShowAddExercise] = useState(false);
@@ -2057,6 +2056,14 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
     const token = localStorage.getItem('ripfit_token');
     const oldExercise = currentExercise;
     
+    const oldNotes = oldExercise.exercise_notes ? `\nPrevious notes (${oldExercise.exercise_name}): ${oldExercise.exercise_notes}` : '';
+    const substitutionNote = reason
+      ? `Substituted for ${oldExercise.exercise_name}. Reason: ${reason}${oldNotes}`
+      : `Substituted for ${oldExercise.exercise_name}${oldNotes}`;
+    const targetWeight = targets.weight && !['BW', '0', '-'].includes(targets.weight.toString().toUpperCase())
+      ? parseFloat(targets.weight)
+      : null;
+
     try {
       // Delete old exercise from workout
       await fetch(`${API_BASE}/workouts/${workout.workout.id}/exercises/${oldExercise.id}`, {
@@ -2074,17 +2081,23 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
         body: JSON.stringify({
           exercise_id: newExercise.id,
           order_index: currentExerciseIdx + 1,
-          exercise_notes: reason ? `Substituted for ${oldExercise.exercise_name}. Reason: ${reason}` : null
+          target_sets: targets.sets ? parseInt(targets.sets) : null,
+          target_reps_min: targets.reps ? parseInt(targets.reps) : null,
+          target_reps_max: targets.reps ? parseInt(targets.reps) : null,
+          target_weight: targetWeight,
         })
       });
+      if (!res.ok) throw new Error(`add exercise failed (${res.status})`);
       const data = await res.json();
-      
-      // Update state with new targets if provided
-      const oldNotes = oldExercise.exercise_notes ? `\nPrevious notes (${oldExercise.exercise_name}): ${oldExercise.exercise_notes}` : '';
-      const substitutionNote = reason 
-        ? `Substituted for ${oldExercise.exercise_name}. Reason: ${reason}${oldNotes}` 
-        : `Substituted for ${oldExercise.exercise_name}${oldNotes}`;
-      
+
+      // The substitution note goes to the server through the normal note
+      // endpoint, so it is still there after a reload or resume (Phase 0B-1).
+      await fetch(`${API_BASE}/workouts/${workout.workout.id}/exercises/${data.id}/notes`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ notes: substitutionNote }),
+      }).catch(err => console.error('Failed to save substitution note:', err));
+
       const updatedExercises = [...exercises];
       updatedExercises[currentExerciseIdx] = {
         ...data,
@@ -2097,9 +2110,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
           target_sets: targets.sets ? parseInt(targets.sets) : null,
           target_reps_min: targets.reps ? parseInt(targets.reps) : null,
           target_reps_max: targets.reps ? parseInt(targets.reps) : null,
-          target_weight: targets.weight && !['BW', '0', '-'].includes(targets.weight.toString().toUpperCase()) 
-            ? parseFloat(targets.weight) 
-            : null
+          target_weight: targetWeight,
         }
       };
       
@@ -2307,6 +2318,8 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
         })
       });
 
+      // Cancelled or finished on another device: nothing more can go in.
+      if (res.status === 409) { workoutClosedElsewhere(); return; }
       if (res.ok) {
         // id kept so the set can be corrected in place (Patch 001).
         const saved = await res.json().catch(() => ({}));
@@ -2317,7 +2330,8 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
         }
         updated[currentExerciseIdx].logged_sets.push({
           id: saved.id,
-          set_number: setNumber,
+          // The server numbers sets (two devices can't both make "Set 2").
+          set_number: saved.set_number ?? setNumber,
           reps_completed: parseInt(setForm.reps),
           weight_used: parseFloat(weightValue),
           rpe: setForm.rpe ? parseInt(setForm.rpe) : null,
@@ -2581,12 +2595,13 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
       body: JSON.stringify({ workout_exercise_id: exId, set_number, reps_completed: reps, weight_used: weight, set_type: setType }),
     });
+    if (res.status === 409) { workoutClosedElsewhere(); throw new Error('Workout closed'); }
     if (!res.ok) throw new Error('Failed to log set');
     const saved = await res.json().catch(() => ({}));
     setActiveWorkout(prev => ({
       ...prev,
       exercises: prev.exercises.map(ex => ex.id === exId
-        ? { ...ex, logged_sets: [...(ex.logged_sets || []), { id: saved.id, set_number, reps_completed: reps, weight_used: weight, rpe: null, set_type: setType }] }
+        ? { ...ex, logged_sets: [...(ex.logged_sets || []), { id: saved.id, set_number: saved.set_number ?? set_number, reps_completed: reps, weight_used: weight, rpe: null, set_type: setType }] }
         : ex),
     }));
   };
@@ -2651,7 +2666,11 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
           reps_completed: set.reps, weight_used: 0, set_type: set.setType,
         }),
       });
-      if (res.ok) logged.push({ set_number: set.ordinal, reps_completed: set.reps, weight_used: 0, rpe: null, set_type: set.setType });
+      if (res.status === 409) { workoutClosedElsewhere(); throw new Error('Workout closed'); }
+      if (res.ok) {
+        const saved = await res.json().catch(() => ({}));
+        logged.push({ id: saved.id, set_number: saved.set_number ?? set.ordinal, reps_completed: set.reps, weight_used: 0, rpe: null, set_type: set.setType });
+      }
     }
 
     setActiveWorkout(prev => ({
@@ -2691,7 +2710,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
           <div className="header-buttons">
             <WorkoutClockButton showTime={showHeaderClock} isPaused={isPaused} elapsedStr={elapsedStr} onToggle={togglePause} />
             <div className="clock-settings-wrapper">
-              <button onClick={() => setShowHeaderClockSettings(prev => !prev)} className="clock-settings-btn" title="Clock display settings">⚙</button>
+              <button aria-label="Clock display settings" data-tooltip="Clock display settings" onClick={() => setShowHeaderClockSettings(prev => !prev)} className="clock-settings-btn">⚙</button>
               {showHeaderClockSettings && (
                 <div className="clock-settings-dropdown">
                   <label>
@@ -2816,7 +2835,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
           <h2>{workout.routine_name}</h2>
           <WorkoutClockButton showTime={showHeaderClock} isPaused={isPaused} elapsedStr={elapsedStr} onToggle={togglePause} />
           <div className="clock-settings-wrapper">
-            <button onClick={() => setShowHeaderClockSettings(prev => !prev)} className="clock-settings-btn" title="Clock display settings">⚙</button>
+            <button aria-label="Clock display settings" data-tooltip="Clock display settings" onClick={() => setShowHeaderClockSettings(prev => !prev)} className="clock-settings-btn">⚙</button>
             {showHeaderClockSettings && (
               <div className="clock-settings-dropdown">
                 <label>
@@ -2843,10 +2862,10 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
             <span className="aw-icon-text">Notes</span>
             {workoutNotes && <span className="aw-icon-badge" />}
           </button>
-          <button
+          <button data-tooltip="View all exercises"
             onClick={() => setShowAllExercises(true)}
             className="view-all-btn aw-icon-only"
-            title="View all exercises"
+           
             aria-label="View all exercises"
           >
             ☰
@@ -2904,12 +2923,12 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
             {currentExercise.exercise_name}
           </h3>
           <div className="aw-ex-actions">
-            <button type="button" className="aw-ex-action" onClick={skipCurrentExercise}
-              title="Skip Exercise" aria-label="Skip Exercise">⊘</button>
-            <button type="button" className="aw-ex-action" onClick={() => setShowChangeExercise(true)}
-              title="Change Exercise" aria-label="Change Exercise">↺</button>
-            <button type="button" className="aw-ex-action" onClick={() => setShowAddExercise(true)}
-              title="Add Exercise" aria-label="Add Exercise">+</button>
+            <button data-tooltip="Skip Exercise" type="button" className="aw-ex-action" onClick={skipCurrentExercise}
+              aria-label="Skip Exercise">⊘</button>
+            <button data-tooltip="Change Exercise" type="button" className="aw-ex-action" onClick={() => setShowChangeExercise(true)}
+              aria-label="Change Exercise">↺</button>
+            <button data-tooltip="Add Exercise" type="button" className="aw-ex-action" onClick={() => setShowAddExercise(true)}
+              aria-label="Add Exercise">+</button>
           </div>
         </div>
         {/* The rest countdown lives on this always-present line, so starting it
@@ -3012,16 +3031,16 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
             <h4>Log Set {loggedSets.length + 1}</h4>
             <div className="form-row">
               <input
-                type="number"
+                type="number" min="0"
                 inputMode="numeric"
                 placeholder="Reps"
                 value={setForm.reps}
                 onChange={(e) => setSetForm({...setForm, reps: e.target.value})}
               />
               <input
-                type="number"
+                type="number" min="0" step="any"
                 inputMode="decimal"
-                step="0.1"
+               
                 placeholder="Weight (lbs)"
                 value={setForm.weight}
                 onChange={(e) => setSetForm({...setForm, weight: e.target.value})}
@@ -3150,7 +3169,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
                     >
                       <span className="set-edit-label">Set {set.set_number}</span>
                       <label>Reps
-                        <input type="number" inputMode="numeric" autoFocus value={editingSet.reps}
+                        <input type="number" min="0" inputMode="numeric" autoFocus value={editingSet.reps}
                           onChange={e => setEditingSet(s => ({ ...s, reps: e.target.value }))} />
                       </label>
                       <label>Weight
@@ -3507,7 +3526,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
                 {ratingPrefs.display === 'stars' ? (
                   <div className="session-rating-stars">
                     {ticks.map(v => (
-                      <button
+                      <button data-tooltip={`Rate ${v} out of ${scale}`}
                         key={v}
                         className={`star-btn ${pendingRating >= v ? 'active' : ''}`}
                         onClick={() => setPendingRating(v)}
@@ -3652,8 +3671,8 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
                     <span>{ex.logged_sets?.length || 0} / {ex.template?.target_sets || '?'} sets</span>
                   </div>
                   <div className="exercise-controls" onClick={(e) => e.stopPropagation()}>
-                    <button onClick={() => moveExercise(idx, idx - 1)} disabled={idx === 0}>↑</button>
-                    <button onClick={() => moveExercise(idx, idx + 1)} disabled={idx === exercises.length - 1}>↓</button>
+                    <button aria-label="Move up" data-tooltip="Move up" onClick={() => moveExercise(idx, idx - 1)} disabled={idx === 0}>↑</button>
+                    <button aria-label="Move down" data-tooltip="Move down" onClick={() => moveExercise(idx, idx + 1)} disabled={idx === exercises.length - 1}>↓</button>
                     <button onClick={() => { setCurrentExerciseIdx(idx); setShowAllExercises(false); }}>Go</button>
                   </div>
                 </div>
@@ -3894,7 +3913,7 @@ function AddExerciseModal({ onAdd, onClose }) {
                   onKeyPress={(e) => e.key === 'Enter' && searchExercises()}
                 />
                 {searchQuery && (
-                  <button type="button" className="search-clear-x" onClick={clearSearch}>✕</button>
+                  <button aria-label="Clear search" data-tooltip="Clear search" type="button" className="search-clear-x" onClick={clearSearch}>✕</button>
                 )}
               </div>
               <button onClick={searchExercises}>Search</button>
@@ -3952,7 +3971,7 @@ function AddExerciseModal({ onAdd, onClose }) {
                     onChange={(e) => setTargets({ ...targets, duration: e.target.value })}
                   />
                   <input
-                    type="number"
+                    type="number" inputMode="decimal" min="0"
                     step="0.01"
                     placeholder="Goal Distance"
                     value={targets.distance}
@@ -3967,13 +3986,13 @@ function AddExerciseModal({ onAdd, onClose }) {
                   {selectedExercise.subcategory === 'Swimming' && (
                     <>
                       <input
-                        type="number"
+                        type="number" inputMode="numeric" min="0"
                         placeholder="Goal Laps"
                         value={targets.laps}
                         onChange={(e) => setTargets({ ...targets, laps: e.target.value })}
                       />
                       <input
-                        type="number"
+                        type="number" inputMode="decimal" min="0"
                         step="0.1"
                         placeholder="Lap distance (m)"
                         value={targets.lapDistance}
@@ -3985,14 +4004,14 @@ function AddExerciseModal({ onAdd, onClose }) {
               ) : (
                 <>
                   <input
-                    type="number"
+                    type="number" min="0"
                     inputMode="numeric"
                     placeholder="Target Sets"
                     value={targets.sets}
                     onChange={(e) => setTargets({ ...targets, sets: e.target.value })}
                   />
                   <input
-                    type="number"
+                    type="number" min="0"
                     inputMode="numeric"
                     placeholder="Target Reps"
                     value={targets.reps}
@@ -4110,7 +4129,7 @@ function ChangeExerciseModal({ onChange, onClose, currentExercise }) {
                   onKeyPress={(e) => e.key === 'Enter' && searchExercises()}
                 />
                 {searchQuery && (
-                  <button type="button" className="search-clear-x" onClick={clearSearch}>✕</button>
+                  <button aria-label="Clear search" data-tooltip="Clear search" type="button" className="search-clear-x" onClick={clearSearch}>✕</button>
                 )}
               </div>
               <button onClick={searchExercises}>Search</button>
@@ -4169,14 +4188,14 @@ function ChangeExerciseModal({ onChange, onClose, currentExercise }) {
               <h4>Target Sets/Reps/Weight</h4>
               <div className="target-fields">
                 <input
-                  type="number"
+                  type="number" min="0"
                   inputMode="numeric"
                   placeholder="Sets"
                   value={targets.sets}
                   onChange={(e) => setTargets({ ...targets, sets: e.target.value })}
                 />
                 <input
-                  type="number"
+                  type="number" min="0"
                   inputMode="numeric"
                   placeholder="Reps"
                   value={targets.reps}

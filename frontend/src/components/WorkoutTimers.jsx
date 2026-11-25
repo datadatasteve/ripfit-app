@@ -41,7 +41,7 @@ function IntField({ label, value, min, onCommit }) {
   return (
     <label>{label}
       <input
-        type="number"
+        type="number" min="0"
         inputMode="numeric"
         value={draft ?? value}
         onChange={e => setDraft(e.target.value)}
@@ -85,8 +85,8 @@ function InfoToggle({ text, label }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" className="wt-info-btn" onClick={() => setOpen(o => !o)}
-        aria-expanded={open} aria-label={`About ${label}`} title={`About ${label}`}>ⓘ</button>
+      <button data-tooltip={`About ${label}`} type="button" className="wt-info-btn" onClick={() => setOpen(o => !o)}
+        aria-expanded={open} aria-label={`About ${label}`}>ⓘ</button>
       {open && <p className="wt-info-text">{text}</p>}
     </>
   );
@@ -457,7 +457,7 @@ function TimerRunner({ mode, exerciseName, blockMode, setsBefore = 0, onClose, o
           <div className="wt-amrap-count">Rounds: <strong>{amrapRounds}</strong></div>
           {!timer.finished && (
             <div className="wt-amrap-buttons">
-              <button className="wt-btn" onClick={() => setAmrapRounds(r => Math.max(0, r - 1))}>−</button>
+              <button aria-label="Remove a round" data-tooltip="Remove a round" className="wt-btn" onClick={() => setAmrapRounds(r => Math.max(0, r - 1))}>−</button>
               <button className="wt-btn wt-btn-primary" onClick={() => setAmrapRounds(r => r + 1)}>+ Round</button>
             </div>
           )}
@@ -762,7 +762,7 @@ export default function WorkoutTimerBar({ exercise, cooldownOverride, onCooldown
         {editingCooldown ? (
           <span className="wt-bar-cooldown-edit">
             <input
-              type="number"
+              type="number" inputMode="numeric"
               min="0"
               autoFocus
               value={effectiveCooldown}

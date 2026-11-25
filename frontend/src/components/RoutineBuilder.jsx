@@ -480,8 +480,8 @@ export default function RoutineBuilder({ initialExercises, existingRoutine, onCl
                     />
                   ) : (handle || (
                     <div className="routine-builder-reorder">
-                      <button onClick={() => moveExercise(idx, -1)} disabled={idx === 0} aria-label={`Move ${ex.name} up`}>▲</button>
-                      <button onClick={() => moveExercise(idx, 1)} disabled={idx === exercises.length - 1} aria-label={`Move ${ex.name} down`}>▼</button>
+                      <button data-tooltip={`Move ${ex.name} up`} onClick={() => moveExercise(idx, -1)} disabled={idx === 0} aria-label={`Move ${ex.name} up`}>▲</button>
+                      <button data-tooltip={`Move ${ex.name} down`} onClick={() => moveExercise(idx, 1)} disabled={idx === exercises.length - 1} aria-label={`Move ${ex.name} down`}>▼</button>
                     </div>
                   ))}
                   <div
@@ -494,14 +494,14 @@ export default function RoutineBuilder({ initialExercises, existingRoutine, onCl
                     </strong>
                     <span className="routine-builder-exercise-cat">{ex.category}</span>
                   </div>
-                  <button className="routine-builder-remove" onClick={() => removeExercise(idx)} aria-label={`Remove ${ex.name}`}>✕</button>
+                  <button data-tooltip={`Remove ${ex.name}`} className="routine-builder-remove" onClick={() => removeExercise(idx)} aria-label={`Remove ${ex.name}`}>✕</button>
                 </div>
 
                 <div className="routine-builder-exercise-targets">
                   <label className="rb-target">
                     <span>Sets</span>
                     <input
-                      type="number"
+                      type="number" min="0"
                       inputMode="numeric"
                       value={ex.target_sets}
                       onChange={e => updateExerciseField(idx, 'target_sets', e.target.value)}
@@ -511,7 +511,7 @@ export default function RoutineBuilder({ initialExercises, existingRoutine, onCl
                     <span>Reps</span>
                     <div className="rb-reps-range">
                       <input
-                        type="number"
+                        type="number" min="0"
                         inputMode="numeric"
                         placeholder="Min"
                         aria-label={`${ex.name} min reps`}
@@ -520,7 +520,7 @@ export default function RoutineBuilder({ initialExercises, existingRoutine, onCl
                       />
                       <span aria-hidden="true">–</span>
                       <input
-                        type="number"
+                        type="number" min="0"
                         inputMode="numeric"
                         placeholder="Max"
                         aria-label={`${ex.name} max reps`}
@@ -532,9 +532,9 @@ export default function RoutineBuilder({ initialExercises, existingRoutine, onCl
                   <label className="rb-target">
                     <span>Weight</span>
                     <input
-                      type="number"
+                      type="number" min="0" step="any"
                       inputMode="decimal"
-                      step="0.5"
+                     
                       value={ex.target_weight}
                       onChange={e => updateExerciseField(idx, 'target_weight', e.target.value)}
                     />
@@ -542,7 +542,7 @@ export default function RoutineBuilder({ initialExercises, existingRoutine, onCl
                   <label className="rb-target">
                     <span>Rest (s)</span>
                     <input
-                      type="number"
+                      type="number" min="0"
                       inputMode="numeric"
                       placeholder="60"
                       value={ex.cooldown_seconds}

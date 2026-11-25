@@ -504,7 +504,12 @@ function SessionHistory({ events, longPauses, timeZone }) {
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
-export default function WorkoutDetailPage({ workoutId, workoutType, onBack }) {
+export default function WorkoutDetailPage({ workoutId, workoutType, source, onBack }) {
+  // A quick-cardio session is a workouts row with workout_type 'cardio', and
+  // the history lists tag it source 'workout'; only a cardio_sessions row
+  // (source 'cardio_session') uses the cardio endpoint. Without a source
+  // (older callers) the type decides, as before.
+  const isCardioSession = source ? source === 'cardio_session' : workoutType === 'cardio';
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -539,7 +544,7 @@ export default function WorkoutDetailPage({ workoutId, workoutType, onBack }) {
     if (!workoutId) return;
     setLoading(true);
     setError(null);
-    const url = workoutType === 'cardio'
+    const url = isCardioSession
       ? `${API_BASE}/cardio/${workoutId}`
       : `${API_BASE}/workouts/history/${workoutId}`;
     fetch(url, { headers: { Authorization: `Bearer ${token}` } })
@@ -547,12 +552,12 @@ export default function WorkoutDetailPage({ workoutId, workoutType, onBack }) {
       .then(setData)
       .catch(() => setError('Failed to load workout.'))
       .finally(() => setLoading(false));
-  }, [workoutId, workoutType]);
+  }, [workoutId, isCardioSession]);
 
   if (loading) return <div className="wdp-container"><button className="wdp-back" onClick={onBack}>← Back</button><p className="wdp-loading">Loading…</p></div>;
   if (error || !data) return <div className="wdp-container"><button className="wdp-back" onClick={onBack}>← Back</button><p className="wdp-error">{error || 'No data.'}</p></div>;
 
-  const isCardio = workoutType === 'cardio';
+  const isCardio = isCardioSession;
   const type = workoutType || 'strength';
   const typeColor = TYPE_COLORS[type] || 'var(--color-primary)';
   const typeLabel = TYPE_LABELS[type] || type;

@@ -365,7 +365,7 @@ export default function ExerciseBrowser({ activeWorkout, setActiveWorkout }) {
               onKeyDown={e => e.key === 'Enter' && handleSearch()}
             />
             {searchInput && (
-              <button className="search-clear-x" onClick={handleClearSearch}>✕</button>
+              <button aria-label="Clear search" data-tooltip="Clear search" className="search-clear-x" onClick={handleClearSearch}>✕</button>
             )}
           </div>
           <button className="search-btn" onClick={handleSearch}>Search</button>
@@ -485,7 +485,7 @@ export default function ExerciseBrowser({ activeWorkout, setActiveWorkout }) {
             </div>
             <div className="detail-card-head">
               <h2 className="detail-title">{selectedExercise.name}</h2>
-              <button className="browser-sheet-close" onClick={closeDetail} aria-label="Close">×</button>
+              <button data-tooltip="Close" className="browser-sheet-close" onClick={closeDetail} aria-label="Close">×</button>
             </div>
 
             <div className="detail-tags">
@@ -547,23 +547,23 @@ export default function ExerciseBrowser({ activeWorkout, setActiveWorkout }) {
                     <p className="routine-picker-targets-label">Target sets/reps/weight (optional)</p>
                     <div className="add-to-workout-fields">
                       <input
-                        type="number"
+                        type="number" min="0"
                         inputMode="numeric"
                         placeholder="Sets"
                         value={routineAddForm.sets}
                         onChange={e => setRoutineAddForm({ ...routineAddForm, sets: e.target.value })}
                       />
                       <input
-                        type="number"
+                        type="number" min="0"
                         inputMode="numeric"
                         placeholder="Reps"
                         value={routineAddForm.reps}
                         onChange={e => setRoutineAddForm({ ...routineAddForm, reps: e.target.value })}
                       />
                       <input
-                        type="number"
+                        type="number" min="0" step="any"
                         inputMode="decimal"
-                        step="0.5"
+                       
                         placeholder="Weight"
                         value={routineAddForm.weight}
                         onChange={e => setRoutineAddForm({ ...routineAddForm, weight: e.target.value })}
@@ -592,23 +592,23 @@ export default function ExerciseBrowser({ activeWorkout, setActiveWorkout }) {
                 <h4>Add to Workout (optional)</h4>
                 <div className="add-to-workout-fields">
                   <input
-                    type="number"
+                    type="number" min="0"
                         inputMode="numeric"
                     placeholder="Sets"
                     value={addForm.sets}
                     onChange={e => setAddForm({ ...addForm, sets: e.target.value })}
                   />
                   <input
-                    type="number"
+                    type="number" min="0"
                         inputMode="numeric"
                     placeholder="Reps"
                     value={addForm.reps}
                     onChange={e => setAddForm({ ...addForm, reps: e.target.value })}
                   />
                   <input
-                    type="number"
+                    type="number" min="0" step="any"
                         inputMode="decimal"
-                    step="0.5"
+                   
                     placeholder="Weight"
                     value={addForm.weight}
                     onChange={e => setAddForm({ ...addForm, weight: e.target.value })}

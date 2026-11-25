@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import BarcodeScanner from './BarcodeScanner';
 import { GlassSVG, BottleSVG, WATER_PRESETS_ALL, waterStorageKey, WATER_GOAL_KEY, WATER_PRESET_KEY, readWater, writeWater, readGoal, writeGoal, readPreset } from './WaterWidget';
 import './NutritionPage.css';
+import { usePersistentState } from '../hooks/usePersistentState';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 function token() { return localStorage.getItem('ripfit_token'); }
@@ -208,7 +209,7 @@ function WaterTracker({ date }) {
       </div>
       {editingGoal && (
         <div className="nutri-water-goal-edit">
-          <input type="number" value={goalInput} onChange={e => setGoalInput(e.target.value)}
+          <input type="number" inputMode="decimal" min="0" value={goalInput} onChange={e => setGoalInput(e.target.value)}
             className="nutri-water-goal-input" min={1} />
           <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>oz</span>
           <button className="nutri-add-btn" style={{ padding: '6px 12px', fontSize: 'var(--font-size-xs)' }} onClick={saveGoal}>Save</button>
@@ -240,10 +241,10 @@ function WaterTracker({ date }) {
 
         {/* Preset selector — slides out */}
         <div className="nutri-water-preset-wrapper">
-          <button
+          <button aria-label="Choose amount" data-tooltip="Choose amount"
             className={`nutri-water-preset-toggle ${presetsOpen ? 'open' : ''}`}
             onClick={() => setPresetsOpen(o => !o)}
-            title="Choose amount"
+           
           >
             ◀
           </button>
@@ -412,7 +413,7 @@ function FoodSearchModal({ mealType, mealDate, onClose, onAdded }) {
       <div className="nutri-search-modal" onClick={e => e.stopPropagation()}>
         <div className="nutri-modal-header">
           <h3>Add to {MEAL_LABELS[mealType]}</h3>
-          <button className="nutri-modal-close" onClick={onClose}>✕</button>
+          <button aria-label="Close" data-tooltip="Close" className="nutri-modal-close" onClick={onClose}>✕</button>
         </div>
 
         <div className="nutri-modal-tabs">
@@ -458,7 +459,7 @@ function FoodSearchModal({ mealType, mealDate, onClose, onAdded }) {
                 <div className="nutri-serving-row">
                   <label>Serving size</label>
                   <input
-                    type="number"
+                    type="number" inputMode="decimal"
                     min="1"
                     value={serving}
                     onChange={e => setServing(e.target.value)}
@@ -512,7 +513,7 @@ function FoodSearchModal({ mealType, mealDate, onClose, onAdded }) {
             <div className="nutri-custom-row">
               <div className="nutri-custom-field">
                 <label>Serving size</label>
-                <input type="number" value={custom.serving_size} onChange={e => setCustom(f => ({ ...f, serving_size: e.target.value }))} />
+                <input type="number" inputMode="decimal" min="0" value={custom.serving_size} onChange={e => setCustom(f => ({ ...f, serving_size: e.target.value }))} />
               </div>
               <div className="nutri-custom-field">
                 <label>Unit</label>
@@ -525,14 +526,14 @@ function FoodSearchModal({ mealType, mealDate, onClose, onAdded }) {
             </div>
             <p className="nutri-custom-hint">Enter values per 100g (or per 100ml for liquids)</p>
             <div className="nutri-custom-row">
-              <div className="nutri-custom-field"><label>Calories *</label><input type="number" value={custom.calories_per_100g} onChange={e => setCustom(f => ({ ...f, calories_per_100g: e.target.value }))} /></div>
-              <div className="nutri-custom-field"><label>Protein (g)</label><input type="number" value={custom.protein_per_100g} onChange={e => setCustom(f => ({ ...f, protein_per_100g: e.target.value }))} /></div>
+              <div className="nutri-custom-field"><label>Calories *</label><input type="number" inputMode="decimal" min="0" value={custom.calories_per_100g} onChange={e => setCustom(f => ({ ...f, calories_per_100g: e.target.value }))} /></div>
+              <div className="nutri-custom-field"><label>Protein (g)</label><input type="number" inputMode="decimal" min="0" value={custom.protein_per_100g} onChange={e => setCustom(f => ({ ...f, protein_per_100g: e.target.value }))} /></div>
             </div>
             <div className="nutri-custom-row">
-              <div className="nutri-custom-field"><label>Carbs (g)</label><input type="number" value={custom.carbs_per_100g} onChange={e => setCustom(f => ({ ...f, carbs_per_100g: e.target.value }))} /></div>
-              <div className="nutri-custom-field"><label>Fat (g)</label><input type="number" value={custom.fat_per_100g} onChange={e => setCustom(f => ({ ...f, fat_per_100g: e.target.value }))} /></div>
+              <div className="nutri-custom-field"><label>Carbs (g)</label><input type="number" inputMode="decimal" min="0" value={custom.carbs_per_100g} onChange={e => setCustom(f => ({ ...f, carbs_per_100g: e.target.value }))} /></div>
+              <div className="nutri-custom-field"><label>Fat (g)</label><input type="number" inputMode="decimal" min="0" value={custom.fat_per_100g} onChange={e => setCustom(f => ({ ...f, fat_per_100g: e.target.value }))} /></div>
             </div>
-            <div className="nutri-custom-field"><label>Fiber (g)</label><input type="number" value={custom.fiber_per_100g} onChange={e => setCustom(f => ({ ...f, fiber_per_100g: e.target.value }))} /></div>
+            <div className="nutri-custom-field"><label>Fiber (g)</label><input type="number" inputMode="decimal" min="0" value={custom.fiber_per_100g} onChange={e => setCustom(f => ({ ...f, fiber_per_100g: e.target.value }))} /></div>
             {customMsg && <p style={{ color: 'var(--color-danger)', fontSize: '0.85em' }}>{customMsg}</p>}
             <button className="nutri-add-btn" onClick={saveCustomFood} disabled={customSaving} style={{ marginTop: 12, width: '100%' }}>
               {customSaving ? 'Saving…' : 'Save & Add to Meal'}
@@ -633,15 +634,15 @@ function MealSection({ type, typeMeals, goals, mealSplit, date, onAdd, onRemoveF
                     {editingFoodId === f.meal_food_id ? (
                       <div className="nutri-food-edit-row">
                         <span className="nutri-food-name" style={{ flex: 1, minWidth: 80 }}>{f.food_name}</span>
-                        <input type="number" min="1" value={editServing} onChange={e => setEditServing(e.target.value)}
+                        <input type="number" inputMode="decimal" min="1" value={editServing} onChange={e => setEditServing(e.target.value)}
                           className="nutri-serving-input" style={{ width: 64 }} autoFocus />
                         <select value={editUnit} onChange={e => setEditUnit(e.target.value)} className="nutri-unit-select">
                           <option value="g">g</option>
                           <option value="ml">ml</option>
                           <option value="oz">oz</option>
                         </select>
-                        <button className="nutri-add-btn" style={{ padding: '4px 10px', fontSize: '0.8em' }} onClick={() => saveEdit(f.meal_food_id)}>✓</button>
-                        <button className="nutri-cancel-btn" style={{ padding: '4px 8px', fontSize: '0.8em' }} onClick={cancelEdit}>✕</button>
+                        <button aria-label="Save" data-tooltip="Save" className="nutri-add-btn" style={{ padding: '4px 10px', fontSize: '0.8em' }} onClick={() => saveEdit(f.meal_food_id)}>✓</button>
+                        <button aria-label="Cancel" data-tooltip="Cancel" className="nutri-cancel-btn" style={{ padding: '4px 8px', fontSize: '0.8em' }} onClick={cancelEdit}>✕</button>
                       </div>
                     ) : (
                       <>
@@ -655,7 +656,7 @@ function MealSection({ type, typeMeals, goals, mealSplit, date, onAdd, onRemoveF
                           <span className="nutri-food-macro" style={{ color: '#d97706' }}>C {round1(f.carbs)}g</span>
                           <span className="nutri-food-macro" style={{ color: '#0d9488' }}>F {round1(f.fat)}g</span>
                         </div>
-                        <button className="nutri-remove-btn" onClick={() => onRemoveFood(f.meal_food_id)} title="Remove">✕</button>
+                        <button aria-label="Remove" data-tooltip="Remove" className="nutri-remove-btn" onClick={() => onRemoveFood(f.meal_food_id)}>✕</button>
                       </>
                     )}
                   </div>
@@ -673,7 +674,8 @@ function MealSection({ type, typeMeals, goals, mealSplit, date, onAdd, onRemoveF
 // MAIN NUTRITION PAGE
 // ═══════════════════════════════════════════════════════════════════════════
 export default function NutritionPage() {
-  const [date, setDate] = useState(toLocalDateStr());
+  // The day being viewed survives a reload (Phase 0B-1).
+  const [date, setDate] = usePersistentState('nutrition:date', toLocalDateStr, v => /^\d{4}-\d{2}-\d{2}$/.test(v));
   const [meals, setMeals] = useState([]);
   const [totals, setTotals] = useState({ total_calories: 0, total_protein: 0, total_carbs: 0, total_fat: 0, total_fiber: 0 });
   const [goals, setGoals] = useState(() => {
@@ -797,14 +799,14 @@ export default function NutritionPage() {
     <div className="nutri-page">
       {/* Date navigation */}
       <div className="nutri-date-nav">
-        <button className="nutri-date-btn" onClick={() => changeDate(-1)}>‹</button>
+        <button aria-label="Previous day" data-tooltip="Previous day" className="nutri-date-btn" onClick={() => changeDate(-1)}>‹</button>
         <div className="nutri-date-center">
           <span className="nutri-date-label">{isToday ? 'Today' : fmtDate(date)}</span>
           {!isToday && (
             <button className="nutri-today-btn" onClick={() => setDate(toLocalDateStr())}>Today</button>
           )}
         </div>
-        <button className="nutri-date-btn" onClick={() => changeDate(1)} disabled={isToday}>›</button>
+        <button aria-label="Next day" data-tooltip="Next day" className="nutri-date-btn" onClick={() => changeDate(1)} disabled={isToday}>›</button>
       </div>
 
       {/* Macro summary */}
@@ -820,7 +822,7 @@ export default function NutritionPage() {
               <div key={key} className="nutri-goal-edit-field">
                 <label>{label}</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <input type="number" value={goalInput[key]} onChange={e => setGoalInput(g => ({ ...g, [key]: e.target.value }))} className="nutri-goal-input" />
+                  <input type="number" inputMode="decimal" min="0" value={goalInput[key]} onChange={e => setGoalInput(g => ({ ...g, [key]: e.target.value }))} className="nutri-goal-input" />
                   <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)' }}>{unit}</span>
                 </div>
               </div>
@@ -837,7 +839,7 @@ export default function NutritionPage() {
                   <div key={key} className="nutri-goal-edit-field">
                     <label>{label}</label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <input type="number" min="0" max="100" value={splitInput[key]}
+                      <input type="number" inputMode="numeric" min="0" max="100" value={splitInput[key]}
                         onChange={e => setSplitInput(s => ({ ...s, [key]: e.target.value }))}
                         className="nutri-goal-input" />
                       <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)' }}>%</span>

@@ -11,7 +11,9 @@ import NutritionPage from './components/NutritionPage'
 import Login from './components/Login'
 import { useMeditationEngine, segmentRemaining } from './components/MeditationTimer'
 import { UserPrefsContext, DEFAULT_USER_PREFS, prefsFromProfile } from './contexts/UserPrefsContext'
-import { ActiveWorkoutContext, mergeServerWorkout } from './contexts/ActiveWorkoutContext'
+import { ActiveWorkoutContext, mergeServerWorkout, WORKOUT_CLOSED_ELSEWHERE } from './contexts/ActiveWorkoutContext'
+import { usePersistentState, clearViewState } from './hooks/usePersistentState'
+import TooltipLayer from './components/TooltipLayer'
 import './styles/App.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
@@ -191,7 +193,7 @@ function MobileNavDrawer({ open, onClose, currentView, hasActiveWorkout, workout
       <aside className="mobile-drawer-panel" ref={panelRef} role="dialog" aria-modal="true" aria-label="Navigation">
         <div className="mobile-drawer-header">
           <span className="mobile-drawer-title">RipFit</span>
-          <button type="button" className="mobile-drawer-close" onClick={onClose} aria-label="Close menu">×</button>
+          <button data-tooltip="Close menu" type="button" className="mobile-drawer-close" onClick={onClose} aria-label="Close menu">×</button>
         </div>
 
         <nav className="mobile-drawer-nav">
@@ -222,13 +224,16 @@ function MobileNavDrawer({ open, onClose, currentView, hasActiveWorkout, workout
   );
 }
 
+const KNOWN_VIEWS = ['workout', 'exercises', 'stats', 'preferences', 'admin', 'nutrition', 'home'];
+
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(
     () => !!localStorage.getItem('ripfit_token')
   );
-  const [hubView, setHubView] = useState('home');
-  const [selectedProgramId, setSelectedProgramId] = useState(null);
-  const [currentView, setCurrentView] = useState('workout');
+  // Kept across a reload (Phase 0B-1); a fresh login starts on Workouts.
+  const [hubView, setHubView] = usePersistentState('hub', 'home', v => typeof v === 'string');
+  const [selectedProgramId, setSelectedProgramId] = usePersistentState('program', null, v => v === null || Number.isInteger(v));
+  const [currentView, setCurrentView] = usePersistentState('view', 'workout', v => KNOWN_VIEWS.includes(v));
   const [activeWorkout, setActiveWorkout] = useState(null);
   const [workoutSummary, setWorkoutSummary] = useState(null);
   const [showNavClock, setShowNavClock] = useState(true);
@@ -245,6 +250,8 @@ function App() {
   const [resumePrompt, setResumePrompt] = useState(null);
   const [resumeBusy, setResumeBusy] = useState(false);
   const [resumeError, setResumeError] = useState('');
+  // Shown when the open workout was cancelled or finished on another device.
+  const [closedNotice, setClosedNotice] = useState('');
 
   // Advances segments, rings bowls and holds the wake lock whichever view is up.
   useMeditationEngine(activeMeditation, setActiveMeditation);
@@ -269,6 +276,8 @@ function App() {
       .then(r => r.json())
       .then(d => {
         if (d.is_admin) setIsAdmin(true);
+        // A stored Admin view only stands for an admin.
+        else setCurrentView(v => (v === 'admin' ? 'workout' : v));
         setUserPrefs(prefsFromProfile(d));
         setPrefsLoaded(true);
         // Stats bucket by local hour/day in the user's zone: store the
@@ -283,7 +292,7 @@ function App() {
           }).catch(() => {});
         }
       })
-      .catch(() => {});
+      .catch(() => setCurrentView(v => (v === 'admin' ? 'workout' : v)));
   }, [isLoggedIn]);
 
   // On load (after login): is there an unfinished workout? If the call fails,
@@ -310,6 +319,13 @@ function App() {
     setViewingWorkout(null);
     setDrawerOpen(false);
     setCurrentView('workout');
+  }, []);
+
+  // Everything logged is already on the server; only the local view closes.
+  const workoutClosedElsewhere = useCallback(() => {
+    setActiveWorkout(null);
+    setWorkoutSummary(null);
+    setClosedNotice(WORKOUT_CLOSED_ELSEWHERE);
   }, []);
 
   const resumeFromPrompt = () => {
@@ -354,19 +370,33 @@ function App() {
         headers: { Authorization: `Bearer ${localStorage.getItem('ripfit_token')}` },
       })
         .then(r => (r.ok ? r.json() : null))
-        .then(d => {
-          if (!d?.workout) return;
-          setActiveWorkout(prev => (prev?.workout?.id === d.workout.id ? mergeServerWorkout(prev, d) : prev));
+        .then(async d => {
+          if (!d) return;
+          if (d.workout?.id === current.workout.id) {
+            setActiveWorkout(prev => (prev?.workout?.id === d.workout.id ? mergeServerWorkout(prev, d) : prev));
+            return;
+          }
+          // The open workout isn't the one in progress: ask for its status,
+          // and close it here only if it really was cancelled or finished.
+          const r = await fetch(`${API_BASE}/workouts/history/${current.workout.id}`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem('ripfit_token')}` },
+          });
+          if (!r.ok) return;
+          const detail = await r.json();
+          if (detail?.status && detail.status !== 'in_progress'
+              && activeWorkoutRef.current?.workout?.id === current.workout.id) {
+            workoutClosedElsewhere();
+          }
         })
         .catch(() => {});
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [isLoggedIn]);
+  }, [isLoggedIn, workoutClosedElsewhere]);
 
   const activeWorkoutValue = useMemo(
-    () => ({ activeWorkoutId: activeWorkout?.workout?.id ?? null, openWorkout }),
-    [activeWorkout?.workout?.id, openWorkout]
+    () => ({ activeWorkoutId: activeWorkout?.workout?.id ?? null, openWorkout, workoutClosedElsewhere }),
+    [activeWorkout?.workout?.id, openWorkout, workoutClosedElsewhere]
   );
 
   // Optimistic: the UI switches immediately; a failed save rolls back and
@@ -397,6 +427,9 @@ function App() {
   );
 
   const handleLogin = (user) => {
+    clearViewState();
+    setHubView('home');
+    setSelectedProgramId(null);
     setIsLoggedIn(true);
     setCurrentView('workout');
   };
@@ -412,6 +445,7 @@ function App() {
     setPrefsLoaded(false);
     setDrawerOpen(false);
     setResumePrompt(null);
+    clearViewState();
   };
 
   const goToWorkouts = () => {
@@ -448,6 +482,13 @@ function App() {
     <UserPrefsContext.Provider value={prefsValue}>
     <ActiveWorkoutContext.Provider value={activeWorkoutValue}>
     <div className="app">
+      <TooltipLayer />
+      {closedNotice && (
+        <div className="workout-closed-notice" role="alert">
+          <span>{closedNotice}</span>
+          <button type="button" className="btn btn-primary" onClick={() => setClosedNotice('')}>OK</button>
+        </div>
+      )}
       {isLoggedIn && resumePrompt && !activeWorkout && (
         <ResumeWorkoutPrompt
           data={resumePrompt}
@@ -466,6 +507,7 @@ function App() {
                 className="nav-hamburger"
                 onClick={() => setDrawerOpen(true)}
                 aria-label="Open menu"
+                data-tooltip="Open menu"
                 aria-expanded={drawerOpen}
               >
                 <span className="nav-hamburger-bars" />
@@ -572,7 +614,9 @@ function App() {
             ) : currentView === 'preferences' ? (
               <UserPreferencesPage onBack={() => setCurrentView('workout')} />
             ) : currentView === 'admin' ? (
-              <AdminPanel onBack={() => setCurrentView('workout')} />
+              isAdmin
+                ? <AdminPanel onBack={() => setCurrentView('workout')} />
+                : <p className="view-loading">Loading…</p>
             ) : currentView === 'nutrition' ? (
               <NutritionPage />
             ) : (

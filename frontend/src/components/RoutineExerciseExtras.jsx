@@ -258,7 +258,7 @@ export function OverloadEditor({ exercise, onChange }) {
                               aria-label={`Week ${r.week} increment`} />
                           </td>
                           <td>
-                            <button type="button" className="rbx-remove" onClick={() => removeWeek(i)}
+                            <button data-tooltip={`Remove week ${r.week}`} type="button" className="rbx-remove" onClick={() => removeWeek(i)}
                               aria-label={`Remove week ${r.week}`}>×</button>
                           </td>
                         </tr>

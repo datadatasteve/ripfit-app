@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import StatsCenter from './StatsCenter';
 import WorkoutHistory from './WorkoutHistory';
 import './AdminPanel.css';
+import { usePersistentState } from '../hooks/usePersistentState';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 
@@ -606,7 +607,7 @@ function InstructionsEditor({ steps, onChange }) {
             value={step}
             onChange={e => onChange(steps.map((s, idx) => (idx === i ? e.target.value : s)))}
           />
-          <button
+          <button data-tooltip={`Remove step ${i + 1}`}
             type="button"
             className="exm-step-remove"
             onClick={() => onChange(steps.filter((_, idx) => idx !== i))}
@@ -1063,7 +1064,7 @@ function ExerciseManagerTab() {
 // MAIN ADMIN PANEL
 // ═══════════════════════════════════════════════════════════════════════════
 export default function AdminPanel({ onBack }) {
-  const [tab, setTab] = useState('Users');
+  const [tab, setTab] = usePersistentState('admin:tab', 'Users', v => typeof v === 'string');
 
   return (
     <div className="admin-panel">

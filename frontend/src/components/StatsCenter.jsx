@@ -10,6 +10,7 @@ import {
 } from 'recharts';
 import WorkoutHistory from './WorkoutHistory';
 import WorkoutDetailPage from './WorkoutDetailPage';
+import { usePersistentState } from '../hooks/usePersistentState';
 import './StatsCenter.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
@@ -305,7 +306,7 @@ function TimeWindowSelector({ weeks, setWeeks, customWeeks, setCustomWeeks }) {
       {showCustom && (
         <div className="sc-custom-window">
           <input
-            type="number"
+            type="number" inputMode="numeric"
             min={1}
             max={520}
             placeholder="Weeks"
@@ -333,7 +334,7 @@ function WorkoutCalendar({ onSelectWorkout, programId }) {
   useEffect(() => {
     const ctrl = new AbortController();
     const pidQ = programId ? `&programId=${programId}` : '';
-    apiFetch(`/combined?weeks=52${pidQ}`, 3, ctrl.signal)
+    apiFetch(`/combined?weeks=52${pidQ}&include_meditation=1`, 3, ctrl.signal)
       .then(d => setSessions(d.sessions || []))
       .catch(e => { if (e.name !== 'AbortError') console.error(e); });
     return () => ctrl.abort();
@@ -374,9 +375,9 @@ function WorkoutCalendar({ onSelectWorkout, programId }) {
   return (
     <div className="sc-calendar">
       <div className="sc-calendar-nav">
-        <button className="sc-cal-nav-btn" onClick={prevMonth}>‹</button>
+        <button aria-label="Previous month" data-tooltip="Previous month" className="sc-cal-nav-btn" onClick={prevMonth}>‹</button>
         <span className="sc-calendar-month-label">{monthLabel}</span>
-        <button className="sc-cal-nav-btn" onClick={nextMonth} disabled={isNextDisabled}
+        <button aria-label="Next month" data-tooltip="Next month" className="sc-cal-nav-btn" onClick={nextMonth} disabled={isNextDisabled}
           style={{ opacity: isNextDisabled ? 0.3 : 1 }}>›</button>
       </div>
 
@@ -411,7 +412,7 @@ function WorkoutCalendar({ onSelectWorkout, programId }) {
         <div className="sc-calendar-popup">
           <div className="sc-cal-popup-header">
             <strong>{new Date(selected + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</strong>
-            <button onClick={() => setSelected(null)}
+            <button aria-label="Close" data-tooltip="Close" onClick={() => setSelected(null)}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>✕</button>
           </div>
           {byDate[selected].map((s, i) => (
@@ -1164,7 +1165,9 @@ function CardioTab({ onSelectWorkout, initialDrillType, onDrillChange, programId
                     onClick={() => onSelectWorkout && onSelectWorkout({
                       workout_id: s.session_id,
                       id: s.session_id,
-                      type: s.source === 'cardio_session' ? 'cardio' : (s.source || 'strength'),
+                      // A cardio_sessions row, or a workouts row with a cardio exercise.
+                      type: 'cardio',
+                      source: s.source,
                     })}
                   >
                     <td>{fmtDate(s.session_date)}</td>
@@ -1628,16 +1631,25 @@ function CombinedTab({ onSelectWorkout, programId }) {
   const [weeks, setWeeks] = useState(8);
   const [customWeeks, setCustomWeeks] = useState('');
   const [chartType, setChartType] = useState('line');
+  // Meditation is left out of this tab unless switched on (Phase 0B-1).
+  const [includeMeditation, setIncludeMeditation] = usePersistentState('stats:combinedMeditation', false, v => typeof v === 'boolean');
 
   useEffect(() => {
     const ctrl = new AbortController();
     setLoading(true);
-    apiFetch(`/combined?weeks=${weeks}${programId ? `&programId=${programId}` : ''}`, 3, ctrl.signal)
+    apiFetch(`/combined?weeks=${weeks}${programId ? `&programId=${programId}` : ''}${includeMeditation ? '&include_meditation=1' : ''}`, 3, ctrl.signal)
       .then(setData)
       .catch(e => { if (e.name !== 'AbortError') console.error(e); })
       .finally(() => setLoading(false));
     return () => ctrl.abort();
-  }, [weeks, programId]);
+  }, [weeks, programId, includeMeditation]);
+
+  const meditationToggle = (
+    <label className="sc-meditation-toggle">
+      <input type="checkbox" checked={includeMeditation} onChange={e => setIncludeMeditation(e.target.checked)} />
+      Include meditation
+    </label>
+  );
 
   const CHART_OPTIONS = [
     { value: 'line', label: 'Line chart' },
@@ -1646,7 +1658,7 @@ function CombinedTab({ onSelectWorkout, programId }) {
   ];
 
   if (loading) return <Loading />;
-  if (!data || data.sessions.length === 0) return <Empty />;
+  if (!data || data.sessions.length === 0) return <div>{meditationToggle}<Empty /></div>;
 
   // Sessions arrive newest-first from API — reverse for chronological chart display
   const sessionsChronological = [...data.sessions].reverse();
@@ -1683,6 +1695,7 @@ function CombinedTab({ onSelectWorkout, programId }) {
       </p>
 
       <TimeWindowSelector weeks={weeks} setWeeks={setWeeks} customWeeks={customWeeks} setCustomWeeks={setCustomWeeks} />
+      {meditationToggle}
 
       <Section
         title="All Activity"
@@ -1770,7 +1783,7 @@ function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout, progra
     setLoading(true);
     // include_unfinished: the session log lists cancelled / in-progress
     // sessions (tagged); the charts below still use completed ones only.
-    apiFetch(`/combined?weeks=${weeks}&include_unfinished=1${programId ? `&programId=${programId}` : ''}`, 3, ctrl.signal)
+    apiFetch(`/combined?weeks=${weeks}&include_unfinished=1&include_meditation=1${programId ? `&programId=${programId}` : ''}`, 3, ctrl.signal)
       .then(setData)
       .catch(e => { if (e.name !== 'AbortError') console.error(e); })
       .finally(() => setLoading(false));
@@ -2060,7 +2073,7 @@ function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout, progra
                   </button>
                 ))}
                 <input
-                  type="number"
+                  type="number" inputMode="numeric"
                   min={1}
                   placeholder="Custom"
                   value={customPageSize}
@@ -2074,9 +2087,9 @@ function HistoryTab({ initialWorkoutId, onClearSelected, onSelectWorkout, progra
                 />
               </div>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <button className="sc-window-btn" disabled={safePage <= 1} onClick={() => setPage(p => p - 1)}>‹</button>
+                <button aria-label="Previous page" data-tooltip="Previous page" className="sc-window-btn" disabled={safePage <= 1} onClick={() => setPage(p => p - 1)}>‹</button>
                 <span style={{ fontSize: 12 }}>{safePage} / {totalPages}</span>
-                <button className="sc-window-btn" disabled={safePage >= totalPages} onClick={() => setPage(p => p + 1)}>›</button>
+                <button aria-label="Next page" data-tooltip="Next page" className="sc-window-btn" disabled={safePage >= totalPages} onClick={() => setPage(p => p + 1)}>›</button>
               </div>
             </div>
           </Section>
@@ -2301,12 +2314,13 @@ function MeditationTab() {
 }
 
 export default function StatsCenter({ initialProgramId, onProgramStatsConsumed }) {
-  const [tab, setTab] = useState('Overview');
+  // Tab, sub-tab and selections survive a reload (Phase 0B-1).
+  const [tab, setTab] = usePersistentState('stats:tab', 'Overview', v => TABS.includes(v));
   const [selectedHistoryId, setSelectedHistoryId] = useState(null);
-  const [detailWorkout, setDetailWorkout] = useState(null); // { id, type }
-  const [cardioDrillType, setCardioDrillType] = useState(null); // restored after back from detail
-  const [programsSelectedIds, setProgramsSelectedIds] = useState([]);
-  const [programsSubTab, setProgramsSubTab] = useState('Overview');
+  const [detailWorkout, setDetailWorkout] = useState(null); // { id, type, source }
+  const [cardioDrillType, setCardioDrillType] = usePersistentState('stats:cardioDrill', null, v => v === null || typeof v === 'string'); // restored after back from detail
+  const [programsSelectedIds, setProgramsSelectedIds] = usePersistentState('stats:programIds', [], v => Array.isArray(v));
+  const [programsSubTab, setProgramsSubTab] = usePersistentState('stats:programsSubTab', 'Overview', v => PROGRAM_SUB_TABS.includes(v));
 
   // Deep link from a program's "Stats →" button
   useEffect(() => {
@@ -2320,7 +2334,7 @@ export default function StatsCenter({ initialProgramId, onProgramStatsConsumed }
   const handleSelectWorkout = (session) => {
     const id = session.workout_id ?? session.id;
     const type = session.type || 'strength';
-    setDetailWorkout({ id, type });
+    setDetailWorkout({ id, type, source: session.source });
   };
 
   if (detailWorkout) {
@@ -2329,6 +2343,7 @@ export default function StatsCenter({ initialProgramId, onProgramStatsConsumed }
         <WorkoutDetailPage
           workoutId={detailWorkout.id}
           workoutType={detailWorkout.type}
+          source={detailWorkout.source}
           onBack={() => setDetailWorkout(null)}
         />
       </div>

@@ -87,11 +87,11 @@ function SegmentRow({ segment, index, total, onChange, onMove, onRemove, handle 
       <div className="mt-seg-actions">
         {!handle && (
           <>
-            <button onClick={() => onMove(index, index - 1)} disabled={index === 0} aria-label="Move up">↑</button>
-            <button onClick={() => onMove(index, index + 1)} disabled={index === total - 1} aria-label="Move down">↓</button>
+            <button data-tooltip="Move up" onClick={() => onMove(index, index - 1)} disabled={index === 0} aria-label="Move up">↑</button>
+            <button data-tooltip="Move down" onClick={() => onMove(index, index + 1)} disabled={index === total - 1} aria-label="Move down">↓</button>
           </>
         )}
-        <button onClick={() => onRemove(index)} className="mt-seg-remove" aria-label="Remove segment">×</button>
+        <button data-tooltip="Remove segment" onClick={() => onRemove(index)} className="mt-seg-remove" aria-label="Remove segment">×</button>
       </div>
     </div>
   );

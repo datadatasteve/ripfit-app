@@ -45,7 +45,7 @@ export default function CardioWorkout({ onStart, onClose }) {
       <div className="cardio-card">
         <div className="cardio-header">
           <h2>Quick Cardio</h2>
-          <button className="cardio-close" onClick={onClose}>✕</button>
+          <button aria-label="Close" data-tooltip="Close" className="cardio-close" onClick={onClose}>✕</button>
         </div>
         <div className="cardio-type-grid">
           {CARDIO_TYPES.map(t => (
@@ -73,7 +73,7 @@ export default function CardioWorkout({ onStart, onClose }) {
       <div className="cardio-card">
         <div className="cardio-header">
           <h2>{selected.name}</h2>
-          <button className="cardio-close" onClick={onClose}>✕</button>
+          <button aria-label="Close" data-tooltip="Close" className="cardio-close" onClick={onClose}>✕</button>
         </div>
         <p className="cardio-subtitle">Set goals — all optional</p>
         <div className="cardio-form">
@@ -81,7 +81,7 @@ export default function CardioWorkout({ onStart, onClose }) {
           {hasField('duration') && (
             <>
               <label>Goal duration (minutes)</label>
-              <input type="number" placeholder="e.g. 45" value={goals.duration}
+              <input type="number" inputMode="numeric" min="0" placeholder="e.g. 45" value={goals.duration}
                 onChange={e => setGoals(g => ({ ...g, duration: e.target.value }))} />
             </>
           )}
@@ -90,7 +90,7 @@ export default function CardioWorkout({ onStart, onClose }) {
             <>
               <label>Goal distance</label>
               <div className="cardio-row">
-                <input type="number" step="0.1" placeholder="e.g. 5" value={goals.distance}
+                <input type="number" inputMode="decimal" min="0" step="0.1" placeholder="e.g. 5" value={goals.distance}
                   onChange={e => setGoals(g => ({ ...g, distance: e.target.value }))} />
                 <select value={goals.distance_unit}
                   onChange={e => setGoals(g => ({ ...g, distance_unit: e.target.value }))}>
@@ -113,10 +113,10 @@ export default function CardioWorkout({ onStart, onClose }) {
           {hasField('laps') && (
             <>
               <label>Goal laps</label>
-              <input type="number" placeholder="e.g. 20" value={goals.laps}
+              <input type="number" inputMode="numeric" min="0" placeholder="e.g. 20" value={goals.laps}
                 onChange={e => setGoals(g => ({ ...g, laps: e.target.value }))} />
               <label>Lap distance (metres)</label>
-              <input type="number" placeholder="e.g. 25 or 50" value={goals.lap_distance}
+              <input type="number" inputMode="decimal" min="0" placeholder="e.g. 25 or 50" value={goals.lap_distance}
                 onChange={e => setGoals(g => ({ ...g, lap_distance: e.target.value }))} />
             </>
           )}
@@ -124,7 +124,7 @@ export default function CardioWorkout({ onStart, onClose }) {
           {hasField('floors') && (
             <>
               <label>Goal floors</label>
-              <input type="number" placeholder="e.g. 30" value={goals.floors}
+              <input type="number" inputMode="numeric" min="0" placeholder="e.g. 30" value={goals.floors}
                 onChange={e => setGoals(g => ({ ...g, floors: e.target.value }))} />
             </>
           )}

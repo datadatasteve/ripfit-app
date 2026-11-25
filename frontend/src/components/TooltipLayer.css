@@ -1,0 +1,24 @@
+.app-tooltip {
+  position: fixed;
+  z-index: 3000;
+  transform: translate(-50%, -100%);
+  max-width: 240px;
+  padding: 4px 8px;
+  border-radius: var(--radius-md, 6px);
+  background: var(--text-primary);
+  color: var(--bg-primary, #fff);
+  font-size: 0.78rem;
+  line-height: 1.3;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: var(--shadow-md, 0 2px 8px rgba(0, 0, 0, 0.25));
+}
+
+.app-tooltip.below {
+  transform: translate(-50%, 0);
+}
+
+/* No tooltips on touch-only devices, even if a focus slips through. */
+@media (hover: none) {
+  .app-tooltip { display: none; }
+}

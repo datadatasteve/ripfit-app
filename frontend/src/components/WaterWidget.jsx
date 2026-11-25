@@ -166,7 +166,7 @@ export default function WaterWidget() {
       </div>
 
       {/* Gear */}
-      <button className="ww-gear-btn" onClick={() => setShowSettings(s => !s)} title="Water settings">⚙</button>
+      <button aria-label="Water settings" data-tooltip="Water settings" className="ww-gear-btn" onClick={() => setShowSettings(s => !s)}>⚙</button>
 
       {/* Settings panel */}
       {showSettings && (
@@ -174,7 +174,7 @@ export default function WaterWidget() {
           <div className="ww-settings-row">
             <span>Daily goal</span>
             <input
-              type="number"
+              type="number" inputMode="decimal" min="0"
               value={goalInput}
               onChange={e => setGoalInput(e.target.value)}
               className="ww-settings-input"

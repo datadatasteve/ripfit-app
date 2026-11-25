@@ -10,6 +10,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useUserPrefs, AGE_LIMIT_HOURS_OPTIONS, PAUSE_NOTE_MINUTES_OPTIONS } from '../contexts/UserPrefsContext';
 import ProfileCircle from './ProfileCircle';
 import './UserPreferencesPage.css';
+import { usePersistentState } from '../hooks/usePersistentState';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 
@@ -65,7 +66,7 @@ export default function UserPreferencesPage({ onBack }) {
   const [prefMsgType, setPrefMsgType] = useState('ok');
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeSection, setActiveSection] = useState('profile');
+  const [activeSection, setActiveSection] = usePersistentState('prefs:section', 'profile', v => typeof v === 'string');
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState('');
   const [saveMsgType, setSaveMsgType] = useState('ok'); // 'ok' | 'error'
@@ -372,7 +373,7 @@ export default function UserPreferencesPage({ onBack }) {
                   {form.units_weight === 'lbs' ? (
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                       <input
-                        type="number" min={0} max={9}
+                        type="number" inputMode="decimal" min={0} max={9}
                         value={form.height_cm ? Math.floor(form.height_cm / 30.48) : ''}
                         onChange={e => {
                           const ft = parseInt(e.target.value) || 0;
@@ -384,7 +385,7 @@ export default function UserPreferencesPage({ onBack }) {
                       />
                       <span style={{ color: 'var(--text-secondary)', fontSize: '0.85em' }}>ft</span>
                       <input
-                        type="number" min={0} max={11}
+                        type="number" inputMode="decimal" min={0} max={11}
                         value={form.height_cm ? Math.round((form.height_cm / 2.54) % 12) : ''}
                         onChange={e => {
                           const inches = parseInt(e.target.value) || 0;
@@ -398,7 +399,7 @@ export default function UserPreferencesPage({ onBack }) {
                     </div>
                   ) : (
                     <input
-                      type="number"
+                      type="number" inputMode="decimal" min="0"
                       value={form.height_cm}
                       onChange={e => setForm(f => ({ ...f, height_cm: e.target.value }))}
                       placeholder="cm"
@@ -408,7 +409,7 @@ export default function UserPreferencesPage({ onBack }) {
                 </div>
                 <div className="prefs-field-group">
                   <label>Weight ({form.units_weight})</label>
-                  <input type="number" step="0.1" value={form.weight_kg} onChange={e => setForm(f => ({ ...f, weight_kg: e.target.value }))} style={{ maxWidth: 120 }} />
+                  <input type="number" inputMode="decimal" min="0" step="0.1" value={form.weight_kg} onChange={e => setForm(f => ({ ...f, weight_kg: e.target.value }))} style={{ maxWidth: 120 }} />
                 </div>
               </div>
 

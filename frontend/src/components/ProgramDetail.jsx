@@ -1,6 +1,7 @@
 // frontend/src/components/ProgramDetail.jsx
 import { useState, useEffect, useRef } from 'react';
 import './ProgramDetail.css';
+import { usePersistentState } from '../hooks/usePersistentState';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 function authHeaders() { return { Authorization: `Bearer ${localStorage.getItem('ripfit_token')}`, 'Content-Type': 'application/json' }; }
@@ -58,9 +59,9 @@ export default function ProgramDetail({ programId, onBack, onEdit, onStartWorkou
   const [data, setData] = useState(null);
   const [progress, setProgress] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState('Overview');
+  const [tab, setTab] = usePersistentState('programDetail:tab', 'Overview', v => typeof v === 'string');
   const [journalText, setJournalText] = useState('');
-  const [calView, setCalView] = useState('week');
+  const [calView, setCalView] = usePersistentState('programDetail:calView', 'week', v => typeof v === 'string');
 
   useEffect(() => { fetchAll(); }, [programId]);
 

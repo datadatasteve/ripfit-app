@@ -14,11 +14,11 @@ import './SortableList.css';
  */
 function DragHandle({ listeners, attributes, label }) {
   return (
-    <button
+    <button data-tooltip={label}
       type="button"
       className="sortable-handle"
       aria-label={label}
-      title="Drag to reorder"
+     
       {...attributes}
       {...listeners}
     >

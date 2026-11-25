@@ -80,6 +80,7 @@ export default function WorkoutHistory({ initialWorkoutId, onClearSelected }) {
       <WorkoutDetailPage
         workoutId={detailEntry.id}
         workoutType={detailEntry.type}
+        source={detailEntry.source}
         onBack={() => setDetailEntry(null)}
       />
     );
