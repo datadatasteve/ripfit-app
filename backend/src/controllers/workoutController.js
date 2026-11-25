@@ -539,32 +539,59 @@ const getWorkouts = async (req, res) => {
 // Timer modes tag their sets (migration 028); anything else is a normal set.
 const LOGGABLE_SET_TYPES = new Set(['normal', 'warmup', 'drop', 'superset', 'emom', 'tabata', 'amrap', 'interval']);
 
+// Sets and cardio segments only go into a workout that is still running
+// (a cancelled or finished one, e.g. closed on another device, refuses them).
+const WORKOUT_CLOSED_MESSAGE = 'This workout was cancelled or finished.';
+
 const logWorkoutSet = async (req, res) => {
   const { workoutId } = req.params;
-  const { workout_exercise_id, set_number, reps_completed, weight_used, rpe } = req.body;
+  const { workout_exercise_id, reps_completed, weight_used, rpe } = req.body;
   const setType = LOGGABLE_SET_TYPES.has(req.body.set_type) ? req.body.set_type : 'normal';
   const user_id = req.user.userId;
 
+  const client = await pool.connect();
   try {
-    const workoutCheck = await pool.query(
-      `SELECT id FROM workouts WHERE id = $1 AND user_id = $2`,
+    await client.query('BEGIN');
+    const workoutCheck = await client.query(
+      `SELECT id, status FROM workouts WHERE id = $1 AND user_id = $2`,
       [workoutId, user_id]
     );
-
     if (workoutCheck.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Workout not found' });
     }
+    if (workoutCheck.rows[0].status !== 'in_progress') {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: WORKOUT_CLOSED_MESSAGE, status: workoutCheck.rows[0].status });
+    }
 
-    const result = await pool.query(
-      `INSERT INTO workout_sets (workout_exercise_id, set_number, reps_completed, weight_used, rpe, set_type)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [workout_exercise_id, set_number, reps_completed, weight_used, rpe || null, setType]
+    // The set number is the server's: next after the highest one for this
+    // exercise. Locking the exercise row makes two devices logging at once
+    // queue here, so they can't both create "Set 2".
+    const exCheck = await client.query(
+      `SELECT id FROM workout_exercises WHERE id = $1 AND workout_id = $2 FOR UPDATE`,
+      [workout_exercise_id, workoutId]
     );
-
+    if (exCheck.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Exercise not found in this workout' });
+    }
+    const result = await client.query(
+      `INSERT INTO workout_sets (workout_exercise_id, set_number, reps_completed, weight_used, rpe, set_type)
+       VALUES ($1,
+               (SELECT COALESCE(MAX(set_number), 0) + 1 FROM workout_sets WHERE workout_exercise_id = $1),
+               $2, $3, $4, $5)
+       RETURNING *`,
+      [workout_exercise_id, reps_completed, weight_used, rpe || null, setType]
+    );
+    await client.query('COMMIT');
     res.status(201).json(result.rows[0]);
   } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
     console.error('Log set error:', error);
     res.status(500).json({ error: 'Failed to log set' });
+  } finally {
+    client.release();
   }
 };
 
@@ -804,10 +831,16 @@ const addExerciseToWorkout = async (req, res) => {
       return res.status(404).json({ error: 'Workout not found' });
     }
 
+    // Cardio goals (quick cardio, or a cardio exercise added mid-workout) are
+    // kept on the row, so a restored workout gets them back in its template.
+    const g = k => (req.body[k] === undefined || req.body[k] === '' ? null : req.body[k]);
     const result = await pool.query(
-      `INSERT INTO workout_exercises (workout_id, exercise_id, order_index, exercise_notes, target_sets, target_reps_min, target_reps_max, target_weight)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [workoutId, exercise_id, order_index, exercise_notes || null, target_sets || null, repsMin, repsMax, target_weight || null]
+      `INSERT INTO workout_exercises (workout_id, exercise_id, order_index, exercise_notes, target_sets, target_reps_min, target_reps_max, target_weight,
+         goal_duration_seconds, goal_distance, goal_distance_unit, goal_pace, goal_pace_unit, goal_laps, goal_lap_distance)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING *`,
+      [workoutId, exercise_id, order_index, exercise_notes || null, target_sets || null, repsMin, repsMax, target_weight || null,
+       g('goal_duration_seconds'), g('goal_distance'), g('goal_distance_unit'), g('goal_pace'), g('goal_pace_unit'),
+       g('goal_laps'), g('goal_lap_distance')]
     );
 
     res.status(201).json(result.rows[0]);
@@ -871,7 +904,8 @@ const getCombinedHistory = async (req, res) => {
         COUNT(DISTINCT we.id) AS exercise_count,
         w.overall_notes, w.status,
         ${activitySql('w')} AS has_activity,
-        w.session_rating, w.session_notes
+        w.session_rating, w.session_notes,
+        'workout' AS source
        FROM workouts w
        LEFT JOIN workout_routines wr ON w.routine_id = wr.id
        LEFT JOIN workout_exercises we ON w.id = we.workout_id
@@ -891,7 +925,8 @@ const getCombinedHistory = async (req, res) => {
         calories_burned, avg_heart_rate,
         pre_session_notes, mid_session_notes, post_session_notes,
         status, session_rating, session_notes,
-        (COALESCE(duration_seconds, 0) > 0 OR COALESCE(distance, 0) > 0) AS has_activity
+        (COALESCE(duration_seconds, 0) > 0 OR COALESCE(distance, 0) > 0) AS has_activity,
+        'cardio_session' AS source
        FROM cardio_sessions
        WHERE user_id = $1
        ORDER BY session_date DESC, start_time DESC`,
@@ -971,6 +1006,10 @@ const getWorkoutDetail = async (req, res) => {
 // POST /api/v1/workouts/start-free  (open session / quick cardio)
 const startFreeLift = async (req, res) => {
   const { workout_date, workout_title, workout_type = 'open' } = req.body;
+  // Quick cardio's pre-session note, saved with the row so it is in this
+  // first response (it used to be a separate PUT after the start).
+  const overallNotes = typeof req.body.overall_notes === 'string' && req.body.overall_notes.trim()
+    ? req.body.overall_notes : null;
   const user_id = req.user.userId;
   if (!workout_date) {
     return res.status(400).json({ error: 'workout_date required' });
@@ -979,9 +1018,9 @@ const startFreeLift = async (req, res) => {
   try {
     await client.query('BEGIN');
     const result = await client.query(
-      `INSERT INTO workouts (user_id, workout_date, routine_id, start_time, workout_title, workout_type, status)
-       VALUES ($1, $2, NULL, $3, $4, $5, 'in_progress') RETURNING *`,
-      [user_id, workout_date, new Date().toISOString(), workout_title || null, workout_type]
+      `INSERT INTO workouts (user_id, workout_date, routine_id, start_time, workout_title, workout_type, status, overall_notes)
+       VALUES ($1, $2, NULL, $3, $4, $5, 'in_progress', $6) RETURNING *`,
+      [user_id, workout_date, new Date().toISOString(), workout_title || null, workout_type, overallNotes]
     );
     await recordSessionEvent(client, result.rows[0].id, 'started');
     await client.query('COMMIT');
@@ -1014,11 +1053,14 @@ const logCardioSegment = async (req, res) => {
 
   try {
     const workoutCheck = await pool.query(
-      `SELECT id FROM workouts WHERE id = $1 AND user_id = $2`,
+      `SELECT id, status FROM workouts WHERE id = $1 AND user_id = $2`,
       [workoutId, user_id]
     );
     if (workoutCheck.rows.length === 0) {
       return res.status(404).json({ error: 'Workout not found' });
+    }
+    if (workoutCheck.rows[0].status !== 'in_progress') {
+      return res.status(409).json({ error: WORKOUT_CLOSED_MESSAGE, status: workoutCheck.rows[0].status });
     }
 
     const result = await pool.query(

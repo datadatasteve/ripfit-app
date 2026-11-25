@@ -391,7 +391,7 @@ async function getCardioStats(req, res) {
       ? { rows: [] }
       : await pool.query(`
       SELECT
-        id AS session_id, session_date, start_time, cardio_type,
+        id AS session_id, 'cardio_session' AS source, session_date, start_time, cardio_type,
         duration_seconds, distance, distance_unit,
         avg_speed, max_speed, avg_heart_rate, max_heart_rate,
         calories_burned, elevation_gain, session_rating
@@ -404,6 +404,7 @@ async function getCardioStats(req, res) {
     const wRows = await pool.query(`
       SELECT
         w.id AS session_id,
+        'workout' AS source,
         w.workout_date AS session_date,
         w.start_time,
         e.name AS cardio_type,
@@ -550,6 +551,11 @@ async function getCombinedStats(req, res) {
   // completed sessions only.
   const includeUnfinished = req.query.include_unfinished === '1';
   const wStatus = includeUnfinished ? 'TRUE' : "w.status = 'completed'";
+  // Meditation is left out unless asked for: the Overview pies, the Combined
+  // tab (its toggle defaults off) and Avg Session Duration don't count it; the
+  // calendar and History pass include_meditation=1.
+  const includeMeditation = req.query.include_meditation === '1';
+  const wMeditation = includeMeditation ? '' : "AND COALESCE(w.workout_type, '') <> 'meditation'";
   const csStatus = includeUnfinished ? 'TRUE' : "cs.status = 'completed'";
 
   try {
@@ -568,7 +574,8 @@ async function getCombinedStats(req, res) {
         start_time,
         workout_id,
         status,
-        has_activity
+        has_activity,
+        source
       FROM (
         -- Strength/mixed/open sessions
         SELECT
@@ -587,12 +594,13 @@ async function getCombinedStats(req, res) {
           w.start_time AT TIME ZONE 'UTC' AS start_time,
           w.id AS workout_id,
           w.status,
-          ${activitySql('w')} AS has_activity
+          ${activitySql('w')} AS has_activity,
+          'workout' AS source
         FROM workouts w
         LEFT JOIN workout_routines wr ON w.routine_id = wr.id
         LEFT JOIN workout_exercises we ON w.id = we.workout_id
         LEFT JOIN workout_sets ws ON we.id = ws.workout_exercise_id
-        WHERE w.user_id = $1 AND ${wStatus}
+        WHERE w.user_id = $1 AND ${wStatus} ${wMeditation}
           AND w.workout_date >= CURRENT_DATE - ($2 || ' weeks')::INTERVAL
           ${programCond}
         GROUP BY w.id, wr.name
@@ -613,7 +621,8 @@ async function getCombinedStats(req, res) {
           cs.start_time,
           cs.id AS workout_id,
           cs.status,
-          (COALESCE(cs.duration_seconds, 0) > 0 OR COALESCE(cs.distance, 0) > 0) AS has_activity
+          (COALESCE(cs.duration_seconds, 0) > 0 OR COALESCE(cs.distance, 0) > 0) AS has_activity,
+          'cardio_session' AS source
         FROM cardio_sessions cs
         WHERE cs.user_id = $1 AND ${csStatus}
           AND cs.session_date >= CURRENT_DATE - ($2 || ' weeks')::INTERVAL` : ''}

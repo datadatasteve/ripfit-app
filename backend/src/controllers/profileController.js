@@ -16,7 +16,8 @@ async function getProfile(req, res) {
          units_weight, units_distance, theme_preference, goals,
          initials, email_verified, is_admin, workout_rating_prefs, created_at,
          reorder_mode, previous_notes_scope, tempo_visual_enabled, tempo_audio_enabled,
-         timezone, workout_age_limit_hours, pause_note_minutes
+         timezone, workout_age_limit_hours, pause_note_minutes,
+         log_set_button_position, tempo_countdown_beeps
        FROM users WHERE id = $1`,
       [req.user.userId]
     );
@@ -311,6 +312,10 @@ const PREFERENCE_RULES = {
   // workout, and the shortest pause noted on the detail page.
   workout_age_limit_hours: v => AGE_LIMIT_HOURS_OPTIONS.includes(v),
   pause_note_minutes:      v => PAUSE_NOTE_MINUTES_OPTIONS.includes(v),
+  // Phase 0B-1: where Log Set sits on a phone, and the tempo lead-in beeps
+  // (0 turns the lead-in off).
+  log_set_button_position: v => ['inline', 'pinned'].includes(v),
+  tempo_countdown_beeps:   v => Number.isInteger(v) && v >= 0 && v <= 5,
 };
 
 async function updatePreferences(req, res) {
@@ -341,7 +346,7 @@ async function updatePreferences(req, res) {
     const result = await pool.query(
       `UPDATE users SET ${sets.join(', ')} WHERE id = $${values.length}
        RETURNING reorder_mode, previous_notes_scope, tempo_visual_enabled, tempo_audio_enabled, timezone,
-                 workout_age_limit_hours, pause_note_minutes`,
+                 workout_age_limit_hours, pause_note_minutes, log_set_button_position, tempo_countdown_beeps`,
       values
     );
     res.json(result.rows[0]);

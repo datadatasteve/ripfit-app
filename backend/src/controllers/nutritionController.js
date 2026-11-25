@@ -78,8 +78,13 @@ const scanBarcode = async (req, res) => {
 
   try {
     // Step 1: Check if barcode exists in local database
+    // Leading zeros differ between scanners (12-digit UPC-A, 13-digit EAN)
+    // and USDA (often GTIN-14), so compare without them. Otherwise a food
+    // saved from USDA is never found again and is inserted once per scan.
     const existingFood = await pool.query(
-      `SELECT * FROM foods WHERE gtin_upc = $1`,
+      `SELECT * FROM foods
+       WHERE ltrim(gtin_upc, '0') = ltrim($1, '0') AND ltrim($1, '0') <> ''
+       ORDER BY id LIMIT 1`,
       [barcode]
     );
 
@@ -113,8 +118,9 @@ const scanBarcode = async (req, res) => {
       RETURNING *`,
       [
         nutrition.name,
-        100, // USDA data is per 100g
-        'g',
+        // The label serving; the nutrient columns stay per 100 g / 100 ml.
+        nutrition.serving_size,
+        nutrition.serving_unit,
         nutrition.calories,
         nutrition.protein_g,
         nutrition.carbs_g,

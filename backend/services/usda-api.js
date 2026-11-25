@@ -71,32 +71,26 @@ async function searchFoods(query, options = {}) {
  * @returns {Promise<object|null>} - Food data or null if not found
  */
 async function searchByBarcode(barcode) {
+  const code = String(barcode || '').replace(/\D/g, '');
+  if (!code) return null;
+  const bare = code.replace(/^0+/, '');
+  if (!bare) return null;
+  // USDA stores branded GTINs in mixed lengths (some UPC-A 12-digit, some
+  // padded to GTIN-14 with leading zeros) and its search only matches the
+  // exact string, so a scanned 12-digit UPC can miss a 14-digit record. Try
+  // the scanned form, then the padded lengths, and accept only a result whose
+  // GTIN is the same number once leading zeros are ignored.
+  const variants = [...new Set([code, bare.padStart(14, '0'), bare.padStart(13, '0'), bare.padStart(12, '0')])];
   try {
-    // USDA API requires the barcode in the query parameter
-    const params = {
-      api_key: API_KEY,
-      query: barcode,  // Put barcode in query
-      dataType: 'Branded',
-      pageSize: 50  // Get more results to filter through
-    };
-
-    const response = await axios.get(`${USDA_API_BASE}/foods/search`, { params });
-    
-    if (response.data.foods && response.data.foods.length > 0) {
-      // Filter results to find exact barcode match
-      const exactMatch = response.data.foods.find(food => 
-        food.gtinUpc === barcode || 
-        food.gtinUpc === barcode.replace(/^0+/, '')  // Try without leading zeros
+    for (const query of variants) {
+      const response = await axios.get(`${USDA_API_BASE}/foods/search`, {
+        params: { api_key: API_KEY, query, dataType: 'Branded', pageSize: 50 },
+      });
+      const match = (response.data.foods || []).find(
+        food => String(food.gtinUpc || '').replace(/^0+/, '') === bare
       );
-      
-      if (exactMatch) {
-        return exactMatch;
-      }
-      
-      // If no exact match, return first result (might be close match)
-      return response.data.foods[0];
+      if (match) return match;
     }
-    
     return null;
   } catch (error) {
     console.error('Error searching by barcode:', error.message);
@@ -152,24 +146,32 @@ function parseNutrients(food) {
   };
 
   // Extract nutrient values
+  // Branded records can list a nutrient more than once (e.g. one set "per
+  // 100 unit measure" and another derived from a different serving). The
+  // first entry is the provider's per-100 value; later ones must not
+  // overwrite it (the last-wins loop turned Cheerios' 359 kcal into 117).
   if (food.foodNutrients) {
     food.foodNutrients.forEach(nutrient => {
       const key = nutrientMap[nutrient.nutrientId];
-      if (key) {
-        nutrients[key] = nutrient.value || 0;
+      if (key && nutrients[key] === undefined && nutrient.value != null) {
+        nutrients[key] = nutrient.value;
       }
     });
   }
 
-  // Calculate serving size
-  let serving_size = '100g';  // Default
-  if (food.servingSize && food.servingSizeUnit) {
-    serving_size = `${food.servingSize}${food.servingSizeUnit}`;
-  }
+  // The label serving (USDA's values stay per 100 g / 100 ml). Only gram and
+  // millilitre servings are kept, since the meal maths converts by weight.
+  const unit = String(food.servingSizeUnit || '').toLowerCase();
+  const servingUnit = ['g', 'grm', 'gm'].includes(unit) ? 'g' : ['ml', 'mlt'].includes(unit) ? 'ml' : null;
+  const servingAmount = Number(food.servingSize);
+  const hasServing = servingUnit && Number.isFinite(servingAmount) && servingAmount > 0;
+  const serving_size = hasServing ? servingAmount : 100;
 
   return {
     name: food.description || food.brandedFoodCategory || 'Unknown',
-    serving_size: serving_size,
+    serving_size,
+    serving_unit: hasServing ? servingUnit : 'g',
+    household_serving: food.householdServingFullText || null,
     calories: nutrients.calories || 0,
     protein_g: nutrients.protein_g || 0,
     carbs_g: nutrients.carbs_g || 0,

@@ -73,7 +73,10 @@ app.use('/api/v1/programs', programRoutes);
 app.use(`/api/${API_VERSION}/cardio`, cardioRoutes);
 app.use('/api/v1/users', profileRoutes);
 app.use('/api/v1/stats', statsRoutes);
-app.use('/api/v1', statsRoutes); // admin reset password (protected by ADMIN_SECRET)
+// Admin reset password (no JWT, protected by ADMIN_SECRET in the body). Only
+// this one route lives at the API root: mounting all of statsRoutes here put
+// its auth on every /api/v1 path, so the API root and unknown routes got 401.
+app.post('/api/v1/admin/reset-password', require('./controllers/statsController').adminResetPassword);
 app.use('/api/v1/admin', adminRoutes);
 
 // Health check endpoint

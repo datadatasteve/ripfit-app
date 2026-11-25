@@ -256,9 +256,15 @@ const startProgramWorkout = async (req, res) => {
       [programRoutineId, programId, uid]
     );
 
-    if (dayResult.rows.length === 0) return res.status(404).json({ error: 'Program day not found' });
+    if (dayResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Program day not found' });
+    }
     const day = dayResult.rows[0];
-    if (!day.routine_id) return res.status(400).json({ error: 'This day has no routine assigned' });
+    if (!day.routine_id) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'This day has no routine assigned' });
+    }
 
     // Use existing routine start logic — get template exercises
     const templateResult = await client.query(
@@ -274,7 +280,10 @@ const startProgramWorkout = async (req, res) => {
       [day.routine_id]
     );
 
-    if (templateResult.rows.length === 0) return res.status(400).json({ error: 'Routine has no exercises' });
+    if (templateResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Routine has no exercises' });
+    }
 
     // Get last performance
     const lastWorkoutResult = await client.query(
