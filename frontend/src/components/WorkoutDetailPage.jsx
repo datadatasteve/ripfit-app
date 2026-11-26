@@ -22,6 +22,14 @@ function fmtDuration(s) {
   return `${sec}s`;
 }
 
+/** A segment's time as m:ss, or h:mm:ss from an hour (Phase 0B-2). */
+function fmtSegmentTime(seconds) {
+  const t = Math.max(0, Math.round(Number(seconds) || 0));
+  const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
+  const ss = String(s).padStart(2, '0');
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+}
+
 function fmtDate(d) {
   if (!d) return '—';
   let ds;
@@ -655,6 +663,25 @@ export default function WorkoutDetailPage({ workoutId, workoutType, source, onBa
                 )}
                 {ex.category !== 'Cardio' && (!ex.sets || ex.sets.length === 0) && (
                   <p className="wdp-skipped">No sets logged</p>
+                )}
+                {/* Cardio segments (Phase 0B-2): Quick Cardio, or cardio inside
+                    an Open / routine workout, from /workouts/history/:id. */}
+                {ex.category === 'Cardio' && ex.segments?.length > 0 && (
+                  <table className="wdp-sets-table wdp-segments-table">
+                    <thead><tr><th>{ex.segments[0].segment_label || 'Segment'}</th><th>Time</th><th>Distance</th></tr></thead>
+                    <tbody>
+                      {ex.segments.map(sg => (
+                        <tr key={sg.id}>
+                          <td>{sg.segment_number}</td>
+                          <td>{sg.duration_seconds != null ? fmtSegmentTime(sg.duration_seconds) : '—'}</td>
+                          <td>{sg.distance != null ? `${sg.distance} ${sg.distance_unit || ''}`.trim() : '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+                {ex.category === 'Cardio' && Array.isArray(ex.segments) && ex.segments.length === 0 && (
+                  <p className="wdp-skipped">No segments logged</p>
                 )}
               </div>
             ))}

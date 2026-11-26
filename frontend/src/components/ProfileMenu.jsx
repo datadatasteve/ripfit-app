@@ -625,6 +625,10 @@ function GoalFieldSet({ children, hint }) {
   );
 }
 
+// Goal number fields that take whole numbers (numeric keypad, Phase 0B-2);
+// every other goal number field is a weight, measure or % (decimal keypad).
+const WHOLE_NUMBER_GOAL_FIELDS = new Set(['sessions_per_week', 'minutes_per_day']);
+
 // Single labelled input inside a goal detail block
 function GoalField({ label, field, details, onChange, type = 'text', placeholder, step }) {
   return (
@@ -633,7 +637,7 @@ function GoalField({ label, field, details, onChange, type = 'text', placeholder
       <input
         type={type}
         step={step}
-        {...(type === 'number' ? { inputMode: 'decimal', min: '0' } : {})}
+        {...(type === 'number' ? { inputMode: WHOLE_NUMBER_GOAL_FIELDS.has(field) ? 'numeric' : 'decimal', min: '0' } : {})}
         placeholder={placeholder || ''}
         value={details[field] || ''}
         onChange={e => onChange(field, e.target.value)}

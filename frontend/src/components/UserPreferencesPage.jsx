@@ -667,6 +667,10 @@ export default function UserPreferencesPage({ onBack }) {
 // This is critical — defining components inside render functions causes React
 // to treat them as new component types on every render, unmounting/remounting
 // inputs and losing focus. GoalField lives at module scope permanently.
+// Goal number fields that take whole numbers (numeric keypad, Phase 0B-2);
+// every other goal number field is a weight, measure or % (decimal keypad).
+const WHOLE_NUMBER_GOAL_FIELDS = new Set(['sessions_per_week', 'minutes_per_day']);
+
 function GoalField({ label, field, type, placeholder, step, value, onFieldChange, onFieldBlur }) {
   return (
     <div className="prefs-goal-field">
@@ -674,6 +678,7 @@ function GoalField({ label, field, type, placeholder, step, value, onFieldChange
       <input
         type={type || 'text'}
         step={step}
+        {...(type === 'number' ? { inputMode: WHOLE_NUMBER_GOAL_FIELDS.has(field) ? 'numeric' : 'decimal', min: '0' } : {})}
         placeholder={placeholder || ''}
         value={value}
         onChange={e => onFieldChange(field, e.target.value)}

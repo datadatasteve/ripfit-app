@@ -11,6 +11,7 @@ import { useUserPrefs } from '../contexts/UserPrefsContext';
 import { useActiveWorkoutControls } from '../contexts/ActiveWorkoutContext';
 import MeditationTimer from './MeditationTimer';
 import './ActiveWorkout.css';
+import { TIME_INPUT_PROPS, formatTimeTyping } from '../utils/timeTyping';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 
@@ -385,21 +386,21 @@ function CardioSegmentForm({ exercise, workoutId, segments, setSegments, userPac
         {isInterval ? (
           <>
             <input type="number" inputMode="numeric" min="0" placeholder="Rounds / Reps" value={reps} onChange={e => setReps(e.target.value)} />
-            <input type="text" placeholder="Duration (MM:SS)" value={durationInput} onChange={e => setDurationInput(e.target.value)} onBlur={handleAutoDerive} />
+            <input {...TIME_INPUT_PROPS} placeholder="Duration (MM:SS)" value={durationInput} onChange={e => setDurationInput(formatTimeTyping(e.target.value))} onBlur={handleAutoDerive} />
           </>
         ) : isSwimming ? (
           <>
             <input type="number" inputMode="numeric" min="0" placeholder="Laps" value={laps} onChange={e => setLaps(e.target.value)} onBlur={handleAutoDerive} />
             <input type="number" inputMode="decimal" min="0" step="0.1" placeholder="Lap distance (m)" value={lapDistance} onChange={e => setLapDistance(e.target.value)} onBlur={handleAutoDerive} />
-            <input type="text" placeholder="Duration (MM:SS)" value={durationInput} onChange={e => setDurationInput(e.target.value)} onBlur={handleAutoDerive} />
+            <input {...TIME_INPUT_PROPS} placeholder="Duration (MM:SS)" value={durationInput} onChange={e => setDurationInput(formatTimeTyping(e.target.value))} onBlur={handleAutoDerive} />
           </>
         ) : (
           <>
             <input
-              type="text"
+              {...TIME_INPUT_PROPS}
               placeholder={`Duration (MM:SS)${derived === 'duration' ? ' ← auto' : ''}`}
               value={durationInput}
-              onChange={e => { setDurationInput(e.target.value); setDerived(null); }}
+              onChange={e => { setDurationInput(formatTimeTyping(e.target.value)); setDerived(null); }}
               onBlur={handleAutoDerive}
             />
             <input
@@ -412,10 +413,10 @@ function CardioSegmentForm({ exercise, workoutId, segments, setSegments, userPac
             />
             <div style={{ position: 'relative' }}>
               <input
-                type="text"
+                {...TIME_INPUT_PROPS}
                 placeholder={`Pace (${userPaceUnit})${derived === 'pace' ? ' ← auto' : ''}`}
                 value={pace}
-                onChange={e => { setPace(e.target.value); setPaceOverridden(true); setDerived(null); }}
+                onChange={e => { setPace(formatTimeTyping(e.target.value)); setPaceOverridden(true); setDerived(null); }}
                 onBlur={handleAutoDerive}
                 style={{ width: '100%' }}
               />
@@ -2193,7 +2194,17 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
     const tok = localStorage.getItem('ripfit_token');
     try {
       const isCardio = exercise.category === 'Cardio';
-      const goalDurationSecs = targets.duration ? parseInt(targets.duration) * 60 : null;
+      // "M:SS" or whole minutes (Phase 0B-2: the box now fills in the colon
+      // as digits are typed, so "130" is 1:30; before, the seconds were dropped).
+      const goalDurationSecs = (() => {
+        if (!targets.duration) return null;
+        const str = String(targets.duration);
+        if (str.includes(':')) {
+          const [m, sec] = str.split(':').map(Number);
+          return Math.round((m || 0) * 60 + (sec || 0)) || null;
+        }
+        return Math.round((parseFloat(str) || 0) * 60) || null;
+      })();
       const goalPaceVal = targets.pace ? parsePaceString(targets.pace) : null;
 
       const addBody = {
@@ -4025,10 +4036,10 @@ function AddExerciseModal({ onAdd, onClose }) {
               {selectedExercise.category === 'Cardio' ? (
                 <>
                   <input
-                    type="text"
+                    {...TIME_INPUT_PROPS}
                     placeholder="Goal Duration (MM:SS)"
                     value={targets.duration}
-                    onChange={(e) => setTargets({ ...targets, duration: e.target.value })}
+                    onChange={(e) => setTargets({ ...targets, duration: formatTimeTyping(e.target.value) })}
                   />
                   <input
                     type="number" inputMode="decimal" min="0"
@@ -4038,10 +4049,10 @@ function AddExerciseModal({ onAdd, onClose }) {
                     onChange={(e) => setTargets({ ...targets, distance: e.target.value })}
                   />
                   <input
-                    type="text"
+                    {...TIME_INPUT_PROPS}
                     placeholder="Goal Pace (MM:SS per mile)"
                     value={targets.pace}
-                    onChange={(e) => setTargets({ ...targets, pace: e.target.value })}
+                    onChange={(e) => setTargets({ ...targets, pace: formatTimeTyping(e.target.value) })}
                   />
                   {selectedExercise.subcategory === 'Swimming' && (
                     <>

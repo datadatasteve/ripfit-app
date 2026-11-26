@@ -1454,7 +1454,8 @@ function CardioTab({ onSelectWorkout, initialDrillType, onDrillChange, programId
                   <td>{s.cardio_type}</td>
                   <td>{s.sessions}</td>
                   <td>{fmtDuration(s.avg_duration_seconds)}</td>
-                  <td>{s.total_distance > 0 ? `${s.total_distance}` : '—'}</td>
+                  {/* Average per session over sessions with a distance (Phase 0B-2). */}
+                  <td>{s.avg_distance > 0 ? `${s.avg_distance}` : '—'}</td>
                   <td>{s.avg_speed ?? '—'}</td>
                   <td style={{ color: ratingColor(s.avg_rating), fontWeight: s.avg_rating ? 600 : 400 }}>
                     {s.avg_rating ?? '—'}

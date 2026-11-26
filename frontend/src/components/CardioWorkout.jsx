@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import './CardioWorkout.css';
+import { TIME_INPUT_PROPS, formatTimeTyping } from '../utils/timeTyping';
 
 // Cardio type definitions with subcategory and field config
 export const CARDIO_TYPES = [
@@ -105,8 +106,8 @@ export default function CardioWorkout({ onStart, onClose }) {
           {hasField('pace') && (
             <>
               <label>Goal pace (MM:SS per {goals.distance_unit || 'mi'})</label>
-              <input type="text" placeholder="e.g. 8:30" value={goals.pace}
-                onChange={e => setGoals(g => ({ ...g, pace: e.target.value }))} />
+              <input {...TIME_INPUT_PROPS} placeholder="e.g. 8:30" value={goals.pace}
+                onChange={e => setGoals(g => ({ ...g, pace: formatTimeTyping(e.target.value) }))} />
             </>
           )}
 
