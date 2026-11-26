@@ -452,12 +452,14 @@ async function getCardioStats(req, res) {
     allRows.forEach(r => {
       const t = r.cardio_type;
       if (!summaryMap[t]) {
-        summaryMap[t] = { cardio_type: t, sessions: 0, total_duration: 0, total_distance: 0, total_calories: 0, ratings: [], speeds: [] };
+        summaryMap[t] = { cardio_type: t, sessions: 0, total_duration: 0, total_distance: 0, distance_sessions: 0, total_calories: 0, ratings: [], speeds: [] };
       }
       const s = summaryMap[t];
       s.sessions++;
       s.total_duration += r.duration_seconds || 0;
-      s.total_distance += parseFloat(r.distance || 0);
+      const dist = parseFloat(r.distance || 0);
+      s.total_distance += dist;
+      if (dist > 0) s.distance_sessions++;
       s.total_calories += r.calories_burned || 0;
       if (r.session_rating) s.ratings.push(parseFloat(r.session_rating));
       if (r.avg_speed) s.speeds.push(parseFloat(r.avg_speed));
@@ -468,6 +470,11 @@ async function getCardioStats(req, res) {
       sessions: s.sessions,
       avg_duration_seconds: Math.round(s.total_duration / s.sessions),
       total_distance: Math.round(s.total_distance * 100) / 100,
+      // Phase 0B-2: the average distance per session, over the sessions in
+      // the selection that have a distance recorded (sessions with no
+      // distance don't pull it down). null when none has a distance.
+      avg_distance: s.distance_sessions ? Math.round((s.total_distance / s.distance_sessions) * 100) / 100 : null,
+      distance_sessions: s.distance_sessions,
       avg_speed: s.speeds.length ? Math.round((s.speeds.reduce((a,b)=>a+b,0)/s.speeds.length)*100)/100 : null,
       total_calories: s.total_calories || null,
       avg_rating: s.ratings.length ? Math.round((s.ratings.reduce((a,b)=>a+b,0)/s.ratings.length)*10)/10 : null,

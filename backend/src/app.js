@@ -138,6 +138,19 @@ app.use((err, req, res, next) => {
     ).catch(logErr => console.error('Failed to log error to DB:', logErr));
   }
 
+  // Production (Phase 0B-2): no stack and no internal detail in a response.
+  // A body that isn't valid JSON gets a plain 400; other client errors keep
+  // their message only when it was written for the client (err.expose, as
+  // set by body-parser / http-errors); anything else is a generic message.
+  // Other NODE_ENV values behave as before.
+  if (process.env.NODE_ENV === 'production') {
+    let safe;
+    if (err.type === 'entity.parse.failed') safe = 'Malformed JSON in request body';
+    else if (statusCode < 500 && err.expose) safe = message;
+    else safe = statusCode < 500 ? 'Bad Request' : 'Internal Server Error';
+    return res.status(statusCode).json({ error: safe });
+  }
+
   res.status(statusCode).json({
     error: message,
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),

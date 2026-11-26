@@ -1044,12 +1044,37 @@ const getWorkoutDetail = async (req, res) => {
        ORDER BY we.order_index`,
       [id]
     );
+    // Cardio segments (Phase 0B-2), for any workout that has them: Quick
+    // Cardio, or a cardio exercise inside an Open / routine workout. Added
+    // data only: each exercise gains `segments` (empty when none) and the
+    // response gains `cardio_segments` (every segment, in exercise order).
+    const segmentsResult = await pool.query(
+      `SELECT wcs.id, wcs.workout_exercise_id, we.exercise_id, e.name AS exercise_name,
+              wcs.segment_number, wcs.segment_label, wcs.duration_seconds,
+              wcs.distance, wcs.distance_unit, wcs.pace, wcs.pace_unit, wcs.reps
+       FROM workout_cardio_segments wcs
+       JOIN workout_exercises we ON we.id = wcs.workout_exercise_id
+       JOIN exercises e ON e.id = we.exercise_id
+       WHERE wcs.workout_id = $1
+       ORDER BY we.order_index, wcs.segment_number, wcs.id`,
+      [id]
+    );
+    const cardioSegments = segmentsResult.rows.map(r => ({
+      ...r,
+      distance: r.distance == null ? null : Number(r.distance),
+      pace: r.pace == null ? null : Number(r.pace),
+    }));
+    const exercisesWithSegments = exercisesResult.rows.map(ex => ({
+      ...ex,
+      segments: cardioSegments.filter(sg => sg.workout_exercise_id === ex.id),
+    }));
     const history = await sessionHistory(pool, id, user_id);
     const canReopen = workoutResult.rows[0].status === 'cancelled'
       && await reopenEligibility(pool, user_id, id);
     res.json({
       ...workoutResult.rows[0],
-      exercises: exercisesResult.rows,
+      exercises: exercisesWithSegments,
+      cardio_segments: cardioSegments,
       ...history,
       can_reopen: canReopen,
     });
