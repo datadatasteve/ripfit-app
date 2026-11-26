@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { playBeep, isTimerAudioEnabled, setTimerAudioEnabled, primeAudio } from './audioCues';
+import { playBeep, isTimerAudioEnabled, setTimerAudioEnabled, onTimerAudioChange, primeAudio } from './audioCues';
 import './WorkoutTimers.css';
 
 const DEFAULT_COOLDOWN = 60;
@@ -55,6 +55,8 @@ function IntField({ label, value, min, onCommit }) {
 /** Persistent on/off switch for transition beeps, shown in every timer panel. */
 function SoundToggle() {
   const [on, setOn] = useState(isTimerAudioEnabled);
+  // Follows a "Turn on" tapped elsewhere (Start Set, Test sound; Phase 0B-2).
+  useEffect(() => onTimerAudioChange(setOn), []);
   const toggle = () => {
     setTimerAudioEnabled(!on);
     setOn(!on);

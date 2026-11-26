@@ -1834,7 +1834,8 @@
 
 
 /* Tempo click track (Phase 0B-1b) */
-.aw-tempo-track-btn {
+.aw-tempo-track-btn,
+.aw-start-set-btn {
   min-height: 36px;
   padding: 0 var(--space-md);
   border: 1px solid var(--color-primary);
@@ -1846,7 +1847,51 @@
   cursor: pointer;
   white-space: nowrap;
 }
-.aw-tempo-track-btn.running {
+.aw-tempo-track-btn.running,
+.aw-start-set-btn.running {
   background: var(--color-danger);
   border-color: var(--color-danger);
+}
+
+/* ── Start Set, Test sound (Phase 0B-2) ── */
+.aw-set-reps {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-xs);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+.aw-set-reps input {
+  width: 4.5rem;
+  min-height: 36px;
+  padding: 0 var(--space-sm);
+  font-size: 16px; /* 16px stops phones zooming in on focus */
+}
+.aw-sound-off {
+  color: var(--color-warning, var(--text-secondary));
+}
+.aw-link-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-primary);
+  font: inherit;
+  font-weight: var(--font-weight-semibold);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.aw-test-sound {
+  margin-top: var(--space-sm);
+}
+.aw-test-sound-btn {
+  min-height: 36px;
+  padding: 0 var(--space-md);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-primary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
 }

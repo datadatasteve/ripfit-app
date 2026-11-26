@@ -20,32 +20,59 @@ export function isTimerAudioEnabled() {
   }
 }
 
+const TIMER_AUDIO_EVENT = 'ripfit:timer-audio';
+
 export function setTimerAudioEnabled(on) {
   try {
     localStorage.setItem(TIMER_AUDIO_KEY, String(!!on));
   } catch {
     /* storage unavailable — preference just won't persist */
   }
+  // Every Sound switch and "Turn on" link on screen follows the change.
+  try { window.dispatchEvent(new CustomEvent(TIMER_AUDIO_EVENT, { detail: !!on })); } catch { /* no window */ }
+}
+
+/** Calls `fn(on)` whenever the timer Sound switch changes. Returns an unsubscribe. */
+export function onTimerAudioChange(fn) {
+  if (typeof window === 'undefined') return () => {};
+  const handler = e => fn(!!e.detail);
+  window.addEventListener(TIMER_AUDIO_EVENT, handler);
+  return () => window.removeEventListener(TIMER_AUDIO_EVENT, handler);
+}
+
+function audioCtor() {
+  if (typeof window === 'undefined') return null;
+  return window.AudioContext || window.webkitAudioContext || null;
 }
 
 function getCtx() {
-  if (typeof window === 'undefined') return null;
-  const AudioCtor = window.AudioContext || window.webkitAudioContext;
+  const AudioCtor = audioCtor();
   if (!AudioCtor) return null;
-  if (!ctx) ctx = new AudioCtor();
-  if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+  if (!ctx || ctx.state === 'closed') ctx = new AudioCtor();
+  // 'interrupted' is iOS's state after a call or another app took the audio.
+  if (ctx.state === 'suspended' || ctx.state === 'interrupted') ctx.resume().catch(() => {});
   return ctx;
 }
 
-/** One blip at audio-clock time `t` (a sine unless `type` says otherwise). Returns the oscillator (stoppable). */
-function tone(ac, t, frequency, duration, volume, type = 'sine') {
+/**
+ * One blip at audio-clock time `t` (a sine unless `type` says otherwise).
+ * `sustain` holds the level for the whole duration and then releases over
+ * 40 ms (a steady beep) instead of decaying from the start (a click).
+ * Returns the oscillator (stoppable).
+ */
+function tone(ac, t, frequency, duration, volume, type = 'sine', sustain = false) {
   const osc = ac.createOscillator();
   const gain = ac.createGain();
   osc.type = type;
   osc.frequency.value = frequency;
   gain.gain.setValueAtTime(0, t);
   gain.gain.linearRampToValueAtTime(volume, t + 0.01);
-  gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+  if (sustain) {
+    gain.gain.setValueAtTime(volume, t + Math.max(0.02, duration - 0.04));
+    gain.gain.linearRampToValueAtTime(0.0001, t + duration);
+  } else {
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+  }
   osc.connect(gain).connect(ac.destination);
   osc.start(t);
   osc.stop(t + duration + 0.05);
@@ -95,9 +122,50 @@ export function scheduleCountdownBeeps(count, { intervalMs = LEAD_IN_INTERVAL_MS
   }
 }
 
-/** Resumes the audio context inside a user gesture so later scheduled cues can play. */
+/**
+ * Call inside a tap, before any cue that plays later. Resumes the shared
+ * audio context, and (Phase 0B-2) when it still isn't running, replaces it
+ * with a new one made inside this tap: a context first made outside a tap,
+ * or one the phone stopped, can refuse to resume on some Android browsers,
+ * while a context made during a tap starts running. Nothing audible is lost,
+ * since a context that isn't running plays nothing. A one-sample silent
+ * buffer is also played, the usual way to unlock audio output on phones.
+ */
 export function primeAudio() {
-  getCtx();
+  const AudioCtor = audioCtor();
+  if (!AudioCtor) return null;
+  try {
+    let ac = getCtx();
+    if (ac && ac.state !== 'running') {
+      const old = ac;
+      ac = new AudioCtor();
+      ctx = ac;
+      old.close?.().catch(() => {});
+      if (ac.state !== 'running') ac.resume().catch(() => {});
+    }
+    const buf = ac.createBuffer(1, 1, ac.sampleRate);
+    const src = ac.createBufferSource();
+    src.buffer = buf;
+    src.connect(ac.destination);
+    src.start(0);
+    return ac;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * What stands between a cue and the speaker, for the Test sound readout:
+ *   supported   the browser has Web Audio
+ *   state       the shared context's state ('running', 'suspended', ...)
+ *   soundOn     the timer Sound switch (ripfit_timer_audio)
+ */
+export function audioStatus() {
+  return {
+    supported: !!audioCtor(),
+    state: ctx ? ctx.state : 'not started',
+    soundOn: isTimerAudioEnabled(),
+  };
 }
 
 // ── Clicks and click tracks (Phase 0B-1b; Phase 3-2 reuses them) ───────────
@@ -113,11 +181,16 @@ export const CLICK_SOUNDS = Object.freeze({
   accent: { frequency: 1568, duration: 0.06,  volume: 0.36, type: 'square' },
   /** Top of each rep ("go"). Longer and higher, so it can't be mistaken. */
   go:     { frequency: 2093, duration: 0.14,  volume: 0.4,  type: 'square' },
+  /**
+   * End of a rep (Start Set, Phase 0B-2): a steady half-second beep, lower
+   * than the clicks and smooth rather than buzzy, so it can't be taken for one.
+   */
+  rep:    { frequency: 784,  duration: 0.5,   volume: 0.5,  type: 'triangle', sustain: true },
 });
 
 function scheduleClick(ac, t, sound) {
   const s = CLICK_SOUNDS[sound] || CLICK_SOUNDS.tick;
-  return tone(ac, t, s.frequency, s.duration, s.volume, s.type);
+  return tone(ac, t, s.frequency, s.duration, s.volume, s.type, !!s.sustain);
 }
 
 /** One click now ('tick' | 'accent' | 'go'). Silent when timer audio is off. */
@@ -153,6 +226,36 @@ export function tempoClickBeats(phaseSeconds) {
     phaseNo++;
   });
   return { beats, cycleSeconds: at };
+}
+
+/**
+ * The beats of a whole tempo set (Start Set, Phase 0B-2): `reps` reps back to
+ * back, one click per second of every phase, an accent on the first second
+ * of each later phase, and a half-second 'rep' beep at the end of every rep
+ * (the last one ends the set). The end-of-rep beep also marks the top of the
+ * next rep, so the first second of reps 2 onwards has no click of its own.
+ * Rep 1's first second is marked by the lead-in's "go" when `leadIn` is
+ * true, else by an accent. Nothing follows the last beep.
+ * Returns { beats, cycleSeconds, totalSeconds } (cycleSeconds = one rep).
+ */
+export function tempoSetBeats(phaseSeconds, reps, { leadIn = true } = {}) {
+  const { beats: one, cycleSeconds } = tempoClickBeats(phaseSeconds);
+  const n = Math.max(0, Math.floor(Number(reps) || 0));
+  const beats = [];
+  if (!(cycleSeconds > 0) || n === 0) return { beats, cycleSeconds, totalSeconds: 0 };
+  for (let r = 0; r < n; r++) {
+    const base = r * cycleSeconds;
+    for (const b of one) {
+      let sound = b.sound;
+      if (sound === 'go') {
+        if (r > 0 || leadIn) continue;   // the rep beep / the lead-in "go" stands in
+        sound = 'accent';
+      }
+      beats.push({ at: base + b.at, sound, phase: b.phase, second: b.second, rep: r });
+    }
+    beats.push({ at: base + cycleSeconds, sound: 'rep', rep: r });
+  }
+  return { beats, cycleSeconds, totalSeconds: n * cycleSeconds + CLICK_SOUNDS.rep.duration };
 }
 
 /**
@@ -215,6 +318,26 @@ export function scheduleClickPattern({ beats, cycleSeconds, cycles = Infinity, s
       oscs.clear();
     },
   };
+}
+
+/**
+ * Test sound (Phase 0B-2): a tick, an accent click and the end-of-rep beep,
+ * 0.6 s apart. Call from the tap. It plays even when the timer Sound switch
+ * is off (it tests the phone, not the setting); `audioStatus()` says whether
+ * that switch would silence the workout sounds.
+ */
+export function playTestSound() {
+  const ac = primeAudio();
+  if (!ac) return false;
+  try {
+    const t0 = ac.currentTime + 0.08;
+    scheduleClick(ac, t0, 'tick');
+    scheduleClick(ac, t0 + 0.6, 'accent');
+    scheduleClick(ac, t0 + 1.2, 'rep');
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // ── Tempo guide ticks (Feature 8d) ─────────────────────────────────────────

@@ -9,6 +9,7 @@ import BugReportModal from './BugReportModal';
 import { useTheme } from '../contexts/ThemeContext';
 import { useUserPrefs, AGE_LIMIT_HOURS_OPTIONS, PAUSE_NOTE_MINUTES_OPTIONS, TEMPO_COUNTDOWN_BEEPS_OPTIONS } from '../contexts/UserPrefsContext';
 import ProfileCircle from './ProfileCircle';
+import { TestSoundButton } from './TempoGuide';
 import './UserPreferencesPage.css';
 import { usePersistentState } from '../hooks/usePersistentState';
 
@@ -598,7 +599,13 @@ export default function UserPreferencesPage({ onBack }) {
                   <option value="on">On (default)</option>
                   <option value="off">Off</option>
                 </select>
-                <p className="prefs-hint">Shows a Tempo track button on exercises that have a tempo. It clicks every second of each phase (3-1-2 = 3, 1 and 2 clicks), with a sharper click at each phase change and a high "go" at the top of each rep, until you tap Stop or reach your reps. You can also turn it off for one workout from the exercise's Tempo Guide.</p>
+                <p className="prefs-hint">The clicks of the Start Set button on exercises that have a tempo: a click every second of each phase (3-1-2 = 3, 1 and 2 clicks), a sharper click at each phase change, and a half-second beep at the end of every rep. Off keeps Start Set's count and glow but makes it silent. You can also turn the clicks off for one workout from the exercise's Tempo Guide.</p>
+              </div>
+
+              <div className="prefs-field-group">
+                <label>Test sound</label>
+                <TestSoundButton />
+                <p className="prefs-hint">Plays a click, an accent click and the end-of-rep beep, so you can check your phone is playing the workout sounds.</p>
               </div>
 
               <div className="prefs-field-group">

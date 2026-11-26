@@ -2588,11 +2588,14 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
   // An exercise-bound timer belongs to one exercise; changing exercise closes it.
   useEffect(() => { setTimerOpen(false); }, [currentExercise.id]);
 
-  // Tempo track rep target (Phase 0B-1b): the reps typed in the set form,
-  // else the exercise's target reps (the top of a range), else until Stop.
-  const tempoTargetReps = (() => {
+  // Start Set reps (Phase 0B-2): the reps typed in the set form win, else
+  // the top of the exercise's target range (8-12 → 12), else the "Reps for
+  // this set" field inside the tempo guide.
+  const tempoTypedReps = (() => {
     const typed = parseInt(setForm.reps, 10);
-    if (Number.isInteger(typed) && typed > 0) return typed;
+    return Number.isInteger(typed) && typed > 0 ? typed : null;
+  })();
+  const tempoTargetReps = (() => {
     const t = parseInt(currentExercise.template?.target_reps_max ?? currentExercise.template?.target_reps_min, 10);
     return Number.isInteger(t) && t > 0 ? t : null;
   })();
@@ -2603,6 +2606,7 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
     eccentric: currentExercise.template?.tempo_eccentric,
     pause: currentExercise.template?.tempo_pause,
     concentric: currentExercise.template?.tempo_concentric,
+    typedReps: tempoTypedReps,
     targetReps: tempoTargetReps,
     onGlow: setTempoGlow,
   });
@@ -3120,7 +3124,6 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
             {tempoGuide.guideView}
             <div className={`aw-log-row ${logPinned ? 'pinned' : ''}`}>
               <button onClick={handleLogSet} className="log-set-btn">Complete Set</button>
-              {tempoGuide.startRepButton}
             </div>
           </div>
         )}
