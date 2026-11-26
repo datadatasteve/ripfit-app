@@ -1,0 +1,3 @@
+# Playwright output (screenshots, traces, HTML report) stays out of git
+test-results/
+playwright-report/
