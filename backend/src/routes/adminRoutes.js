@@ -46,4 +46,10 @@ router.delete('/exercises/:id',             deleteExercise);
 router.get('/exercise-reports',             listExerciseReports);
 router.put('/exercise-reports/:id/resolve', resolveExerciseReport);
 
+// Global exercise aliases (Phase 1A-1; admin check inside each handler)
+const ac = require('../controllers/exerciseAliasController');
+router.get('/exercises/:id/aliases',         ac.listGlobalAliases);
+router.post('/exercises/:id/aliases',        ac.addGlobalAlias);
+router.delete('/exercise-aliases/:aliasId',  ac.deleteGlobalAlias);
+
 module.exports = router;

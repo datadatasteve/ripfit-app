@@ -8,6 +8,14 @@ router.get('/exercises/search', workoutController.searchExercises);
 router.get('/exercises/browse', workoutController.browseExercises);
 router.get('/exercises/:id', workoutController.getExerciseById);
 
+// Exercise aliases and default names (Phase 1A-1)
+const ac = require('../controllers/exerciseAliasController');
+router.get('/exercises/:id/aliases', authenticate, ac.listAliases);
+router.post('/exercises/:id/aliases', authenticate, ac.addUserAlias);
+router.delete('/exercises/aliases/:aliasId', authenticate, ac.deleteUserAlias);
+router.put('/exercises/:id/default-name', authenticate, ac.setDefaultName);
+router.delete('/exercises/:id/default-name', authenticate, ac.clearDefaultName);
+
 // History — must come before /:workoutId routes
 router.get('/history', authenticate, workoutController.getCombinedHistory);
 router.get('/history/:id', authenticate, workoutController.getWorkoutDetail);
@@ -44,6 +52,7 @@ router.put('/:workoutId/reopen', authenticate, workoutController.reopenWorkout);
 router.put('/:workoutId/exercises/order', authenticate, workoutController.reorderWorkoutExercises);
 
 router.post('/:workoutId/exercises', authenticate, workoutController.addExerciseToWorkout);
+router.put('/:workoutId/exercises/:exerciseId/targets', authenticate, workoutController.updateExerciseTargets);
 router.delete('/:workoutId/exercises/:exerciseId', authenticate, workoutController.deleteExerciseFromWorkout);
 router.put('/:workoutId/exercises/:exerciseId/notes', authenticate, workoutController.updateExerciseNotes);
 router.post('/:workoutId/exercises/:exerciseId/cardio-segments', authenticate, workoutController.logCardioSegment);

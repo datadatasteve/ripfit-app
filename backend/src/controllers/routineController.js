@@ -3,6 +3,8 @@
 // ============================================================================
 const { pool } = require('../config/database');
 const { recordSessionEvent } = require('../utils/workoutStatus');
+const V = require('../utils/validate');
+const { loadCircuits, copyRoutineCircuits } = require('./circuitController');
 
 // ============================================================================
 // ROUTINE MANAGEMENT
@@ -51,7 +53,11 @@ const ROUTINE_EXERCISE_COLUMNS = [
   'cooldown_seconds', 'training_type', 'training_duration',
   'overload_strategy', 'overload_increment', 'overload_schedule', 'overload_week_targets',
   'tempo_eccentric', 'tempo_pause', 'tempo_concentric',
+  'target_rpe', 'micro_overload',   // Phase 1A-1
 ];
+
+// JSONB columns: a stored value carried over a delete-and-reinsert is re-encoded.
+const JSON_COLUMNS = new Set(['overload_week_targets', 'micro_overload']);
 
 // NOT NULL columns with a DB default: an empty value means "use the default".
 const DEFAULT_WHEN_EMPTY = new Set(['training_type']);
@@ -85,6 +91,13 @@ function normaliseRoutineExerciseField(column, value) {
     case 'tempo_pause':
     case 'tempo_concentric':
       return toWholeOrNull(value);
+    // Phase 1A-1: invalid values are a 400 (err.statusCode), not silently dropped.
+    case 'target_rpe':
+      return V.take(V.rpeTarget(value));
+    case 'micro_overload': {
+      const mo = V.take(V.microOverload(value));
+      return mo === null ? null : JSON.stringify(mo);
+    }
     case 'overload_strategy':
       return OVERLOAD_STRATEGIES.has(value) ? value : 'none';
     case 'overload_schedule':
@@ -144,7 +157,7 @@ async function insertRoutineExercise(client, routineId, ex, previous = null) {
       else bind(v);
     } else if (previous && column in previous) {
       const prev = previous[column];
-      bind(column === 'overload_week_targets' && prev !== null ? JSON.stringify(prev) : prev);
+      bind(JSON_COLUMNS.has(column) && prev !== null ? JSON.stringify(prev) : prev);
     } else {
       // Neither sent nor previously stored: let the column default apply
       // (cooldown_seconds 60, training_type 'standard', overload 'none'/'linear').
@@ -206,7 +219,7 @@ const createRoutine = async (req, res) => {
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Create routine error:', error);
-    res.status(500).json({ error: error.message || 'Failed to create routine' });
+    res.status(error.statusCode === 400 ? 400 : 500).json({ error: error.message || 'Failed to create routine' });
   } finally {
     client.release();
   }
@@ -274,6 +287,7 @@ const getRoutineById = async (req, res) => {
         re.cooldown_seconds, re.training_type,
         re.overload_strategy, re.overload_increment, re.overload_schedule, re.overload_week_targets,
         re.tempo_eccentric, re.tempo_pause, re.tempo_concentric,
+        re.target_rpe, re.micro_overload,
         e.id as exercise_id, e.name as exercise_name, 
         e.category, e.equipment_type
        FROM routine_exercises re
@@ -285,7 +299,8 @@ const getRoutineById = async (req, res) => {
 
     res.json({
       ...routine,
-      exercises: exercisesResult.rows
+      exercises: exercisesResult.rows,
+      circuits: await loadCircuits(pool, { routineId: routine.id }),   // Phase 1A-1
     });
 
   } catch (error) {
@@ -363,7 +378,7 @@ const updateRoutine = async (req, res) => {
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Update routine error:', error);
-    res.status(500).json({ error: error.message || 'Failed to update routine' });
+    res.status(error.statusCode === 400 ? 400 : 500).json({ error: error.message || 'Failed to update routine' });
   } finally {
     client.release();
   }
@@ -436,6 +451,7 @@ const startWorkoutFromRoutine = async (req, res) => {
               re.target_weight, re.superset_group, re.notes, re.cooldown_seconds,
               re.overload_strategy, re.overload_increment, re.overload_schedule, re.overload_week_targets,
               re.tempo_eccentric, re.tempo_pause, re.tempo_concentric,
+              re.target_rpe, re.micro_overload,
               e.name as exercise_name, e.category, e.equipment_type,
               e.video_url_male, e.video_url_female
        FROM routine_exercises re
@@ -512,11 +528,12 @@ const startWorkoutFromRoutine = async (req, res) => {
       const exerciseResult = await client.query(
         `INSERT INTO workout_exercises (
           workout_id, exercise_id, order_index, exercise_notes,
-          target_sets, target_reps_min, target_reps_max, target_weight
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          target_sets, target_reps_min, target_reps_max, target_weight, target_rpe
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING *`,
         [workout.id, ex.exercise_id, ex.order_index, ex.notes,
-         ex.target_sets || null, ex.target_reps_min || null, ex.target_reps_max || null, ex.target_weight || null]
+         ex.target_sets || null, ex.target_reps_min || null, ex.target_reps_max || null, ex.target_weight || null,
+         ex.target_rpe ?? null]
       );
 
       workoutExercises.push({
@@ -540,11 +557,16 @@ const startWorkoutFromRoutine = async (req, res) => {
           overload_week_targets: ex.overload_week_targets,
           tempo_eccentric: ex.tempo_eccentric,
           tempo_pause: ex.tempo_pause,
-          tempo_concentric: ex.tempo_concentric
+          tempo_concentric: ex.tempo_concentric,
+          target_rpe: ex.target_rpe ?? null,
+          micro_overload: ex.micro_overload ?? null
         },
         last_performance: lastPerformance || null
       });
     }
+
+    // Phase 1A-1: the routine's circuits are copied into the new workout.
+    const circuits = await copyRoutineCircuits(client, routine.id, workout.id, user_id);
 
     await client.query('COMMIT');
 
@@ -552,6 +574,7 @@ const startWorkoutFromRoutine = async (req, res) => {
       workout,
       routine_name: routine.name,
       exercises: workoutExercises,
+      circuits,
       last_workout_date: lastWorkoutData?.workout_date || null,
       previous_overall_notes: lastWorkoutData?.overall_notes || null,
       message: 'Workout started from routine'
@@ -567,6 +590,7 @@ const startWorkoutFromRoutine = async (req, res) => {
 };
 
 module.exports = {
+  insertRoutineExercise,
   createRoutine,
   getRoutines,
   getRoutineById,

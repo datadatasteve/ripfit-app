@@ -6,6 +6,33 @@ const {
   sweepStaleWorkouts, workoutHasActivity, durationSql, activitySql,
   recordSessionEvent, listAttentionWorkouts, openPauseSecondsSql, cancelTimeSql, NOW_UTC_SQL,
 } = require('../utils/workoutStatus');
+const { cleanExerciseName, findOrCreateExerciseByName } = require('../utils/customExercise');
+const V = require('../utils/validate');
+const { loadCircuits } = require('./circuitController');
+
+/** Best-effort user id from an optional Bearer token (public exercise endpoints). */
+function optionalUserId(req) {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+    const jwt = require('jsonwebtoken');
+    const decoded = jwt.verify(authHeader.substring(7), process.env.JWT_SECRET || 'your-secret-key');
+    return Number.isInteger(decoded.userId) ? decoded.userId : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+/** Adds default_name (the user's own name for the exercise, or null) to search results. */
+async function withDefaultNames(rows, userId) {
+  if (!userId || rows.length === 0) return rows.map(r => ({ ...r, default_name: null }));
+  const names = await pool.query(
+    `SELECT exercise_id, display_name FROM user_exercise_names WHERE user_id = $1 AND exercise_id = ANY($2::int[])`,
+    [userId, rows.map(r => r.id)]
+  );
+  const byId = new Map(names.rows.map(n => [n.exercise_id, n.display_name]));
+  return rows.map(r => ({ ...r, default_name: byId.get(r.id) || null }));
+}
 
 // RPE is a whole number from 1 to 11 (11 = beyond max effort; migration 034).
 const RPE_MIN = 1;
@@ -33,6 +60,10 @@ const searchExercises = async (req, res) => {
   if (!q) {
     return res.status(400).json({ error: 'Search query required' });
   }
+
+  // Phase 1A-1: a signed-in caller's own aliases and default names also match.
+  // Without a token only global aliases do (search stays public, as before).
+  const searchUserId = optionalUserId(req);
 
   try {
     const rawTerm = q.toLowerCase().trim();
@@ -115,14 +146,14 @@ const searchExercises = async (req, res) => {
       return res.json({
         query: q,
         count: catResult.rows.length,
-        exercises: catResult.rows.map(ex => ({
+        exercises: await withDefaultNames(catResult.rows.map(ex => ({
           id: ex.id,
           name: ex.name,
           description: ex.description,
           category: ex.category,
           subcategory: ex.subcategory || null,
           equipment_type: ex.equipment_type
-        }))
+        })), searchUserId)
       });
     }
 
@@ -142,14 +173,23 @@ const searchExercises = async (req, res) => {
     };
 
     // Build params array with synonyms expanded
-    let allParams = [];
+    // $1 is the caller's user id (or NULL) for alias / default-name matching.
+    let allParams = [searchUserId];
     let wordConditions = [];
     let andParts = [];
-    let paramIdx = 1;
+    let paramIdx = 2;
+
+    // A word matches the exercise name, a global alias, the caller's own
+    // alias, or the caller's default name for it (Phase 1A-1).
+    const nameOrAlias = (p) => `(LOWER(name) LIKE $${p}
+      OR EXISTS (SELECT 1 FROM exercise_aliases ea WHERE ea.exercise_id = exercises.id
+                 AND (ea.user_id IS NULL OR ea.user_id = $1::int) AND LOWER(ea.alias) LIKE $${p})
+      OR EXISTS (SELECT 1 FROM user_exercise_names un WHERE un.exercise_id = exercises.id
+                 AND un.user_id = $1::int AND LOWER(un.display_name) LIKE $${p}))`;
 
     for (const word of uniqueWords) {
       const syns = synonyms[word] || [word];
-      const conditions = syns.map((s, i) => `LOWER(name) LIKE $${paramIdx + i}`);
+      const conditions = syns.map((s, i) => nameOrAlias(paramIdx + i));
       wordConditions.push(`(${conditions.join(' OR ')})`);
       andParts.push(`(${conditions.join(' OR ')})`);
       allParams.push(...syns.map(s => `%${s}%`));
@@ -203,14 +243,14 @@ const searchExercises = async (req, res) => {
     res.json({
       query: q,
       count: result.rows.length,
-      exercises: result.rows.map(ex => ({
+      exercises: await withDefaultNames(result.rows.map(ex => ({
         id: ex.id,
         name: ex.name,
         description: ex.description,
         category: ex.category,
         subcategory: ex.subcategory || null,
         equipment_type: ex.equipment_type
-      }))
+      })), searchUserId)
     });
   } catch (error) {
     console.error('Exercise search error:', error);
@@ -876,6 +916,9 @@ const addExerciseToWorkout = async (req, res) => {
   const repsMin = req.body.target_reps_min || req.body.target_reps_max || null;
   const repsMax = req.body.target_reps_max || req.body.target_reps_min || null;
   const user_id = req.user.userId;
+  // RPE target (Phase 1A-1): optional, 1 to 11.
+  const targetRpe = V.rpeTarget(req.body.target_rpe);
+  if (targetRpe.error) return res.status(400).json({ error: targetRpe.error });
 
   try {
     const workoutCheck = await pool.query(
@@ -892,17 +935,64 @@ const addExerciseToWorkout = async (req, res) => {
     const g = k => (req.body[k] === undefined || req.body[k] === '' ? null : req.body[k]);
     const result = await pool.query(
       `INSERT INTO workout_exercises (workout_id, exercise_id, order_index, exercise_notes, target_sets, target_reps_min, target_reps_max, target_weight,
-         goal_duration_seconds, goal_distance, goal_distance_unit, goal_pace, goal_pace_unit, goal_laps, goal_lap_distance)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING *`,
+         goal_duration_seconds, goal_distance, goal_distance_unit, goal_pace, goal_pace_unit, goal_laps, goal_lap_distance, target_rpe)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *`,
       [workoutId, exercise_id, order_index, exercise_notes || null, target_sets || null, repsMin, repsMax, target_weight || null,
        g('goal_duration_seconds'), g('goal_distance'), g('goal_distance_unit'), g('goal_pace'), g('goal_pace_unit'),
-       g('goal_laps'), g('goal_lap_distance')]
+       g('goal_laps'), g('goal_lap_distance'), targetRpe.value]
     );
 
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Add exercise error:', error);
     res.status(500).json({ error: 'Failed to add exercise' });
+  }
+};
+
+/**
+ * Targets of one exercise in a workout (Phase 1A-1). Only the keys sent change.
+ * PUT /api/v1/workouts/:workoutId/exercises/:exerciseId/targets
+ * { target_rpe?, target_sets?, target_reps_min?, target_reps_max?, target_weight? }
+ */
+const updateExerciseTargets = async (req, res) => {
+  const { workoutId, exerciseId } = req.params;
+  const body = req.body || {};
+  const checks = {
+    target_rpe: v => V.rpeTarget(v),
+    target_sets: v => V.intIn(v, 'target_sets', 1, 1000),
+    target_reps_min: v => V.intIn(v, 'target_reps_min', 1, 10000),
+    target_reps_max: v => V.intIn(v, 'target_reps_max', 1, 10000),
+    target_weight: v => V.numMin(v, 'target_weight', 0, { max: 99999 }),
+  };
+  const sets = []; const vals = [];
+  for (const [k, check] of Object.entries(checks)) {
+    if (!(k in body)) continue;
+    const r = check(body[k]);
+    if (r.error) return res.status(400).json({ error: r.error });
+    vals.push(r.value); sets.push(`${k} = $${vals.length}`);
+  }
+  if (!sets.length) return res.status(400).json({ error: `Send at least one of: ${Object.keys(checks).join(', ')}` });
+  const wId = Number(workoutId); const eId = Number(exerciseId);
+  if (!Number.isInteger(wId) || !Number.isInteger(eId)) return res.status(404).json({ error: 'Exercise not found in workout' });
+  try {
+    const cur = await pool.query(
+      `SELECT we.target_reps_min, we.target_reps_max FROM workout_exercises we
+       JOIN workouts w ON w.id = we.workout_id
+       WHERE we.id = $1 AND we.workout_id = $2 AND w.user_id = $3`,
+      [eId, wId, req.user.userId]
+    );
+    if (!cur.rows.length) return res.status(404).json({ error: 'Exercise not found in workout' });
+    const min = 'target_reps_min' in body ? vals[Object.keys(checks).filter(k => k in body).indexOf('target_reps_min')] : cur.rows[0].target_reps_min;
+    const max = 'target_reps_max' in body ? vals[Object.keys(checks).filter(k => k in body).indexOf('target_reps_max')] : cur.rows[0].target_reps_max;
+    if (min != null && max != null && max < min) return res.status(400).json({ error: 'target_reps_max must be at least target_reps_min' });
+    const r = await pool.query(
+      `UPDATE workout_exercises SET ${sets.join(', ')} WHERE id = $${vals.length + 1} RETURNING *`,
+      [...vals, eId]
+    );
+    res.json(r.rows[0]);
+  } catch (error) {
+    console.error('Update exercise targets error:', error);
+    res.status(500).json({ error: 'Failed to update targets' });
   }
 };
 
@@ -1025,7 +1115,7 @@ const getWorkoutDetail = async (req, res) => {
     const exercisesResult = await pool.query(
       `SELECT
         we.id, we.exercise_id, we.order_index, we.exercise_notes,
-        we.target_sets, we.target_reps_min, we.target_reps_max, we.target_weight,
+        we.target_sets, we.target_reps_min, we.target_reps_max, we.target_weight, we.target_rpe,
         e.name AS exercise_name, e.category,
         json_agg(
           json_build_object(
@@ -1075,6 +1165,7 @@ const getWorkoutDetail = async (req, res) => {
       ...workoutResult.rows[0],
       exercises: exercisesWithSegments,
       cardio_segments: cardioSegments,
+      circuits: await loadCircuits(pool, { workoutId: workoutResult.rows[0].id }),   // Phase 1A-1
       ...history,
       can_reopen: canReopen,
     });
@@ -1372,6 +1463,7 @@ async function buildActivePayload(db, workoutId) {
             re.id AS re_id, re.superset_group, re.cooldown_seconds, re.notes AS re_notes,
             re.overload_strategy, re.overload_increment, re.overload_schedule, re.overload_week_targets,
             re.tempo_eccentric, re.tempo_pause, re.tempo_concentric,
+            re.target_rpe AS re_target_rpe, re.micro_overload AS re_micro_overload,
             COALESCE((
               SELECT json_agg(json_build_object(
                        'id', ws.id, 'set_number', ws.set_number,
@@ -1429,7 +1521,7 @@ async function buildActivePayload(db, workoutId) {
     const {
       re_id, superset_group, cooldown_seconds, re_notes,
       overload_strategy, overload_increment, overload_schedule, overload_week_targets,
-      tempo_eccentric, tempo_pause, tempo_concentric,
+      tempo_eccentric, tempo_pause, tempo_concentric, re_target_rpe, re_micro_overload,
       logged_sets, cardio_segments, ...we
     } = row;
     const fromRoutine = re_id != null;
@@ -1451,6 +1543,8 @@ async function buildActivePayload(db, workoutId) {
         tempo_eccentric: fromRoutine ? tempo_eccentric : null,
         tempo_pause: fromRoutine ? tempo_pause : null,
         tempo_concentric: fromRoutine ? tempo_concentric : null,
+        target_rpe: we.target_rpe ?? (fromRoutine ? re_target_rpe : null),
+        micro_overload: fromRoutine ? re_micro_overload : null,
         goal_duration_seconds: we.goal_duration_seconds,
         goal_distance: num(we.goal_distance),
         goal_distance_unit: we.goal_distance_unit,
@@ -1475,6 +1569,7 @@ async function buildActivePayload(db, workoutId) {
     program_id: workout.program_id || null,
     program_routine_id: workout.program_routine_id || null,
     exercises,
+    circuits: await loadCircuits(db, { workoutId: workout.id }),   // Phase 1A-1
     last_workout_date: last?.workout_date || null,
     previous_overall_notes: last?.overall_notes || null,
   };
@@ -1807,28 +1902,14 @@ const reportExercise = async (req, res) => {
  * ON CONFLICT (which would never fire and would insert duplicates).
  */
 const findOrCreateExercise = async (req, res) => {
-  const name = typeof req.body?.name === 'string' ? req.body.name.trim().replace(/\s+/g, ' ') : '';
+  const name = cleanExerciseName(req.body?.name);
   if (!name) return res.status(400).json({ error: 'name is required' });
   if (name.length > 255) return res.status(400).json({ error: 'name is too long' });
 
   try {
-    const existing = await pool.query(
-      `SELECT id, name, category, equipment_type, source
-       FROM exercises WHERE LOWER(name) = LOWER($1)
-       ORDER BY id LIMIT 1`,
-      [name]
-    );
-    if (existing.rows.length > 0) {
-      return res.json({ ...existing.rows[0], created: false });
-    }
-
-    const inserted = await pool.query(
-      `INSERT INTO exercises (name, category, source, is_custom, created_by_user_id)
-       VALUES ($1, 'General', 'user_generated', TRUE, $2)
-       RETURNING id, name, category, equipment_type, source`,
-      [name, req.user.userId]
-    );
-    res.status(201).json({ ...inserted.rows[0], created: true });
+    // Same rule as before Phase 1A-1, now shared with program create/update.
+    const ex = await findOrCreateExerciseByName(pool, name, req.user.userId);
+    res.status(ex.created ? 201 : 200).json(ex);
   } catch (error) {
     console.error('Find-or-create exercise error:', error);
     res.status(500).json({ error: 'Failed to resolve exercise' });
@@ -1836,6 +1917,7 @@ const findOrCreateExercise = async (req, res) => {
 };
 
 module.exports = {
+  updateExerciseTargets,
   updateWorkoutSet,
   searchExercises,
   getExerciseById,

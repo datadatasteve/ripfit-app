@@ -28,4 +28,9 @@ router.get('/me/tempo-templates', listTempoTemplates);
 router.post('/me/tempo-templates', createTempoTemplate);
 router.delete('/me/tempo-templates/:id', deleteTempoTemplate);
 
+// Calendar feed link (Phase 1A-1)
+const { getFeedLink, regenerateFeedLink } = require('../controllers/calendarController');
+router.get('/me/calendar-feed', getFeedLink);
+router.post('/me/calendar-feed/regenerate', regenerateFeedLink);
+
 module.exports = router;

@@ -29,7 +29,10 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// Request logging
+// Request logging. The calendar feed's secret token (Phase 1A-1) is cut out
+// of every logged URL.
+morgan.token('url', (req) =>
+  String(req.originalUrl || req.url).replace(/(\/calendar\/feed\/)[^/?#]+/, '$1[redacted]'));
 if (process.env.NODE_ENV !== 'test') {
   app.use(morgan('dev'));
 }
@@ -64,6 +67,8 @@ const cardioRoutes = require('./routes/cardioRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 const statsRoutes = require('./routes/statsRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const circuitRoutes = require('./routes/circuitRoutes');
+const calendarRoutes = require('./routes/calendarRoutes');
 
 app.use(`/api/${API_VERSION}/nutrition`, nutritionRoutes);
 app.use(`/api/${API_VERSION}/auth`, authRoutes);
@@ -78,6 +83,8 @@ app.use('/api/v1/stats', statsRoutes);
 // its auth on every /api/v1 path, so the API root and unknown routes got 401.
 app.post('/api/v1/admin/reset-password', require('./controllers/statsController').adminResetPassword);
 app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/circuits', circuitRoutes);     // Phase 1A-1
+app.use('/api/v1/calendar', calendarRoutes);    // Phase 1A-1 (public .ics feed by token)
 
 // Health check endpoint
 app.get('/health', (req, res) => {
