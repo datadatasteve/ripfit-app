@@ -60,6 +60,13 @@ async function ensureStarters(db, uid, goals) {
        ON CONFLICT (user_id, starter_key) WHERE starter_key IS NOT NULL DO NOTHING`,
       [uid, s.name, gv ?? s.fallback, s.unit, s.frequency, s.auto_metric, s.goal_link, s.key, gv !== null]
     );
+    // A starter the user never changed (updated_at still equals created_at)
+    // stays in step with the settings goal: active while the goal has a value.
+    await db.query(
+      `UPDATE habits SET is_active = $3
+       WHERE user_id = $1 AND starter_key = $2 AND updated_at IS NOT DISTINCT FROM created_at AND is_active <> $3`,
+      [uid, s.key, gv !== null]
+    );
   }
 }
 
@@ -124,6 +131,16 @@ async function autoValue(db, uid, habit, from, to) {
     default:
       return 0;
   }
+}
+
+/** A habit's value over [from, to]: the auto metric, else the sum of its logs. */
+async function habitPeriodValue(db, uid, habit, from, to) {
+  if (habit.auto_metric) return autoValue(db, uid, habit, from, to);
+  const r = await db.query(
+    `SELECT COALESCE(SUM(value), 0) AS v FROM habit_logs WHERE habit_id = $1 AND log_date BETWEEN $2 AND $3`,
+    [habit.id, from, to]
+  );
+  return Number(r.rows[0].v) || 0;
 }
 
 /** Adds effective_target, progress and warnings to a habit row. */
@@ -423,5 +440,5 @@ module.exports = {
   listHabits, getHabit, createHabit, updateHabit, deleteHabit, listLogs, putLog, deleteLog,
   listProgramGoals, createProgramGoal, updateProgramGoal, deleteProgramGoal,
   // shared with reviews
-  userInfo, ensureStarters, decorate, dbDate,
+  userInfo, ensureStarters, decorate, dbDate, habitPeriodValue, goalValue,
 };

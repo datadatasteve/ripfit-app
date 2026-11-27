@@ -167,7 +167,7 @@ const listCircuits = async (req, res) => {
   try {
     const owner = routineId.value
       ? await pool.query(`SELECT id FROM workout_routines WHERE id = $1 AND user_id = $2`, [routineId.value, uid])
-      : await pool.query(`SELECT id FROM workouts WHERE id = $1 AND user_id = $2`, [workoutId.value, uid]);
+      : await pool.query(`SELECT id FROM workouts WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`, [workoutId.value, uid]);
     if (!owner.rows.length) return res.status(404).json({ error: routineId.value ? 'Routine not found' : 'Workout not found' });
     res.json({ circuits: await loadCircuits(pool, { routineId: routineId.value, workoutId: workoutId.value }) });
   } catch (err) { fail(res, err, 'list circuits'); }
@@ -188,7 +188,7 @@ const createCircuit = async (req, res) => {
     await client.query('BEGIN');
     const owner = routineId
       ? await client.query(`SELECT id FROM workout_routines WHERE id = $1 AND user_id = $2`, [routineId, uid])
-      : await client.query(`SELECT id FROM workouts WHERE id = $1 AND user_id = $2`, [workoutId, uid]);
+      : await client.query(`SELECT id FROM workouts WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`, [workoutId, uid]);
     if (!owner.rows.length) {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: routineId ? 'Routine not found' : 'Workout not found' });

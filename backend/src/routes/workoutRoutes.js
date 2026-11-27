@@ -16,6 +16,20 @@ router.delete('/exercises/aliases/:aliasId', authenticate, ac.deleteUserAlias);
 router.put('/exercises/:id/default-name', authenticate, ac.setDefaultName);
 router.delete('/exercises/:id/default-name', authenticate, ac.clearDefaultName);
 
+// Edit audit trail and soft delete (Phase 1A-2)
+const ec = require('../controllers/editController');
+router.get('/deleted', authenticate, ec.listDeleted);
+router.patch('/sets/:id/edit', authenticate, ec.editSet);
+router.delete('/sets/:id', authenticate, ec.deleteSet);
+router.post('/sets/:id/restore', authenticate, ec.restoreSet);
+router.patch('/cardio-segments/:id', authenticate, ec.editSegment);
+router.delete('/cardio-segments/:id', authenticate, ec.deleteSegment);
+router.post('/cardio-segments/:id/restore', authenticate, ec.restoreSegment);
+router.patch('/:workoutId/edit', authenticate, ec.editWorkout);
+router.delete('/:workoutId', authenticate, ec.deleteWorkout);
+router.post('/:workoutId/restore', authenticate, ec.restoreWorkout);
+router.get('/:workoutId/edits', authenticate, ec.listEdits);
+
 // History — must come before /:workoutId routes
 router.get('/history', authenticate, workoutController.getCombinedHistory);
 router.get('/history/:id', authenticate, workoutController.getWorkoutDetail);

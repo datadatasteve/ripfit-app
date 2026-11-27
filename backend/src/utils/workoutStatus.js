@@ -30,9 +30,9 @@ const PAUSE_NOTE_MINUTES_OPTIONS = Object.freeze([5, 10, 15, 20, 25, 30, 35, 40,
 function activitySql(w = 'w') {
   return `(
     EXISTS (SELECT 1 FROM workout_exercises act_we
-            JOIN workout_sets act_ws ON act_ws.workout_exercise_id = act_we.id
+            JOIN (SELECT * FROM workout_sets WHERE deleted_at IS NULL) act_ws ON act_ws.workout_exercise_id = act_we.id
             WHERE act_we.workout_id = ${w}.id)
-    OR EXISTS (SELECT 1 FROM workout_cardio_segments act_wcs WHERE act_wcs.workout_id = ${w}.id)
+    OR EXISTS (SELECT 1 FROM (SELECT * FROM workout_cardio_segments WHERE deleted_at IS NULL) act_wcs WHERE act_wcs.workout_id = ${w}.id)
     OR (${w}.workout_type = 'meditation'
         AND COALESCE(${w}.duration_seconds, EXTRACT(EPOCH FROM (${w}.end_time - ${w}.start_time))) > 0)
   )`;
@@ -46,9 +46,9 @@ function activitySql(w = 'w') {
 function lastActivitySql(w = 'w') {
   return `GREATEST(
     (SELECT MAX(la_ws.created_at) FROM workout_exercises la_we
-       JOIN workout_sets la_ws ON la_ws.workout_exercise_id = la_we.id
+       JOIN (SELECT * FROM workout_sets WHERE deleted_at IS NULL) la_ws ON la_ws.workout_exercise_id = la_we.id
        WHERE la_we.workout_id = ${w}.id),
-    (SELECT MAX(la_wcs.created_at) AT TIME ZONE 'UTC' FROM workout_cardio_segments la_wcs
+    (SELECT MAX(la_wcs.created_at) AT TIME ZONE 'UTC' FROM (SELECT * FROM workout_cardio_segments WHERE deleted_at IS NULL) la_wcs
        WHERE la_wcs.workout_id = ${w}.id),
     (SELECT MAX(la_wse.occurred_at) AT TIME ZONE 'UTC' FROM workout_session_events la_wse
        WHERE la_wse.workout_id = ${w}.id),
@@ -156,7 +156,7 @@ async function sweepStaleWorkouts(db, userId) {
   const result = await db.query(
     `WITH stale AS (
        SELECT w.id, ${lastActivitySql('w')} AS last_activity
-       FROM workouts w
+       FROM (SELECT * FROM workouts WHERE deleted_at IS NULL) w
        WHERE w.user_id = $1
          AND w.status = 'in_progress'
          AND ${lastActivitySql('w')}
@@ -202,10 +202,10 @@ async function listAttentionWorkouts(db, userId, { workoutId = null, status = nu
             (w.paused_at IS NOT NULL) AS paused,
             w.paused_at,
             (SELECT COUNT(*)::INTEGER FROM workout_exercises sc_we
-               JOIN workout_sets sc_ws ON sc_ws.workout_exercise_id = sc_we.id
+               JOIN (SELECT * FROM workout_sets WHERE deleted_at IS NULL) sc_ws ON sc_ws.workout_exercise_id = sc_we.id
                WHERE sc_we.workout_id = w.id) AS set_count,
             CASE WHEN w.status = 'cancelled' THEN ${cancelTimeSql('w')} AT TIME ZONE 'UTC' END AS cancelled_at
-     FROM workouts w
+     FROM (SELECT * FROM workouts WHERE deleted_at IS NULL) w
      LEFT JOIN workout_routines wr ON wr.id = w.routine_id
      WHERE w.user_id = $1
        AND ($2::integer IS NULL OR w.id = $2::integer)
@@ -225,7 +225,7 @@ async function listAttentionWorkouts(db, userId, { workoutId = null, status = nu
 /** Does this workout have activity? */
 async function workoutHasActivity(db, workoutId) {
   const result = await db.query(
-    `SELECT ${activitySql('w')} AS has_activity FROM workouts w WHERE w.id = $1`,
+    `SELECT ${activitySql('w')} AS has_activity FROM (SELECT * FROM workouts WHERE deleted_at IS NULL) w WHERE w.id = $1`,
     [workoutId]
   );
   return !!result.rows[0]?.has_activity;

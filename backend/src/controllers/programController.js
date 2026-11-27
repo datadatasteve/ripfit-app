@@ -15,7 +15,7 @@ function userId(req) { return req.user.userId; }
 // Rows pointing at an in-progress or cancelled workout (e.g. recorded through
 // POST /complete, or before Phase 0A-1) are ignored everywhere.
 const pwDone = (pw) =>
-  `EXISTS (SELECT 1 FROM workouts pw_w WHERE pw_w.id = ${pw}.workout_id AND pw_w.status = 'completed')`;
+  `EXISTS (SELECT 1 FROM (SELECT * FROM workouts WHERE deleted_at IS NULL) pw_w WHERE pw_w.id = ${pw}.workout_id AND pw_w.status = 'completed')`;
 
 // ── Phase 1A-1 helpers ────────────────────────────────────────────────────────
 
@@ -492,7 +492,7 @@ const startProgramWorkout = async (req, res) => {
 
     // Get last performance
     const lastWorkoutResult = await client.query(
-      `SELECT w.id, w.workout_date, w.overall_notes FROM workouts w
+      `SELECT w.id, w.workout_date, w.overall_notes FROM (SELECT * FROM workouts WHERE deleted_at IS NULL) w
        WHERE w.user_id = $1 AND w.routine_id = $2 AND w.workout_date <= $3
          AND w.status = 'completed'  -- an unfinished or cancelled session is never "last time"
        ORDER BY w.workout_date DESC, w.start_time DESC LIMIT 1`,
@@ -506,7 +506,7 @@ const startProgramWorkout = async (req, res) => {
         `SELECT we.exercise_id, we.exercise_notes,
                 json_agg(json_build_object('set_number', ws.set_number, 'reps', ws.reps_completed, 'weight', ws.weight_used, 'rpe', ws.rpe) ORDER BY ws.set_number) AS sets_completed
          FROM workout_exercises we
-         JOIN workout_sets ws ON we.id = ws.workout_exercise_id
+         JOIN (SELECT * FROM workout_sets WHERE deleted_at IS NULL) ws ON we.id = ws.workout_exercise_id
          WHERE we.workout_id = $1
          GROUP BY we.id, we.exercise_id, we.exercise_notes`,
         [lastWorkout.id]
@@ -592,7 +592,7 @@ const completeProgramWorkout = async (req, res) => {
 
     // Completion is recorded only for the user's own completed workout.
     const done = await pool.query(
-      `SELECT id FROM workouts WHERE id = $1 AND user_id = $2 AND status = 'completed'`,
+      `SELECT id FROM workouts WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL AND status = 'completed'`,
       [workout_id, uid]
     );
     if (done.rows.length === 0) {
@@ -637,7 +637,7 @@ const getProgramProgress = async (req, res) => {
         ${durationSql('w')} AS duration_seconds,
         pr.week_number, pr.day_of_week
        FROM program_workouts pw
-       JOIN workouts w ON w.id = pw.workout_id AND w.status = 'completed'
+       JOIN (SELECT * FROM workouts WHERE deleted_at IS NULL) w ON w.id = pw.workout_id AND w.status = 'completed'
        JOIN program_routines pr ON pr.id = pw.program_routine_id
        WHERE pw.program_id = $1
        ORDER BY pw.completed_date`,
@@ -655,11 +655,11 @@ const getProgramProgress = async (req, res) => {
           END
         ), 1) AS target_achievement_pct
        FROM program_workouts pw
-       JOIN workouts aw ON aw.id = pw.workout_id AND aw.status = 'completed'
+       JOIN (SELECT * FROM workouts WHERE deleted_at IS NULL) aw ON aw.id = pw.workout_id AND aw.status = 'completed'
        JOIN workout_exercises we ON we.workout_id = pw.workout_id
        LEFT JOIN (
          SELECT ws.workout_exercise_id, COUNT(*) AS qualifying_count
-         FROM workout_sets ws
+         FROM (SELECT * FROM workout_sets WHERE deleted_at IS NULL) ws
          JOIN workout_exercises we2 ON we2.id = ws.workout_exercise_id
          WHERE (we2.target_reps_min IS NULL OR ws.reps_completed >= we2.target_reps_min)
            AND (we2.target_weight IS NULL OR ws.weight_used >= we2.target_weight)
@@ -826,11 +826,11 @@ const getProgramStats = async (req, res) => {
         COUNT(DISTINCT we.id) AS exercise_count,
         COUNT(ws.id) AS total_sets
        FROM program_workouts pw
-       JOIN workouts w ON w.id = pw.workout_id AND w.status = 'completed'
+       JOIN workouts w ON w.id = pw.workout_id AND w.status = 'completed' AND w.deleted_at IS NULL
        LEFT JOIN workout_routines wr ON wr.id = w.routine_id
        LEFT JOIN program_routines pr ON pr.id = pw.program_routine_id
        LEFT JOIN workout_exercises we ON we.workout_id = w.id
-       LEFT JOIN workout_sets ws ON ws.workout_exercise_id = we.id
+       LEFT JOIN (SELECT * FROM workout_sets WHERE deleted_at IS NULL) ws ON ws.workout_exercise_id = we.id
        WHERE pw.program_id = $1
        GROUP BY w.id, wr.name, pr.week_number, pr.day_of_week, pr.order_index
        ORDER BY w.workout_date`,
@@ -848,10 +848,10 @@ const getProgramStats = async (req, res) => {
         COUNT(ws.id) AS sets_logged,
         ROUND(AVG(ws.rpe)::NUMERIC, 1) AS avg_rpe
        FROM program_workouts pw
-       JOIN workouts w ON w.id = pw.workout_id AND w.status = 'completed'
+       JOIN (SELECT * FROM workouts WHERE deleted_at IS NULL) w ON w.id = pw.workout_id AND w.status = 'completed'
        JOIN workout_exercises we ON we.workout_id = w.id
        JOIN exercises e ON e.id = we.exercise_id
-       JOIN workout_sets ws ON ws.workout_exercise_id = we.id
+       JOIN (SELECT * FROM workout_sets WHERE deleted_at IS NULL) ws ON ws.workout_exercise_id = we.id
        LEFT JOIN program_routines pr ON pr.id = pw.program_routine_id
        WHERE pw.program_id = $1
        GROUP BY e.name, w.workout_date, pr.week_number

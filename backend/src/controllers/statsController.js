@@ -55,7 +55,7 @@ async function getOverview(req, res) {
       FROM (
         -- workout_date / session_date are the user's local calendar day
         SELECT workout_date::timestamp AS d FROM workouts
-        WHERE user_id = $1 AND COALESCE(workout_type, '') <> 'meditation' AND ${DONE} ${weeksCond} ${programCond}
+        WHERE deleted_at IS NULL AND user_id = $1 AND COALESCE(workout_type, '') <> 'meditation' AND ${DONE} ${weeksCond} ${programCond}
         ${includeCardio ? `UNION ALL
         SELECT session_date::timestamp AS d FROM cardio_sessions
         WHERE user_id = $1 AND ${DONE} ${weeksCond2}` : ''}
@@ -74,7 +74,7 @@ async function getOverview(req, res) {
         -- start_time is naive UTC on workouts and timestamptz on cardio_sessions;
         -- both are converted to the user's own zone before bucketing.
         SELECT ${localTimeSql('start_time', TZ)} AS d FROM workouts
-        WHERE user_id = $1 AND COALESCE(workout_type, '') <> 'meditation' AND ${DONE} AND start_time IS NOT NULL ${programCond}
+        WHERE deleted_at IS NULL AND user_id = $1 AND COALESCE(workout_type, '') <> 'meditation' AND ${DONE} AND start_time IS NOT NULL ${programCond}
         ${includeCardio ? `UNION ALL
         SELECT start_time AT TIME ZONE ${TZ} AS d FROM cardio_sessions
         WHERE user_id = $1 AND ${DONE} AND start_time IS NOT NULL` : ''}
@@ -90,7 +90,7 @@ async function getOverview(req, res) {
         COUNT(*) AS count
       FROM (
         SELECT COALESCE(${localTimeSql('start_time', TZ)}, workout_date::timestamp) AS d FROM workouts
-        WHERE user_id = $1 AND COALESCE(workout_type, '') <> 'meditation' AND ${DONE} ${programCond}
+        WHERE deleted_at IS NULL AND user_id = $1 AND COALESCE(workout_type, '') <> 'meditation' AND ${DONE} ${programCond}
         ${includeCardio ? `UNION ALL
         SELECT COALESCE(start_time AT TIME ZONE ${TZ}, session_date::timestamp) AS d FROM cardio_sessions
         WHERE user_id = $1 AND ${DONE}` : ''}
@@ -108,7 +108,7 @@ async function getOverview(req, res) {
           'strength' AS type,
           start_time AT TIME ZONE 'UTC' AS start_time
         FROM workouts
-        WHERE user_id = $1 AND COALESCE(workout_type, '') <> 'meditation' AND ${DONE} ${programCond}
+        WHERE deleted_at IS NULL AND user_id = $1 AND COALESCE(workout_type, '') <> 'meditation' AND ${DONE} ${programCond}
       ) w_dur WHERE duration_seconds > 0
       ${includeCardio ? `UNION ALL
       SELECT duration_seconds, 'cardio' AS type, start_time
@@ -126,7 +126,7 @@ async function getOverview(req, res) {
         'strength' AS type,
         start_time AT TIME ZONE 'UTC' AS start_time
       FROM workouts
-      WHERE user_id = $1 AND COALESCE(workout_type, '') <> 'meditation' AND session_rating IS NOT NULL AND ${DONE} ${programCond}
+      WHERE deleted_at IS NULL AND user_id = $1 AND COALESCE(workout_type, '') <> 'meditation' AND session_rating IS NOT NULL AND ${DONE} ${programCond}
       ${includeCardio ? `UNION ALL
       SELECT
         to_char(session_date, 'YYYY-MM-DD') AS date,
@@ -149,7 +149,7 @@ async function getOverview(req, res) {
           ${durationSql('workouts')} AS dur,
           session_rating
         FROM workouts
-        WHERE user_id = $1 AND COALESCE(workout_type, '') <> 'meditation' AND ${DONE} ${programCond}
+        WHERE deleted_at IS NULL AND user_id = $1 AND COALESCE(workout_type, '') <> 'meditation' AND ${DONE} ${programCond}
         ${includeCardio ? `UNION ALL
         SELECT duration_seconds AS dur, session_rating FROM cardio_sessions
         WHERE user_id = $1 AND ${DONE}` : ''}
@@ -227,10 +227,10 @@ async function getStrengthStats(req, res) {
         ROUND(AVG(ws.rpe)::NUMERIC, 1) AS avg_rpe,
         -- Estimated 1RM using Epley formula: weight * (1 + reps/30)
         ROUND(MAX(ws.weight_used * (1 + ws.reps_completed::NUMERIC / 30))::NUMERIC, 1) AS estimated_1rm
-      FROM workouts w
+      FROM (SELECT * FROM workouts WHERE deleted_at IS NULL) w
       JOIN workout_exercises we ON w.id = we.workout_id
       JOIN exercises e ON we.exercise_id = e.id
-      JOIN workout_sets ws ON we.id = ws.workout_exercise_id
+      JOIN (SELECT * FROM workout_sets WHERE deleted_at IS NULL) ws ON we.id = ws.workout_exercise_id
       WHERE ${whereClause}
       GROUP BY e.id, e.name, e.category, e.muscles_primary, e.muscles_secondary
       ORDER BY sessions_logged DESC, e.name
@@ -261,8 +261,8 @@ async function getStrengthStats(req, res) {
       FROM workouts w
       JOIN workout_exercises we ON w.id = we.workout_id
       JOIN exercises e ON we.exercise_id = e.id
-      JOIN workout_sets ws ON we.id = ws.workout_exercise_id
-      WHERE ${whereClause}
+      JOIN (SELECT * FROM workout_sets WHERE deleted_at IS NULL) ws ON we.id = ws.workout_exercise_id
+      WHERE w.deleted_at IS NULL AND ${whereClause}
       GROUP BY e.id, e.name, w.id, w.workout_date, w.start_time
       ORDER BY e.name, w.start_time
     `, params);
@@ -286,9 +286,9 @@ async function getStrengthStats(req, res) {
         COUNT(CASE WHEN we.target_sets IS NOT NULL THEN 1 END)::INTEGER AS sets_with_targets
       FROM workouts w
       JOIN workout_exercises we ON w.id = we.workout_id
-      JOIN workout_sets ws ON we.id = ws.workout_exercise_id
+      JOIN (SELECT * FROM workout_sets WHERE deleted_at IS NULL) ws ON we.id = ws.workout_exercise_id
       LEFT JOIN workout_routines wr ON w.routine_id = wr.id
-      WHERE w.user_id = $1 AND w.status = 'completed'
+      WHERE w.deleted_at IS NULL AND w.user_id = $1 AND w.status = 'completed'
         AND (we.target_weight IS NOT NULL OR we.target_reps_min IS NOT NULL OR we.target_sets IS NOT NULL)
         ${programId === 'all' ? 'AND w.program_id IS NOT NULL' : programId ? 'AND w.program_id = $2' : ''}
       GROUP BY w.id, w.workout_date, wr.name
@@ -432,8 +432,8 @@ async function getCardioStats(req, res) {
       FROM workouts w
       JOIN workout_exercises we ON we.workout_id = w.id
       JOIN exercises e ON e.id = we.exercise_id AND e.category = 'Cardio'
-      LEFT JOIN workout_cardio_segments wcs ON wcs.workout_exercise_id = we.id
-      WHERE ${wWhere}
+      LEFT JOIN (SELECT * FROM workout_cardio_segments WHERE deleted_at IS NULL) wcs ON wcs.workout_exercise_id = we.id
+      WHERE w.deleted_at IS NULL AND ${wWhere}
       GROUP BY w.id, w.workout_date, w.start_time, w.end_time, w.session_rating, e.name
       -- A Quick Cardio counts even without segments (older rows); cardio in
       -- any other workout counts once a segment is logged.
@@ -530,10 +530,10 @@ async function getRecords(req, res) {
             PARTITION BY e.id
             ORDER BY ws.reps_completed DESC, ws.weight_used DESC
           ) AS rn_reps
-        FROM workouts w
+        FROM (SELECT * FROM workouts WHERE deleted_at IS NULL) w
         JOIN workout_exercises we ON w.id = we.workout_id
         JOIN exercises e ON we.exercise_id = e.id
-        JOIN workout_sets ws ON we.id = ws.workout_exercise_id
+        JOIN (SELECT * FROM workout_sets WHERE deleted_at IS NULL) ws ON we.id = ws.workout_exercise_id
         WHERE w.user_id = $1 AND w.status = 'completed'
           AND ws.weight_used > 0 AND ws.reps_completed > 0 ${programCond}
       )
@@ -616,7 +616,7 @@ async function getCombinedStats(req, res) {
           -- distance when every segment with a distance uses one unit.
           (SELECT CASE WHEN COUNT(DISTINCT d_wcs.distance_unit) <= 1
                        THEN ROUND(SUM(d_wcs.distance)::NUMERIC, 2) END
-             FROM workout_cardio_segments d_wcs
+             FROM (SELECT * FROM workout_cardio_segments WHERE deleted_at IS NULL) d_wcs
              WHERE d_wcs.workout_id = w.id AND d_wcs.distance IS NOT NULL) AS distance,
           NULL::INTEGER AS avg_heart_rate,
           w.start_time AT TIME ZONE 'UTC' AS start_time,
@@ -627,14 +627,14 @@ async function getCombinedStats(req, res) {
           -- Quick Cardio, or any workout with a cardio segment logged: listed
           -- under History's Cardio filter whatever its own type.
           (w.workout_type = 'cardio'
-           OR EXISTS (SELECT 1 FROM workout_cardio_segments hc_wcs WHERE hc_wcs.workout_id = w.id)) AS has_cardio,
-          (SELECT MAX(u_wcs.distance_unit) FROM workout_cardio_segments u_wcs
+           OR EXISTS (SELECT 1 FROM (SELECT * FROM workout_cardio_segments WHERE deleted_at IS NULL) hc_wcs WHERE hc_wcs.workout_id = w.id)) AS has_cardio,
+          (SELECT MAX(u_wcs.distance_unit) FROM (SELECT * FROM workout_cardio_segments WHERE deleted_at IS NULL) u_wcs
              WHERE u_wcs.workout_id = w.id AND u_wcs.distance IS NOT NULL) AS distance_unit
         FROM workouts w
         LEFT JOIN workout_routines wr ON w.routine_id = wr.id
         LEFT JOIN workout_exercises we ON w.id = we.workout_id
-        LEFT JOIN workout_sets ws ON we.id = ws.workout_exercise_id
-        WHERE w.user_id = $1 AND ${wStatus} ${wMeditation}
+        LEFT JOIN (SELECT * FROM workout_sets WHERE deleted_at IS NULL) ws ON we.id = ws.workout_exercise_id
+        WHERE w.deleted_at IS NULL AND w.user_id = $1 AND ${wStatus} ${wMeditation}
           AND w.workout_date >= CURRENT_DATE - ($2 || ' weeks')::INTERVAL
           ${programCond}
         GROUP BY w.id, wr.name
@@ -702,9 +702,9 @@ async function getExerciseStats(req, res) {
         w.id AS workout_id,
         w.start_time,
         ROUND((ws.weight_used * (1 + ws.reps_completed::NUMERIC / 30))::NUMERIC, 1) AS est_1rm
-      FROM workouts w
+      FROM (SELECT * FROM workouts WHERE deleted_at IS NULL) w
       JOIN workout_exercises we ON w.id = we.workout_id
-      JOIN workout_sets ws ON we.id = ws.workout_exercise_id
+      JOIN (SELECT * FROM workout_sets WHERE deleted_at IS NULL) ws ON we.id = ws.workout_exercise_id
       WHERE w.user_id = $1 AND we.exercise_id = $2 AND w.status = 'completed'
       ORDER BY w.start_time, ws.set_number
     `, [userId, id]);
@@ -729,8 +729,8 @@ async function getExerciseStats(req, res) {
         MAX(we.target_reps_max) AS target_reps_max
       FROM workouts w
       JOIN workout_exercises we ON w.id = we.workout_id
-      JOIN workout_sets ws ON we.id = ws.workout_exercise_id
-      WHERE w.user_id = $1 AND we.exercise_id = $2 AND w.status = 'completed'
+      JOIN (SELECT * FROM workout_sets WHERE deleted_at IS NULL) ws ON we.id = ws.workout_exercise_id
+      WHERE w.deleted_at IS NULL AND w.user_id = $1 AND we.exercise_id = $2 AND w.status = 'completed'
       GROUP BY w.id, w.workout_date, w.start_time
       ORDER BY w.start_time
     `, [userId, id]);
@@ -745,9 +745,9 @@ async function getExerciseStats(req, res) {
         COUNT(ws.id)::INTEGER AS total_sets,
         MIN(w.workout_date) AS first_logged,
         MAX(w.workout_date) AS last_logged
-      FROM workouts w
+      FROM (SELECT * FROM workouts WHERE deleted_at IS NULL) w
       JOIN workout_exercises we ON w.id = we.workout_id
-      JOIN workout_sets ws ON we.id = ws.workout_exercise_id
+      JOIN (SELECT * FROM workout_sets WHERE deleted_at IS NULL) ws ON we.id = ws.workout_exercise_id
       WHERE w.user_id = $1 AND we.exercise_id = $2 AND w.status = 'completed'
     `, [userId, id]);
 
@@ -884,7 +884,7 @@ async function getMeditationStats(req, res) {
               ${durationSql('w')} AS duration_seconds,
               w.workout_title,
               w.overall_notes
-       FROM workouts w
+       FROM (SELECT * FROM workouts WHERE deleted_at IS NULL) w
        WHERE w.user_id = $1
          AND w.workout_type = 'meditation'
          AND w.status = 'completed'

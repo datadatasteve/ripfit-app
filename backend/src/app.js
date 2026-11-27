@@ -72,6 +72,8 @@ const calendarRoutes = require('./routes/calendarRoutes');
 const habitRoutes = require('./routes/habitRoutes');
 const injuryRoutes = require('./routes/injuryRoutes');
 const checkinRoutes = require('./routes/checkinRoutes');
+const deviceRoutes = require('./routes/deviceRoutes');
+const reviewRoutes = require('./routes/reviewRoutes');
 
 app.use(`/api/${API_VERSION}/nutrition`, nutritionRoutes);
 app.use(`/api/${API_VERSION}/auth`, authRoutes);
@@ -91,6 +93,9 @@ app.use('/api/v1/calendar', calendarRoutes);    // Phase 1A-1 (public .ics feed 
 app.use('/api/v1/habits', habitRoutes);         // Phase 1A-2
 app.use('/api/v1/injuries', injuryRoutes);      // Phase 1A-2
 app.use('/api/v1/checkins', checkinRoutes);     // Phase 1A-2
+app.use('/api/v1/device', deviceRoutes.device);            // Phase 1A-2
+app.use('/api/v1/saved-routes', deviceRoutes.savedRoutes);  // Phase 1A-2
+app.use('/api/v1/reviews', reviewRoutes);                   // Phase 1A-2
 
 // Health check endpoint
 app.get('/health', (req, res) => {

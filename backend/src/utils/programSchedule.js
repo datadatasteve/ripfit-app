@@ -88,7 +88,7 @@ async function loadSchedule(db, programs) {
        LEFT JOIN LATERAL (
          SELECT pw.workout_id, pw.completed_date, pw.created_at
          FROM program_workouts pw
-         JOIN workouts w ON w.id = pw.workout_id AND w.status = 'completed'
+         JOIN (SELECT * FROM workouts WHERE deleted_at IS NULL) w ON w.id = pw.workout_id AND w.status = 'completed'
          WHERE pw.program_routine_id = pr.id
          ORDER BY pw.completed_date DESC NULLS LAST, pw.id DESC LIMIT 1
        ) done ON TRUE

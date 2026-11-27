@@ -44,7 +44,7 @@ async function listUsers(req, res) {
         COUNT(DISTINCT br.id) AS bug_reports,
         COUNT(DISTINCT el.id) AS error_count
       FROM users u
-      LEFT JOIN workouts w ON w.user_id = u.id
+      LEFT JOIN (SELECT * FROM workouts WHERE deleted_at IS NULL) w ON w.user_id = u.id
       LEFT JOIN cardio_sessions cs ON cs.user_id = u.id
       LEFT JOIN bug_reports br ON br.user_id = u.id
       LEFT JOIN error_logs el ON el.user_id = u.id AND el.resolved = FALSE
@@ -90,8 +90,8 @@ async function getUser(req, res) {
       FROM workouts w
       LEFT JOIN workout_routines r ON w.routine_id = r.id
       LEFT JOIN workout_exercises we ON we.workout_id = w.id
-      LEFT JOIN workout_sets ws ON ws.workout_exercise_id = we.id
-      WHERE w.user_id = $1
+      LEFT JOIN (SELECT * FROM workout_sets WHERE deleted_at IS NULL) ws ON ws.workout_exercise_id = we.id
+      WHERE w.deleted_at IS NULL AND w.user_id = $1
       GROUP BY w.id, r.name
       ORDER BY w.start_time DESC NULLS LAST
       LIMIT 20

@@ -571,7 +571,7 @@ const getWorkouts = async (req, res) => {
                   'rpe', ws.rpe
                 )
               )
-              FROM workout_sets ws
+              FROM (SELECT * FROM workout_sets WHERE deleted_at IS NULL) ws
               WHERE ws.workout_exercise_id = we.id
             )
           ) ORDER BY we.order_index
@@ -579,7 +579,7 @@ const getWorkouts = async (req, res) => {
        FROM workouts w
        LEFT JOIN workout_exercises we ON w.id = we.workout_id
        LEFT JOIN exercises e ON we.exercise_id = e.id
-       WHERE w.user_id = $1
+       WHERE w.deleted_at IS NULL AND w.user_id = $1
        GROUP BY w.id
        ORDER BY w.workout_date DESC, w.start_time DESC
        LIMIT $2`,
@@ -616,7 +616,7 @@ const logWorkoutSet = async (req, res) => {
   try {
     await client.query('BEGIN');
     const workoutCheck = await client.query(
-      `SELECT id, status FROM workouts WHERE id = $1 AND user_id = $2`,
+      `SELECT id, status FROM workouts WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`,
       [workoutId, user_id]
     );
     if (workoutCheck.rows.length === 0) {
@@ -690,9 +690,21 @@ const updateWorkoutSet = async (req, res) => {
   if (sets.length === 0) return res.status(400).json({ error: 'Nothing to update' });
 
   try {
+    // Phase 1A-2: a soft-deleted set (or a set of a deleted workout) is not
+    // found, and a change to a finished workout's set keeps the original
+    // values in record_edits and marks the set edited.
+    const cur = await pool.query(
+      `SELECT ws.*, w.status AS w_status, w.id AS w_id FROM workout_sets ws
+       JOIN workout_exercises we ON we.id = ws.workout_exercise_id
+       JOIN workouts w ON w.id = we.workout_id
+       WHERE ws.id = $1 AND w.user_id = $2 AND ws.deleted_at IS NULL AND w.deleted_at IS NULL`,
+      [Number.isInteger(Number(setId)) ? Number(setId) : -1, user_id]
+    );
+    if (cur.rows.length === 0) return res.status(404).json({ error: 'Set not found' });
+    const finished = cur.rows[0].w_status === 'completed';
     values.push(setId, user_id);
     const result = await pool.query(
-      `UPDATE workout_sets ws SET ${sets.join(', ')}
+      `UPDATE workout_sets ws SET ${sets.join(', ')}${finished ? ', edited_at = NOW()' : ''}
        FROM workout_exercises we, workouts w
        WHERE ws.id = $${values.length - 1}
          AND we.id = ws.workout_exercise_id
@@ -701,6 +713,14 @@ const updateWorkoutSet = async (req, res) => {
       values
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Set not found' });
+    if (finished) {
+      const { changesOf, logEdit } = require('./editController');
+      const after = result.rows[0];
+      const changes = changesOf(cur.rows[0], { reps_completed: after.reps_completed, weight_used: after.weight_used, rpe: after.rpe });
+      if (Object.keys(changes).length) {
+        await logEdit(pool, { userId: user_id, type: 'set', id: after.id, workoutId: cur.rows[0].w_id, action: 'edit', changes });
+      }
+    }
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Update set error:', error);
@@ -723,7 +743,7 @@ async function saveElapsedAsCardioSegment(db, workoutId) {
        SELECT w.id AS workout_id, we.id AS workout_exercise_id,
               GREATEST(0, EXTRACT(EPOCH FROM (${NOW_UTC_SQL} - w.start_time))::INTEGER
                           - COALESCE(w.total_paused_seconds, 0)) AS secs
-       FROM workouts w
+       FROM (SELECT * FROM workouts WHERE deleted_at IS NULL) w
        JOIN workout_exercises we ON we.workout_id = w.id
        JOIN exercises e ON e.id = we.exercise_id AND e.category = 'Cardio'
        WHERE w.id = $1
@@ -761,7 +781,7 @@ const finishWorkout = async (req, res) => {
     await client.query('BEGIN');
 
     const existing = await client.query(
-      `SELECT id FROM workouts WHERE id = $1 AND user_id = $2 FOR UPDATE`,
+      `SELECT id FROM workouts WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL FOR UPDATE`,
       [workoutId, user_id]
     );
     if (existing.rows.length === 0) {
@@ -836,7 +856,7 @@ const cancelWorkout = async (req, res) => {
   try {
     await client.query('BEGIN');
     const existing = await client.query(
-      `SELECT * FROM workouts WHERE id = $1 AND user_id = $2 FOR UPDATE`,
+      `SELECT * FROM workouts WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL FOR UPDATE`,
       [workoutId, user_id]
     );
     if (existing.rows.length === 0) {
@@ -873,7 +893,7 @@ const updateWorkoutNotes = async (req, res) => {
 
   try {
     const result = await pool.query(
-      `UPDATE workouts SET overall_notes = $1 WHERE id = $2 AND user_id = $3 RETURNING *`,
+      `UPDATE workouts SET overall_notes = $1 WHERE id = $2 AND user_id = $3 AND deleted_at IS NULL RETURNING *`,
       [overall_notes, workoutId, user_id]
     );
 
@@ -896,7 +916,7 @@ const deleteExerciseFromWorkout = async (req, res) => {
 
   try {
     const workoutCheck = await pool.query(
-      `SELECT id FROM workouts WHERE id = $1 AND user_id = $2`,
+      `SELECT id FROM workouts WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`,
       [workoutId, user_id]
     );
 
@@ -930,7 +950,7 @@ const addExerciseToWorkout = async (req, res) => {
 
   try {
     const workoutCheck = await pool.query(
-      `SELECT id FROM workouts WHERE id = $1 AND user_id = $2`,
+      `SELECT id FROM workouts WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`,
       [workoutId, user_id]
     );
 
@@ -988,7 +1008,7 @@ const updateExerciseTargets = async (req, res) => {
   try {
     const cur = await pool.query(
       `SELECT we.target_reps_min, we.target_reps_max FROM workout_exercises we
-       JOIN workouts w ON w.id = we.workout_id
+       JOIN (SELECT * FROM workouts WHERE deleted_at IS NULL) w ON w.id = we.workout_id
        WHERE we.id = $1 AND we.workout_id = $2 AND w.user_id = $3`,
       [eId, wId, req.user.userId]
     );
@@ -1014,7 +1034,7 @@ const updateExerciseNotes = async (req, res) => {
 
   try {
     const workoutCheck = await pool.query(
-      `SELECT id FROM workouts WHERE id = $1 AND user_id = $2`,
+      `SELECT id FROM workouts WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`,
       [workoutId, user_id]
     );
 
@@ -1069,7 +1089,7 @@ const getCombinedHistory = async (req, res) => {
        FROM workouts w
        LEFT JOIN workout_routines wr ON w.routine_id = wr.id
        LEFT JOIN workout_exercises we ON w.id = we.workout_id
-       WHERE w.user_id = $1 ${pid ? 'AND w.program_id = $2' : isAllPrograms ? 'AND w.program_id IS NOT NULL' : ''}
+       WHERE w.deleted_at IS NULL AND w.user_id = $1 ${pid ? 'AND w.program_id = $2' : isAllPrograms ? 'AND w.program_id IS NOT NULL' : ''}
        GROUP BY w.id, wr.name
        ORDER BY w.workout_date DESC, w.start_time DESC`,
       pid ? [user_id, pid] : [user_id]
@@ -1118,7 +1138,7 @@ const getWorkoutDetail = async (req, res) => {
     const workoutResult = await pool.query(
       `SELECT w.*, COALESCE(w.workout_title, wr.name, 'Open Session') AS routine_name,
               ${durationSql('w')} AS duration_seconds
-       FROM workouts w
+       FROM (SELECT * FROM workouts WHERE deleted_at IS NULL) w
        LEFT JOIN workout_routines wr ON w.routine_id = wr.id
        WHERE w.id = $1 AND w.user_id = $2`,
       [id, user_id]
@@ -1142,7 +1162,7 @@ const getWorkoutDetail = async (req, res) => {
         ) FILTER (WHERE ws.id IS NOT NULL) AS sets
        FROM workout_exercises we
        JOIN exercises e ON we.exercise_id = e.id
-       LEFT JOIN workout_sets ws ON we.id = ws.workout_exercise_id
+       LEFT JOIN (SELECT * FROM workout_sets WHERE deleted_at IS NULL) ws ON we.id = ws.workout_exercise_id
        WHERE we.workout_id = $1
        GROUP BY we.id, we.exercise_id, we.order_index, we.exercise_notes, e.name, e.category
        ORDER BY we.order_index`,
@@ -1156,7 +1176,7 @@ const getWorkoutDetail = async (req, res) => {
       `SELECT wcs.id, wcs.workout_exercise_id, we.exercise_id, e.name AS exercise_name,
               wcs.segment_number, wcs.segment_label, wcs.duration_seconds,
               wcs.distance, wcs.distance_unit, wcs.pace, wcs.pace_unit, wcs.reps
-       FROM workout_cardio_segments wcs
+       FROM (SELECT * FROM workout_cardio_segments WHERE deleted_at IS NULL) wcs
        JOIN workout_exercises we ON we.id = wcs.workout_exercise_id
        JOIN exercises e ON e.id = we.exercise_id
        WHERE wcs.workout_id = $1
@@ -1242,7 +1262,7 @@ const logCardioSegment = async (req, res) => {
 
   try {
     const workoutCheck = await pool.query(
-      `SELECT id, status FROM workouts WHERE id = $1 AND user_id = $2`,
+      `SELECT id, status FROM workouts WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`,
       [workoutId, user_id]
     );
     if (workoutCheck.rows.length === 0) {
@@ -1284,7 +1304,7 @@ const getCardioSegments = async (req, res) => {
 
   try {
     const workoutCheck = await pool.query(
-      `SELECT id FROM workouts WHERE id = $1 AND user_id = $2`,
+      `SELECT id FROM workouts WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`,
       [workoutId, user_id]
     );
     if (workoutCheck.rows.length === 0) {
@@ -1293,7 +1313,7 @@ const getCardioSegments = async (req, res) => {
 
     const result = await pool.query(
       `SELECT * FROM workout_cardio_segments
-       WHERE workout_exercise_id = $1 AND workout_id = $2
+       WHERE deleted_at IS NULL AND workout_exercise_id = $1 AND workout_id = $2
        ORDER BY segment_number`,
       [exerciseId, workoutId]
     );
@@ -1397,7 +1417,7 @@ const getPreviousExerciseNotes = async (req, res) => {
               w.status,
               we.exercise_notes
        FROM workout_exercises we
-       JOIN workouts w ON w.id = we.workout_id
+       JOIN (SELECT * FROM workouts WHERE deleted_at IS NULL) w ON w.id = we.workout_id
        WHERE w.user_id = $1
          AND we.exercise_id = $2
          -- Any prior session containing the exercise, cancelled ones included
@@ -1408,7 +1428,7 @@ const getPreviousExerciseNotes = async (req, res) => {
          AND NOT (
            w.status = 'cancelled'
            AND NULLIF(BTRIM(COALESCE(we.exercise_notes, '')), '') IS NULL
-           AND NOT EXISTS (SELECT 1 FROM workout_sets pn_ws WHERE pn_ws.workout_exercise_id = we.id)
+           AND NOT EXISTS (SELECT 1 FROM (SELECT * FROM workout_sets WHERE deleted_at IS NULL) pn_ws WHERE pn_ws.workout_exercise_id = we.id)
          )
          ${scopeSql}
        ORDER BY w.workout_date DESC, w.id DESC
@@ -1440,7 +1460,7 @@ async function closeOpenPause(db, workoutId, reason = null) {
   const result = await db.query(
     `WITH p AS (
        SELECT w.id, ${openPauseSecondsSql('w')} AS secs
-       FROM workouts w WHERE w.id = $1 AND w.paused_at IS NOT NULL
+       FROM (SELECT * FROM workouts WHERE deleted_at IS NULL) w WHERE w.id = $1 AND w.paused_at IS NOT NULL
      )
      UPDATE workouts w
      SET total_paused_seconds = COALESCE(w.total_paused_seconds, 0) + p.secs,
@@ -1467,7 +1487,7 @@ const num = v => (v == null ? v : Number(v));
 async function buildActivePayload(db, workoutId) {
   const wRes = await db.query(
     `SELECT w.*, wr.name AS routine_name_join, p.name AS program_name
-     FROM workouts w
+     FROM (SELECT * FROM workouts WHERE deleted_at IS NULL) w
      LEFT JOIN workout_routines wr ON wr.id = w.routine_id
      LEFT JOIN programs p ON p.id = w.program_id
      WHERE w.id = $1`,
@@ -1490,14 +1510,14 @@ async function buildActivePayload(db, workoutId) {
                        'reps_completed', ws.reps_completed, 'weight_used', ws.weight_used,
                        'rpe', ws.rpe, 'set_type', ws.set_type)
                      ORDER BY ws.set_number, ws.id)
-              FROM workout_sets ws WHERE ws.workout_exercise_id = we.id
+              FROM (SELECT * FROM workout_sets WHERE deleted_at IS NULL) ws WHERE ws.workout_exercise_id = we.id
             ), '[]'::json) AS logged_sets,
             COALESCE((
               SELECT json_agg(wcs.* ORDER BY wcs.segment_number, wcs.id)
-              FROM workout_cardio_segments wcs WHERE wcs.workout_exercise_id = we.id
+              FROM (SELECT * FROM workout_cardio_segments WHERE deleted_at IS NULL) wcs WHERE wcs.workout_exercise_id = we.id
             ), '[]'::json) AS cardio_segments
      FROM workout_exercises we
-     JOIN workouts w ON w.id = we.workout_id
+     JOIN (SELECT * FROM workouts WHERE deleted_at IS NULL) w ON w.id = we.workout_id
      JOIN exercises e ON e.id = we.exercise_id
      LEFT JOIN LATERAL (
        SELECT r.* FROM routine_exercises r
@@ -1515,7 +1535,7 @@ async function buildActivePayload(db, workoutId) {
   let last = null;
   if (workout.routine_id) {
     const lastRes = await db.query(
-      `SELECT w.id, w.workout_date, w.overall_notes FROM workouts w
+      `SELECT w.id, w.workout_date, w.overall_notes FROM (SELECT * FROM workouts WHERE deleted_at IS NULL) w
        WHERE w.user_id = $1 AND w.routine_id = $2 AND w.workout_date <= $3
          AND w.status = 'completed' AND w.id <> $4
        ORDER BY w.workout_date DESC, w.start_time DESC LIMIT 1`,
@@ -1528,7 +1548,7 @@ async function buildActivePayload(db, workoutId) {
                 json_agg(json_build_object('set_number', ws.set_number, 'reps', ws.reps_completed,
                                            'weight', ws.weight_used, 'rpe', ws.rpe) ORDER BY ws.set_number) AS sets_completed
          FROM workout_exercises we
-         JOIN workout_sets ws ON we.id = ws.workout_exercise_id
+         JOIN (SELECT * FROM workout_sets WHERE deleted_at IS NULL) ws ON we.id = ws.workout_exercise_id
          WHERE we.workout_id = $1
          GROUP BY we.id, we.exercise_id, we.exercise_notes`,
         [lw.id]
@@ -1658,7 +1678,7 @@ const pauseWorkout = async (req, res) => {
   try {
     await client.query('BEGIN');
     const existing = await client.query(
-      `SELECT * FROM workouts WHERE id = $1 AND user_id = $2 FOR UPDATE`,
+      `SELECT * FROM workouts WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL FOR UPDATE`,
       [workoutId, user_id]
     );
     if (existing.rows.length === 0) {
@@ -1697,7 +1717,7 @@ const resumeWorkout = async (req, res) => {
   try {
     await client.query('BEGIN');
     const existing = await client.query(
-      `SELECT * FROM workouts WHERE id = $1 AND user_id = $2 FOR UPDATE`,
+      `SELECT * FROM workouts WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL FOR UPDATE`,
       [workoutId, user_id]
     );
     if (existing.rows.length === 0) {
@@ -1754,7 +1774,7 @@ const reopenWorkout = async (req, res) => {
     await sweepStaleWorkouts(client, user_id);
 
     const existing = await client.query(
-      `SELECT * FROM workouts WHERE id = $1 AND user_id = $2 FOR UPDATE`,
+      `SELECT * FROM workouts WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL FOR UPDATE`,
       [workoutId, user_id]
     );
     if (existing.rows.length === 0) {
@@ -1780,7 +1800,7 @@ const reopenWorkout = async (req, res) => {
 
     const gapRes = await client.query(
       `SELECT GREATEST(0, FLOOR(EXTRACT(EPOCH FROM ((NOW() AT TIME ZONE 'UTC') - ${cancelTimeSql('w')}))))::INTEGER AS gap
-       FROM workouts w WHERE w.id = $1`,
+       FROM (SELECT * FROM workouts WHERE deleted_at IS NULL) w WHERE w.id = $1`,
       [workoutId]
     );
     const gap = gapRes.rows[0].gap;
@@ -1822,7 +1842,7 @@ const reorderWorkoutExercises = async (req, res) => {
     await client.query('BEGIN');
     const check = await client.query(
       `SELECT we.id FROM workout_exercises we
-       JOIN workouts w ON w.id = we.workout_id
+       JOIN (SELECT * FROM workouts WHERE deleted_at IS NULL) w ON w.id = we.workout_id
        WHERE we.workout_id = $1 AND w.user_id = $2`,
       [workoutId, user_id]
     );

@@ -240,7 +240,7 @@ const getRoutines = async (req, res) => {
         COUNT(DISTINCT w.id) AS use_count
        FROM workout_routines r
        LEFT JOIN routine_exercises re ON r.id = re.routine_id
-       LEFT JOIN workouts w ON w.routine_id = r.id AND w.status = 'completed'
+       LEFT JOIN (SELECT * FROM workouts WHERE deleted_at IS NULL) w ON w.routine_id = r.id AND w.status = 'completed'
        WHERE r.user_id = $1
        GROUP BY r.id
        ORDER BY r.is_active DESC, r.name`,
@@ -468,7 +468,7 @@ const startWorkoutFromRoutine = async (req, res) => {
     // Get last workout from this routine
     const lastWorkoutResult = await client.query(
       `SELECT w.id, w.workout_date, w.overall_notes
-       FROM workouts w
+       FROM (SELECT * FROM workouts WHERE deleted_at IS NULL) w
        WHERE w.user_id = $1 AND w.routine_id = $2 AND w.workout_date <= $3
          AND w.status = 'completed'  -- an unfinished or cancelled session is never "last time"
        ORDER BY w.workout_date DESC, w.start_time DESC
@@ -493,7 +493,7 @@ const startWorkoutFromRoutine = async (req, res) => {
                   ) ORDER BY ws.set_number
                 ) as sets_completed
          FROM workout_exercises we
-         JOIN workout_sets ws ON we.id = ws.workout_exercise_id
+         JOIN (SELECT * FROM workout_sets WHERE deleted_at IS NULL) ws ON we.id = ws.workout_exercise_id
          WHERE we.workout_id = $1
          GROUP BY we.id, we.exercise_id, we.exercise_notes`,
         [lastWorkout.id]
