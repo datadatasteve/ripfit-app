@@ -7,6 +7,7 @@
 - **Regenerated in full on 2026-11-22 (Phase 0A-1)** from a local database built from repo migrations 001 through 031. Every column's Notes start with the migration that created it. Types are the real Postgres types (`timestamp` means `timestamp without time zone`).
 - **Updated 2026-11-24 (Phase 0B-1)** for migrations 032 and 033, checked against `backend/scripts/one-off/dump-schema.js` run on a local database built from migrations 001 through 033: every table and column in the database is listed here.
 - **Updated 2026-11-26 (Phase 1A-2)** for migrations 034, 035 and 036, generated from `backend/scripts/one-off/dump-schema.js` run on a local database built from migrations 001 through 036 (every table and column the dump lists is here; `schema_migrations` is left out as before). Soft delete (036): `workouts`, `workout_sets` and `workout_cardio_segments` have `deleted_at`; every read path skips rows where it is set.
+- **Updated 2026-11-27 (Phase 1B-1)** for migration 037, generated the same way from a local database built from 001 through 037. `meals.meal_type` also accepts 'snacks' since 037.
 
 ## Connection
 
@@ -398,6 +399,18 @@ Created in migration 001.
 |instructions|text[]|migration 021|
 |source|varchar|migration 027; default 'admin'|
 
+### food_nutrients
+
+Created in migration 037. Extra nutrients per food, per 100 g (Phase 1B-1). Nutrients that have a foods column (nutrients.food_column) stay in that column.
+
+|Column|Type|Notes|
+|---|---|---|
+|food_id|integer FK → foods (cascade) not null|migration 037|
+|nutrient_key|text not null|migration 037|
+|amount_per_100g|numeric(12,4) not null|migration 037|
+
+Constraints: `food_nutrients_amount_nonneg` CHECK ((amount_per_100g >= (0)::numeric))
+
 ### foods
 
 Created in migration 002.
@@ -429,6 +442,7 @@ Created in migration 002.
 |ingredients|text|migration 003|
 |is_verified|boolean|migration 003; default true|
 |usda_fdc_id|integer|migration 003|
+|archived_at|timestamptz|migration 037|
 
 Constraints: `positive_calories` CHECK ((calories_per_100g >= (0)::numeric)); `positive_macros` CHECK (((protein_per_100g >= (0)::numeric) AND (carbs_per_100g >= (0)::numeric) AND (fat_per_100g >= (0)::numeric)))
 
@@ -520,6 +534,36 @@ Created in migration 002.
 
 Constraints: `positive_serving` CHECK ((serving_size > (0)::numeric))
 
+### meal_template_items
+
+Created in migration 037. Foods of a meal template (Phase 1B-1).
+
+|Column|Type|Notes|
+|---|---|---|
+|id|serial PK|migration 037|
+|template_id|integer FK → meal_templates (cascade) not null|migration 037|
+|food_id|integer FK → foods (cascade) not null|migration 037|
+|serving_size|numeric(8,2) not null|migration 037|
+|serving_unit|varchar(20) not null|migration 037; default 'g'|
+|order_index|integer not null|migration 037; default 1|
+
+Constraints: `meal_template_items_serving_positive` CHECK ((serving_size > (0)::numeric))
+
+### meal_templates
+
+Created in migration 037. Saved meal templates (Phase 1B-1), applied to a meal on a date.
+
+|Column|Type|Notes|
+|---|---|---|
+|id|serial PK|migration 037|
+|user_id|integer FK → users (cascade) not null|migration 037|
+|name|text not null|migration 037|
+|notes|text|migration 037|
+|created_at|timestamptz|migration 037; default now()|
+|updated_at|timestamptz|migration 037; default now()|
+
+Constraints: `meal_templates_name_not_blank` CHECK ((length(btrim(name)) > 0))
+
 ### meals
 
 Created in migration 002.
@@ -534,8 +578,12 @@ Created in migration 002.
 |notes|text|migration 002|
 |created_at|timestamp|migration 002; default CURRENT_TIMESTAMP|
 |updated_at|timestamp|migration 002; default CURRENT_TIMESTAMP|
+|meal_slot|smallint|migration 037|
+|unassigned|boolean not null|migration 037; default false|
 
-Constraints: `meals_meal_type_check` CHECK (((meal_type)::text = ANY ((ARRAY['breakfast'::character varying, 'lunch'::character varying, 'dinner'::character varying, 'snack'::character varying, 'other'::character varying])::text[])))
+Constraints: `meals_meal_type_check` CHECK (meal_type IN ('breakfast', 'lunch', 'dinner', 'snack', 'snacks', 'other')) (widened in migration 037 to accept 'snacks', the value the Nutrition screen sends)
+
+Added constraints (Phase 1A): `meals_meal_slot_range` CHECK (((meal_slot IS NULL) OR ((meal_slot >= 1) AND (meal_slot <= 8))))
 
 ### muscles
 
@@ -568,6 +616,43 @@ Created in migration 036. Rules-based note tags (Phase 1A-2), rebuilt whenever a
 |created_at|timestamptz|migration 036; default now()|
 
 Constraints: `note_tags_source_type_allowed` CHECK ((source_type = ANY (ARRAY['workout_overall'::text, 'workout_session'::text, 'exercise'::text, 'segment'::text])))
+
+### nutrient_goals
+
+Created in migration 037. Nutrient goals (Phase 1B-1): daily or weekly; at_least / at_most / range; amount or percent of calories; soft and hard limits (warnings only).
+
+|Column|Type|Notes|
+|---|---|---|
+|id|serial PK|migration 037|
+|user_id|integer FK → users (cascade) not null|migration 037|
+|nutrient_key|text not null|migration 037|
+|period|text not null|migration 037; default 'daily'|
+|direction|text not null|migration 037|
+|mode|text not null|migration 037; default 'amount'|
+|target|numeric(12,4)|migration 037|
+|min_value|numeric(12,4)|migration 037|
+|max_value|numeric(12,4)|migration 037|
+|soft_limit|numeric(12,4)|migration 037|
+|hard_limit|numeric(12,4)|migration 037|
+|is_active|boolean not null|migration 037; default true|
+|created_at|timestamptz|migration 037; default now()|
+|updated_at|timestamptz|migration 037; default now()|
+
+Constraints: `nutrient_goals_direction_allowed` CHECK ((direction = ANY (ARRAY['at_least'::text, 'at_most'::text, 'range'::text]))); `nutrient_goals_mode_allowed` CHECK ((mode = ANY (ARRAY['amount'::text, 'percent_calories'::text]))); `nutrient_goals_period_allowed` CHECK ((period = ANY (ARRAY['daily'::text, 'weekly'::text]))); `nutrient_goals_values_nonneg` CHECK ((((target IS NULL) OR (target >= (0)::numeric)) AND ((min_value IS NULL) OR (min_value >= (0)::numeric)) AND ((max_value IS NULL) OR (max_value >= (0)::numeric)) AND ((soft_limit IS NULL) OR (soft_limit >= (0)::numeric)) AND ((hard_limit IS NULL) OR (hard_limit >= (0)::numeric))))
+
+### nutrients
+
+Created in migration 037. Nutrient list for the key-value store (Phase 1B-1), seeded by the migration. food_column = the existing foods column that stays authoritative.
+
+|Column|Type|Notes|
+|---|---|---|
+|key|text PK|migration 037|
+|name|text not null|migration 037|
+|unit|text not null|migration 037|
+|category|text not null|migration 037|
+|sort_order|integer not null|migration 037; default 100|
+|food_column|text|migration 037|
+|usda_nutrient_id|integer|migration 037|
 
 ### nutrition_plans
 
@@ -792,6 +877,46 @@ Created in migration 001.
 |notes|text|migration 001|
 |created_at|timestamp|migration 001; default CURRENT_TIMESTAMP|
 
+### recipe_ingredients
+
+Created in migration 037. Recipe ingredient lines (Phase 1B-1): parsed quantity / unit / name, raw text kept, food_id when an obvious match was found.
+
+|Column|Type|Notes|
+|---|---|---|
+|id|serial PK|migration 037|
+|recipe_id|integer FK → recipes (cascade) not null|migration 037|
+|order_index|integer not null|migration 037; default 1|
+|raw_text|text|migration 037|
+|quantity|numeric(10,3)|migration 037|
+|unit|text|migration 037|
+|name|text|migration 037|
+|food_id|integer FK → foods (set null)|migration 037|
+|notes|text|migration 037|
+
+Constraints: `recipe_ingredients_has_text` CHECK (((raw_text IS NOT NULL) OR (name IS NOT NULL))); `recipe_ingredients_quantity_nonneg` CHECK (((quantity IS NULL) OR (quantity >= (0)::numeric)))
+
+### recipes
+
+Created in migration 037. Recipes (Phase 1B-1): manual, or imported (url / text / file) as drafts with source credit.
+
+|Column|Type|Notes|
+|---|---|---|
+|id|serial PK|migration 037|
+|user_id|integer FK → users (cascade) not null|migration 037|
+|name|text not null|migration 037|
+|servings|numeric(8,2)|migration 037|
+|steps|jsonb not null|migration 037; default '[]'|
+|notes|text|migration 037|
+|status|text not null|migration 037; default 'ready'|
+|source_type|text not null|migration 037; default 'manual'|
+|source_url|text|migration 037|
+|source_title|text|migration 037|
+|source_author|text|migration 037|
+|created_at|timestamptz|migration 037; default now()|
+|updated_at|timestamptz|migration 037; default now()|
+
+Constraints: `recipes_name_not_blank` CHECK ((length(btrim(name)) > 0)); `recipes_servings_positive` CHECK (((servings IS NULL) OR (servings > (0)::numeric))); `recipes_source_type_allowed` CHECK ((source_type = ANY (ARRAY['manual'::text, 'url'::text, 'text'::text, 'file'::text]))); `recipes_status_allowed` CHECK ((status = ANY (ARRAY['draft'::text, 'ready'::text])))
+
 ### record_edits
 
 Created in migration 036. Edit audit trail (Phase 1A-2): one row per edit, soft delete or restore of a workout, set or cardio segment; changes = { column: { from, to } }.
@@ -875,6 +1000,16 @@ Created in migration 001.
 Constraints: `positive_order` CHECK ((order_index > 0)); `routine_exercises_overload_schedule_check` CHECK (((overload_schedule)::text = ANY ((ARRAY['linear'::character varying, 'custom'::character varying])::text[]))); `routine_exercises_overload_strategy_check` CHECK (((overload_strategy)::text = ANY ((ARRAY['none'::character varying, 'weight'::character varying, 'reps'::character varying, 'sets'::character varying])::text[])))
 
 Added constraints (Phase 1A): `routine_exercises_target_rpe_range` CHECK (((target_rpe IS NULL) OR ((target_rpe >= 1) AND (target_rpe <= 11))))
+
+### saved_foods
+
+Created in migration 037. Foods a user saved as favorites (Phase 1B-1).
+
+|Column|Type|Notes|
+|---|---|---|
+|user_id|integer FK → users (cascade) not null|migration 037|
+|food_id|integer FK → foods (cascade) not null|migration 037|
+|created_at|timestamptz|migration 037; default now()|
 
 ### saved_routes
 
@@ -984,6 +1119,19 @@ Created in migration 004.
 
 Constraints: `positive_calories` CHECK (((calories IS NULL) OR (calories >= (0)::numeric))); `positive_carbs` CHECK (((carbs_g IS NULL) OR (carbs_g >= (0)::numeric))); `positive_fat` CHECK (((fat_g IS NULL) OR (fat_g >= (0)::numeric))); `positive_fiber` CHECK (((fiber_g IS NULL) OR (fiber_g >= (0)::numeric))); `positive_protein` CHECK (((protein_g IS NULL) OR (protein_g >= (0)::numeric))); `positive_sugar` CHECK (((sugar_g IS NULL) OR (sugar_g >= (0)::numeric))); `unique_user_food_override` UNIQUE (user_id, food_id)
 
+### user_meal_slots
+
+Created in migration 037. A user's meals per day (Phase 1B-1), 1-8 named slots with an optional time. No rows = the default four.
+
+|Column|Type|Notes|
+|---|---|---|
+|user_id|integer FK → users (cascade) not null|migration 037|
+|slot_number|smallint not null|migration 037|
+|name|text not null|migration 037|
+|target_time|time|migration 037|
+
+Constraints: `user_meal_slots_name_not_blank` CHECK ((length(btrim(name)) > 0)); `user_meal_slots_number_range` CHECK (((slot_number >= 1) AND (slot_number <= 8)))
+
 ### user_metrics
 
 Created in migration 001.
@@ -1042,8 +1190,31 @@ Created in migration 001.
 |tempo_click_track_enabled|boolean not null|migration 034; default true|
 |tempo_track_with_timers|boolean not null|migration 034; default false|
 |readiness_checkin_default|boolean not null|migration 036; default false|
+|diet_type|text not null|migration 037; default 'standard'|
+|diet_custom|jsonb|migration 037|
+|bmr_formula|text not null|migration 037; default 'mifflin_st_jeor'|
+|overconsumption_threshold_pct|numeric(5,2) not null|migration 037; default 10|
+|water_goal_oz|numeric(6,1)|migration 037|
+|water_preset_oz|numeric(6,1)|migration 037|
 
 Constraints: `oauth_unique` UNIQUE (oauth_provider, oauth_id); `users_email_key` UNIQUE (email); `users_previous_notes_scope_check` CHECK (((previous_notes_scope)::text = ANY ((ARRAY['all'::character varying, 'program'::character varying, 'non_program'::character varying])::text[]))); `users_reorder_mode_check` CHECK (((reorder_mode)::text = ANY ((ARRAY['drag'::character varying, 'arrows'::character varying])::text[]))); `users_username_key` UNIQUE (username); `users_workout_age_limit_hours_allowed` CHECK (workout_age_limit_hours IN (1,2,3,4,5,6,7,8,9,10,11,12,24,36,48)); `users_pause_note_minutes_allowed` CHECK (pause_note_minutes IN (5,10,15,20,25,30,35,40,45,50,55,60)); `users_log_set_button_position_allowed` CHECK (log_set_button_position IN ('inline','pinned')); `users_tempo_countdown_beeps_allowed` CHECK (tempo_countdown_beeps BETWEEN 0 AND 5)
+
+Added constraints (Phase 1A): `users_bmr_formula_allowed` CHECK ((bmr_formula = ANY (ARRAY['mifflin_st_jeor'::text, 'harris_benedict'::text, 'katch_mcardle'::text]))); `users_diet_type_allowed` CHECK ((diet_type = ANY (ARRAY['standard'::text, 'vegetarian'::text, 'vegan'::text, 'keto'::text, 'low_carb'::text, 'high_protein'::text, 'custom'::text]))); `users_overconsumption_threshold_range` CHECK (((overconsumption_threshold_pct >= (0)::numeric) AND (overconsumption_threshold_pct <= (100)::numeric)))
+
+### water_logs
+
+Created in migration 037. Water per user per day in fluid ounces (Phase 1B-1); source app | import.
+
+|Column|Type|Notes|
+|---|---|---|
+|user_id|integer FK → users (cascade) not null|migration 037|
+|log_date|date not null|migration 037|
+|amount_oz|numeric(7,1) not null|migration 037; default 0|
+|source|text not null|migration 037; default 'app'|
+|created_at|timestamptz|migration 037; default now()|
+|updated_at|timestamptz|migration 037; default now()|
+
+Constraints: `water_logs_amount_nonneg` CHECK ((amount_oz >= (0)::numeric)); `water_logs_source_allowed` CHECK ((source = ANY (ARRAY['app'::text, 'import'::text])))
 
 ### workout_cardio_segments
 
