@@ -40,6 +40,11 @@ router.post('/exercises/find-or-create', authenticate, workoutController.findOrC
 router.post('/', authenticate, workoutController.logWorkout);
 router.get('/', authenticate, workoutController.getWorkouts);
 
+// Readiness check-in (Phase 1A-2)
+const ckc = require('../controllers/checkinController');
+router.get('/:workoutId/readiness', authenticate, ckc.getWorkoutReadiness);
+router.put('/:workoutId/readiness', authenticate, ckc.putWorkoutReadiness);
+
 router.post('/:workoutId/sets', authenticate, workoutController.logWorkoutSet);
 router.patch('/sets/:setId', authenticate, workoutController.updateWorkoutSet);
 router.put('/:workoutId/finish', authenticate, workoutController.finishWorkout);

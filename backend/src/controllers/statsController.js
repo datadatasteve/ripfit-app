@@ -4,6 +4,7 @@
 
 const { pool } = require('../config/database');
 const { durationSql, userTimezoneSql, localTimeSql, sweepStaleWorkouts, activitySql } = require('../utils/workoutStatus');
+const { retagSafely } = require('../utils/noteTags');
 
 // Only completed workouts count toward any stat (Phase 0A-1).
 const DONE = "status = 'completed'";
@@ -771,18 +772,33 @@ async function rateWorkout(req, res) {
   if (session_rating !== undefined && (session_rating < 1 || session_rating > 10)) {
     return res.status(400).json({ error: 'Rating must be between 1 and 10' });
   }
+  // Phase 1A-2: session_rating is the Effort rating. Vibes (same 1-10 range)
+  // and fuel (1-5) are separate and change only when sent.
+  const extra = [];
+  const extraVals = [];
+  for (const [key, max] of [['vibes_rating', 10], ['fuel_rating', 5]]) {
+    if (!(key in req.body)) continue;
+    const raw = req.body[key];
+    const n = raw === null || raw === '' ? null : Number(raw);
+    if (n !== null && (!Number.isInteger(n) || n < 1 || n > max)) {
+      return res.status(400).json({ error: `${key} must be a whole number from 1 to ${max}` });
+    }
+    extraVals.push(n);
+    extra.push(`${key} = $${4 + extraVals.length}`);
+  }
 
   try {
     const result = await pool.query(
       `UPDATE workouts
-       SET session_rating = $1, session_notes = $2
-       WHERE id = $3 AND user_id = $4
-       RETURNING id, session_rating, session_notes`,
-      [session_rating || null, session_notes || null, id, userId]
+       SET session_rating = $1, session_notes = $2${extra.length ? ', ' + extra.join(', ') : ''}
+       WHERE id = $3 AND user_id = $4 AND deleted_at IS NULL
+       RETURNING id, session_rating, session_notes, vibes_rating, fuel_rating`,
+      [session_rating || null, session_notes || null, id, userId, ...extraVals]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Workout not found' });
     }
+    await retagSafely(pool, { userId, workoutId: result.rows[0].id, sourceType: 'workout_session', sourceId: result.rows[0].id, text: session_notes || null });
     res.json(result.rows[0]);
   } catch (err) {
     console.error('rateWorkout error:', err);

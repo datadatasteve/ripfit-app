@@ -9,6 +9,7 @@ const {
 const { cleanExerciseName, findOrCreateExerciseByName } = require('../utils/customExercise');
 const V = require('../utils/validate');
 const { loadCircuits } = require('./circuitController');
+const { retagSafely } = require('../utils/noteTags');
 
 /** Best-effort user id from an optional Bearer token (public exercise endpoints). */
 function optionalUserId(req) {
@@ -460,6 +461,9 @@ const logWorkout = async (req, res) => {
     const workout = workoutResult.rows[0];
     const workoutExercises = [];
     const workoutSets = [];
+    if (overall_notes) {   // Phase 1A-2 note tags
+      await retagSafely(client, { userId: user_id, workoutId: workout.id, sourceType: 'workout_overall', sourceId: workout.id, text: overall_notes });
+    }
 
     // Process each exercise
     for (let i = 0; i < exercises.length; i++) {
@@ -478,6 +482,9 @@ const logWorkout = async (req, res) => {
       );
 
       const workoutExercise = exerciseResult.rows[0];
+      if (exercise_notes) {
+        await retagSafely(client, { userId: user_id, workoutId: workout.id, sourceType: 'exercise', sourceId: workoutExercise.id, text: exercise_notes });
+      }
       workoutExercises.push(workoutExercise);
 
       // Create sets for this exercise
@@ -873,6 +880,7 @@ const updateWorkoutNotes = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Workout not found' });
     }
+    await retagSafely(pool, { userId: user_id, workoutId: result.rows[0].id, sourceType: 'workout_overall', sourceId: result.rows[0].id, text: overall_notes });
 
     res.json(result.rows[0]);
   } catch (error) {
@@ -941,6 +949,9 @@ const addExerciseToWorkout = async (req, res) => {
        g('goal_duration_seconds'), g('goal_distance'), g('goal_distance_unit'), g('goal_pace'), g('goal_pace_unit'),
        g('goal_laps'), g('goal_lap_distance'), targetRpe.value]
     );
+    if (exercise_notes) {   // Phase 1A-2 note tags
+      await retagSafely(pool, { userId: user_id, workoutId: result.rows[0].workout_id, sourceType: 'exercise', sourceId: result.rows[0].id, text: exercise_notes });
+    }
 
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -1020,6 +1031,9 @@ const updateExerciseNotes = async (req, res) => {
        RETURNING *`,
       [notes, exerciseId, workoutId]
     );
+    if (result.rows[0]) {   // Phase 1A-2 note tags (set lines and general lines)
+      await retagSafely(pool, { userId: user_id, workoutId: result.rows[0].workout_id, sourceType: 'exercise', sourceId: result.rows[0].id, text: notes });
+    }
 
     res.json(result.rows[0]);
   } catch (error) {
@@ -1195,6 +1209,9 @@ const startFreeLift = async (req, res) => {
       [user_id, workout_date, new Date().toISOString(), workout_title || null, workout_type, overallNotes]
     );
     await recordSessionEvent(client, result.rows[0].id, 'started');
+    if (overallNotes) {   // Phase 1A-2 note tags
+      await retagSafely(client, { userId: user_id, workoutId: result.rows[0].id, sourceType: 'workout_overall', sourceId: result.rows[0].id, text: overallNotes });
+    }
     await client.query('COMMIT');
     res.status(201).json({
       workout: result.rows[0],
@@ -1249,6 +1266,9 @@ const logCardioSegment = async (req, res) => {
         reps || null, avg_speed || null, max_speed || null, notes || null,
       ]
     );
+    if (notes) {   // Phase 1A-2 note tags
+      await retagSafely(pool, { userId: user_id, workoutId: result.rows[0].workout_id, sourceType: 'segment', sourceId: result.rows[0].id, text: notes });
+    }
 
     res.status(201).json(result.rows[0]);
   } catch (error) {

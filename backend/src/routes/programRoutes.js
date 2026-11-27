@@ -42,4 +42,11 @@ router.post('/:id/resume',      pc.resumeProgram);
 router.post('/:id/days/:programRoutineId/skip',   pc.skipDay);
 router.delete('/:id/days/:programRoutineId/skip', pc.unskipDay);
 
+// Phase 1A-2: program goals (target + threshold; advisory warnings)
+const hc = require('../controllers/habitController');
+router.get('/:id/goals',            hc.listProgramGoals);
+router.post('/:id/goals',           hc.createProgramGoal);
+router.put('/:id/goals/:goalId',    hc.updateProgramGoal);
+router.delete('/:id/goals/:goalId', hc.deleteProgramGoal);
+
 module.exports = router;
