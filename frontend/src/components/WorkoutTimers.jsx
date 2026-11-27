@@ -680,7 +680,7 @@ function BlockAttach({ summary, onAttach, onSkip }) {
  * Inline timer inside the exercise card (5d): a mode selector that collapses
  * into the chosen timer. `blockMode` runs it without an exercise (5e).
  */
-export function InlineTimer({ exerciseName, blockMode = false, setsBefore = 0, onClose, onLogSet, onAppendNote, onBlockComplete, onRunState }) {
+export function InlineTimer({ exerciseName, blockMode = false, setsBefore = 0, onClose, onLogSet, onAppendNote, onBlockComplete, onRunState, onStartBlock }) {
   const [mode, setMode] = useState(null);
 
   if (!mode) {
@@ -701,6 +701,14 @@ export function InlineTimer({ exerciseName, blockMode = false, setsBefore = 0, o
               </div>
             ))}
           </div>
+          {/* Phase 1A-1: the card's separate "Start Timer Block" button was
+              merged into Timers. A timer block runs without an exercise and
+              asks which one to attach when it ends. */}
+          {!blockMode && onStartBlock && (
+            <div className="wt-panel-actions">
+              <button className="wt-btn" onClick={onStartBlock}>Timer block (pick exercise after)</button>
+            </div>
+          )}
           <div className="wt-panel-actions">
             <button className="wt-btn" onClick={onClose}>Close</button>
           </div>

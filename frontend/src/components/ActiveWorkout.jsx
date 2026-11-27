@@ -3069,8 +3069,8 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
           exercise={currentExercise}
           cooldownOverride={cooldownOverride}
           onCooldownOverrideChange={setCooldownOverride}
-          timerOpen={timerOpen}
-          onToggleTimer={() => setTimerOpen(o => !o)}
+          timerOpen={timerOpen || blockOpen}
+          onToggleTimer={() => (blockOpen ? setBlockOpen(false) : setTimerOpen(o => !o))}
         />
 
         {currentExercise.category === 'Cardio' ? (
@@ -3150,7 +3150,12 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
             onLogSet={logTimerSet}
             onAppendNote={appendExerciseNote}
             onRunState={handleTimerRunState}
+            onStartBlock={() => { setTimerOpen(false); setBlockOpen(true); }}
           />
+        )}
+        {/* Timer block, opened from the Timers panel (Phase 1A-1). */}
+        {blockOpen && (
+          <InlineTimer blockMode onClose={() => setBlockOpen(false)} onBlockComplete={handleBlockComplete} />
         )}
 
         {currentExercise.category === 'Cardio' ? (
@@ -3441,16 +3446,6 @@ function WorkoutInProgress({ workout, setActiveWorkout, onLogSet, onFinish, onCa
           </div>
         </div>
 
-        {/* Card footer: timer-first logging (5e) — attach an exercise afterwards */}
-        {blockOpen ? (
-          <InlineTimer blockMode onClose={() => setBlockOpen(false)} onBlockComplete={handleBlockComplete} />
-        ) : (
-          <div className="aw-card-footer">
-            <button type="button" className="aw-timer-block-btn" onClick={() => setBlockOpen(true)}>
-              ⏱ Start Timer Block
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Exercise navigation — pinned to the bottom of the viewport */}
