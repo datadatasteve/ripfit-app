@@ -3,6 +3,7 @@
 // ============================================================================
 const { pool } = require('../config/database');
 const usdaApi = require('../../services/usda-api');
+const { goalStatus } = require('../utils/nutritionCore');
 
 // ============================================================================
 // FOOD SEARCH & LOOKUP
@@ -24,7 +25,7 @@ const searchFoods = async (req, res) => {
       `SELECT id, name, brand, calories_per_100g, protein_per_100g, 
               carbs_per_100g, fat_per_100g, serving_size, serving_unit, source
        FROM foods
-       WHERE name ILIKE $1 OR brand ILIKE $1
+       WHERE (name ILIKE $1 OR brand ILIKE $1) AND archived_at IS NULL
        ORDER BY name
        LIMIT $2`,
       [`%${q}%`, limit]
@@ -231,9 +232,17 @@ const logMeal = async (req, res) => {
 
     await client.query('COMMIT');
 
+    // Phase 1B-1: nutrient-goal warnings for that day (advisory, never blocking).
+    let goalWarnings = [];
+    try {
+      const st = await goalStatus(pool, user_id, String(meal_date).slice(0, 10));
+      goalWarnings = st.goals.filter(g => g.warnings.length).map(g => ({ nutrient_key: g.nutrient_key, period: g.period, actual: g.actual, warnings: g.warnings }));
+    } catch (e) { console.error('goal warnings skipped:', e.message); }
+
     res.status(201).json({
       meal,
-      foods: mealFoods
+      foods: mealFoods,
+      goal_warnings: goalWarnings
     });
 
   } catch (error) {

@@ -33,4 +33,39 @@ router.get('/daily/:date', authenticate, nutritionController.getDailyNutrition);
 router.get('/goals', authenticate, nutritionController.getNutritionGoals);
 
 
+// ── Phase 1B-1 ────────────────────────────────────────────────────────────────
+const nc = require('../controllers/nutritionCoreController');
+const rc = require('../controllers/recipeController');
+// My foods and saved foods
+router.get('/my-foods', authenticate, nc.listMyFoods);
+router.post('/my-foods', authenticate, nc.createMyFood);
+router.get('/my-foods/:id', authenticate, nc.getMyFood);
+router.put('/my-foods/:id', authenticate, nc.updateMyFood);
+router.delete('/my-foods/:id', authenticate, nc.deleteMyFood);
+router.get('/saved-foods', authenticate, nc.listSavedFoods);
+router.put('/saved-foods/:foodId', authenticate, nc.saveFood);
+router.delete('/saved-foods/:foodId', authenticate, nc.unsaveFood);
+// Nutrients (key-value store)
+router.get('/nutrients', authenticate, nc.listNutrients);
+router.get('/foods/:id/nutrients', authenticate, nc.getFoodNutrients);
+router.put('/foods/:id/nutrients', authenticate, nc.putFoodNutrients);
+// Nutrient goals
+router.get('/nutrient-goals', authenticate, nc.listGoals);
+router.put('/nutrient-goals', authenticate, nc.putGoal);
+router.delete('/nutrient-goals/:id', authenticate, nc.deleteGoal);
+router.get('/goal-status', authenticate, nc.getGoalStatus);
+// Settings and BMR
+router.get('/settings', authenticate, nc.getSettings);
+router.put('/settings', authenticate, nc.putSettings);
+router.get('/bmr', authenticate, nc.getBmr);
+// Recipes
+router.get('/recipes', authenticate, rc.listRecipes);
+router.post('/recipes', authenticate, rc.createRecipe);
+router.post('/recipes/import/url', authenticate, rc.importFromUrl);
+router.post('/recipes/import/text', authenticate, rc.importFromText);
+router.post('/recipes/import/file', authenticate, rc.importFromFile);
+router.get('/recipes/:id', authenticate, rc.getRecipe);
+router.put('/recipes/:id', authenticate, rc.updateRecipe);
+router.delete('/recipes/:id', authenticate, rc.deleteRecipe);
+
 module.exports = router;
