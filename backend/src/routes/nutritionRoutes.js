@@ -68,4 +68,25 @@ router.get('/recipes/:id', authenticate, rc.getRecipe);
 router.put('/recipes/:id', authenticate, rc.updateRecipe);
 router.delete('/recipes/:id', authenticate, rc.deleteRecipe);
 
+// Meals per day, diary, day API, templates, copy day, water (Phase 1B-1)
+const md = require('../controllers/mealDiaryController');
+router.get('/meal-slots', authenticate, md.getSlots);
+router.put('/meal-slots', authenticate, md.putSlots);
+router.get('/days/:date', authenticate, md.getDay);
+router.post('/days/:date/copy', authenticate, md.copyDay);
+router.post('/diary', authenticate, md.logEntry);
+router.put('/diary/:mealFoodId/assign', authenticate, md.assignEntry);
+router.get('/meal-templates', authenticate, md.listTemplates);
+router.post('/meal-templates', authenticate, md.createTemplate);
+router.get('/meal-templates/:id', authenticate, md.getTemplate);
+router.put('/meal-templates/:id', authenticate, md.updateTemplate);
+router.delete('/meal-templates/:id', authenticate, md.deleteTemplate);
+router.post('/meal-templates/:id/apply', authenticate, md.applyTemplate);
+router.get('/water', authenticate, md.listWater);
+router.post('/water/import', authenticate, md.importWater);
+router.put('/water-settings', authenticate, md.putWaterSettings);
+router.get('/water/:date', authenticate, md.getWater);
+router.put('/water/:date', authenticate, md.setWater);
+router.post('/water/:date/add', authenticate, md.addWater);
+
 module.exports = router;
