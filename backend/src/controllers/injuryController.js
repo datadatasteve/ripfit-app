@@ -6,9 +6,9 @@
 const { pool } = require('../config/database');
 const V = require('../utils/validate');
 
-// Draft text from the build doc (owner to review).
-const INJURY_DISCLAIMER = 'RipFit is a tool to support you on the road to recovery. It does not replace medical care. '
-  + 'Follow all advice from your doctor, physical therapist or other medical professional. Form over ego.';
+// Owner-revised text (after Phase 1A-2).
+const INJURY_DISCLAIMER = 'RipFit is a tool to support your fitness & wellness journey. It does not replace medical care. '
+  + 'Follow all advice from your doctor, physical therapist or other medical professional. Remember, form over ego.';
 
 const STATUSES = ['active', 'recovering', 'resolved'];
 const COLS = `id, user_id, body_area, side, to_char(start_date, 'YYYY-MM-DD') AS start_date,
