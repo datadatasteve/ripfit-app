@@ -74,6 +74,7 @@ const injuryRoutes = require('./routes/injuryRoutes');
 const checkinRoutes = require('./routes/checkinRoutes');
 const deviceRoutes = require('./routes/deviceRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
+const bodyRoutes = require('./routes/bodyRoutes');
 
 app.use(`/api/${API_VERSION}/nutrition`, nutritionRoutes);
 app.use(`/api/${API_VERSION}/auth`, authRoutes);
@@ -96,6 +97,8 @@ app.use('/api/v1/checkins', checkinRoutes);     // Phase 1A-2
 app.use('/api/v1/device', deviceRoutes.device);            // Phase 1A-2
 app.use('/api/v1/saved-routes', deviceRoutes.savedRoutes);  // Phase 1A-2
 app.use('/api/v1/reviews', reviewRoutes);                   // Phase 1A-2
+app.use('/api/v1/body', bodyRoutes.body);                   // Phase 1B-2
+app.use('/api/v1/stickers', bodyRoutes.stickers);           // Phase 1B-2
 
 // Health check endpoint
 app.get('/health', (req, res) => {
