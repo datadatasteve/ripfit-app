@@ -12,6 +12,7 @@
 const { pool } = require('../config/database');
 const V = require('../utils/validate');
 const { gramsOf, goalStatus } = require('../utils/nutritionCore');
+const { foodForUser } = require('../utils/foodOverride');
 
 const DEFAULT_SLOTS = [
   { slot_number: 1, name: 'Breakfast', target_time: null },
@@ -47,13 +48,17 @@ async function slotsOf(db, uid) {
   return r.rows.length ? { slots: r.rows, is_default: false } : { slots: DEFAULT_SLOTS, is_default: true };
 }
 
-/** A food the user may log: public, or their own (archived foods cannot be newly logged). */
+/**
+ * A food the user may log: public, or their own (archived foods cannot be newly
+ * logged). Phase 1B-2: the user's own override (user_food_overrides) replaces
+ * the values it sets, so a diary or template entry uses what the user sees.
+ */
 async function loggableFood(db, foodId, uid) {
   const r = await db.query(
     `SELECT * FROM foods WHERE id = $1 AND archived_at IS NULL AND (created_by_user_id IS NULL OR created_by_user_id = $2 OR source <> 'custom')`,
     [foodId, uid]
   );
-  return r.rows[0] || null;
+  return foodForUser(db, r.rows[0] || null, uid);
 }
 
 /** meal_foods values for a serving, with the same maths as the existing logMeal. */

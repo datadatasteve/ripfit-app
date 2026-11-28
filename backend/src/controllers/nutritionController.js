@@ -70,6 +70,74 @@ const getFoodById = async (req, res) => {
 // BARCODE SCANNING
 // ============================================================================
 
+// The lookup itself, shared by the public endpoint (unchanged behaviour) and
+// the user-scoped one (Phase 1B-2, which adds the user's override). Returns
+// { status, body } exactly as the public endpoint has always answered.
+async function lookupBarcode(barcode) {
+  // Step 1: Check if barcode exists in local database
+  // Leading zeros differ between scanners (12-digit UPC-A, 13-digit EAN)
+  // and USDA (often GTIN-14), so compare without them. Otherwise a food
+  // saved from USDA is never found again and is inserted once per scan.
+  const existingFood = await pool.query(
+    `SELECT * FROM foods
+     WHERE ltrim(gtin_upc, '0') = ltrim($1, '0') AND ltrim($1, '0') <> ''
+     ORDER BY id LIMIT 1`,
+    [barcode]
+  );
+
+  if (existingFood.rows.length > 0) {
+    return { status: 200, body: {
+      source: 'database',
+      food: existingFood.rows[0]
+    } };
+  }
+
+  // Step 2: Query USDA API
+  const usdaFood = await usdaApi.searchByBarcode(barcode);
+
+  if (!usdaFood) {
+    return { status: 404, body: { 
+      error: 'Barcode not found',
+      barcode: barcode 
+    } };
+  }
+
+  // Step 3: Parse nutrition data
+  const nutrition = usdaApi.parseNutrients(usdaFood);
+
+  // Step 4: Save to database
+  const savedFood = await pool.query(
+    `INSERT INTO foods (
+      name, serving_size, serving_unit, calories_per_100g, protein_per_100g,
+      carbs_per_100g, fat_per_100g, fiber_per_100g, sugar_per_100g,
+      gtin_upc, brand, source, usda_fdc_id, is_verified
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+    RETURNING *`,
+    [
+      nutrition.name,
+      // The label serving; the nutrient columns stay per 100 g / 100 ml.
+      nutrition.serving_size,
+      nutrition.serving_unit,
+      nutrition.calories,
+      nutrition.protein_g,
+      nutrition.carbs_g,
+      nutrition.fat_g,
+      nutrition.fiber_g,
+      nutrition.sugar_g,
+      nutrition.gtin_upc,
+      nutrition.brand_owner,
+      nutrition.source,
+      nutrition.usda_fdc_id,
+      true
+    ]
+  );
+
+  return { status: 201, body: {
+    source: 'usda',
+    food: savedFood.rows[0]
+  } };
+}
+
 /**
  * Scan barcode - checks DB first, then USDA API, then saves
  * POST /api/v1/nutrition/foods/barcode/:barcode
@@ -78,69 +146,8 @@ const scanBarcode = async (req, res) => {
   const { barcode } = req.params;
 
   try {
-    // Step 1: Check if barcode exists in local database
-    // Leading zeros differ between scanners (12-digit UPC-A, 13-digit EAN)
-    // and USDA (often GTIN-14), so compare without them. Otherwise a food
-    // saved from USDA is never found again and is inserted once per scan.
-    const existingFood = await pool.query(
-      `SELECT * FROM foods
-       WHERE ltrim(gtin_upc, '0') = ltrim($1, '0') AND ltrim($1, '0') <> ''
-       ORDER BY id LIMIT 1`,
-      [barcode]
-    );
-
-    if (existingFood.rows.length > 0) {
-      return res.json({
-        source: 'database',
-        food: existingFood.rows[0]
-      });
-    }
-
-    // Step 2: Query USDA API
-    const usdaFood = await usdaApi.searchByBarcode(barcode);
-
-    if (!usdaFood) {
-      return res.status(404).json({ 
-        error: 'Barcode not found',
-        barcode: barcode 
-      });
-    }
-
-    // Step 3: Parse nutrition data
-    const nutrition = usdaApi.parseNutrients(usdaFood);
-
-    // Step 4: Save to database
-    const savedFood = await pool.query(
-      `INSERT INTO foods (
-        name, serving_size, serving_unit, calories_per_100g, protein_per_100g,
-        carbs_per_100g, fat_per_100g, fiber_per_100g, sugar_per_100g,
-        gtin_upc, brand, source, usda_fdc_id, is_verified
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-      RETURNING *`,
-      [
-        nutrition.name,
-        // The label serving; the nutrient columns stay per 100 g / 100 ml.
-        nutrition.serving_size,
-        nutrition.serving_unit,
-        nutrition.calories,
-        nutrition.protein_g,
-        nutrition.carbs_g,
-        nutrition.fat_g,
-        nutrition.fiber_g,
-        nutrition.sugar_g,
-        nutrition.gtin_upc,
-        nutrition.brand_owner,
-        nutrition.source,
-        nutrition.usda_fdc_id,
-        true
-      ]
-    );
-
-    res.status(201).json({
-      source: 'usda',
-      food: savedFood.rows[0]
-    });
-
+    const out = await lookupBarcode(barcode);
+    res.status(out.status).json(out.body);
   } catch (error) {
     console.error('Barcode scan error:', error);
     res.status(500).json({ error: 'Failed to scan barcode' });
@@ -636,6 +643,7 @@ module.exports = {
   searchFoods,
   getFoodById,
   scanBarcode,
+  lookupBarcode,
   searchUSDA,
   createCustomFood,
   logMeal,

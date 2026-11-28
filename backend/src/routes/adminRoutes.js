@@ -52,4 +52,11 @@ router.get('/exercises/:id/aliases',         ac.listGlobalAliases);
 router.post('/exercises/:id/aliases',        ac.addGlobalAlias);
 router.delete('/exercise-aliases/:aliasId',  ac.deleteGlobalAlias);
 
+// Food label-submission queue (Phase 1B-2; admin check inside each handler)
+const nx = require('../controllers/nutritionExtrasController');
+router.get('/label-submissions',              nx.adminListSubmissions);
+router.get('/label-submissions/:id',          nx.adminGetSubmission);
+router.post('/label-submissions/:id/approve', nx.adminApprove);
+router.post('/label-submissions/:id/reject',  nx.adminReject);
+
 module.exports = router;

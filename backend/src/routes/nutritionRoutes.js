@@ -89,4 +89,36 @@ router.get('/water/:date', authenticate, md.getWater);
 router.put('/water/:date', authenticate, md.setWater);
 router.post('/water/:date/add', authenticate, md.addWater);
 
+// ── Phase 1B-2: overrides, craving log, label-submission queue ───────────────
+const nx = require('../controllers/nutritionExtrasController');
+const multer = require('multer');
+// Photos stay in memory only until they are checked and stored in the DB.
+const labelPhotos = multer({
+  storage: multer.memoryStorage(),
+  // multer stops at the limit itself, so allow one byte more and let the
+  // controller refuse anything over 2 MB (exactly 2 MB is allowed).
+  limits: { fileSize: nx.MAX_PHOTO_BYTES + 1, files: nx.MAX_PHOTOS, fields: 5 },
+}).array('photos', nx.MAX_PHOTOS);
+
+router.get('/food-overrides', authenticate, nx.listOverrides);
+router.get('/foods/:id/override', authenticate, nx.getOverride);
+router.put('/foods/:id/override', authenticate, nx.putOverride);
+router.delete('/foods/:id/override', authenticate, nx.deleteOverride);
+router.get('/me/foods/:id', authenticate, nx.getFoodForMe);
+router.post('/me/foods/barcode/:barcode', authenticate, nx.scanBarcodeForMe);
+
+router.get('/cravings/summary', authenticate, nx.cravingSummary);
+router.get('/cravings', authenticate, nx.listCravings);
+router.post('/cravings', authenticate, nx.createCraving);
+router.get('/cravings/:id', authenticate, nx.getCraving);
+router.put('/cravings/:id', authenticate, nx.updateCraving);
+router.delete('/cravings/:id', authenticate, nx.deleteCraving);
+
+router.get('/label-submissions', authenticate, nx.listMySubmissions);
+router.post('/label-submissions', authenticate, nx.createSubmission);
+router.get('/label-submissions/:id', authenticate, nx.getSubmission);
+router.post('/label-submissions/:id/photos', authenticate, labelPhotos, nx.photoUploadErrors, nx.addPhotos);
+router.get('/label-submissions/:id/photos/:photoId', authenticate, nx.getPhoto);
+router.delete('/label-submissions/:id/photos/:photoId', authenticate, nx.deletePhoto);
+
 module.exports = router;
