@@ -8,6 +8,7 @@
 - **Updated 2026-11-24 (Phase 0B-1)** for migrations 032 and 033, checked against `backend/scripts/one-off/dump-schema.js` run on a local database built from migrations 001 through 033: every table and column in the database is listed here.
 - **Updated 2026-11-26 (Phase 1A-2)** for migrations 034, 035 and 036, generated from `backend/scripts/one-off/dump-schema.js` run on a local database built from migrations 001 through 036 (every table and column the dump lists is here; `schema_migrations` is left out as before). Soft delete (036): `workouts`, `workout_sets` and `workout_cardio_segments` have `deleted_at`; every read path skips rows where it is set.
 - **Updated 2026-11-27 (Phase 1B-1)** for migration 037, generated the same way from a local database built from 001 through 037. `meals.meal_type` also accepts 'snacks' since 037.
+- **Updated 2026-11-28 (Phase 1B-2)** for migration 038, checked against `backend/scripts/one-off/dump-schema.js` run on a local database built from 001 through 038.
 
 ## Connection
 
@@ -56,6 +57,23 @@ Created in migration 035. Private calendar (.ics) feed token per user (Phase 1A-
 |rotated_at|timestamptz|migration 035|
 
 Constraints: `calendar_feed_tokens_token_key` UNIQUE (token)
+
+### calendar_stickers
+
+Created in migration 038. Habit calendar stickers (Phase 1B-2): a short emoji or label on a date, with an optional note and habit link. Several per date are allowed.
+
+|Column|Type|Notes|
+|---|---|---|
+|id|serial PK|migration 038|
+|user_id|integer FK → users (cascade) not null|migration 038|
+|sticker_date|date not null|migration 038|
+|sticker|text not null|migration 038; 1-32 characters|
+|note|text|migration 038|
+|habit_id|integer FK → habits (set null)|migration 038|
+|created_at|timestamptz|migration 038; default now()|
+|updated_at|timestamptz|migration 038; default now()|
+
+Constraints: `calendar_stickers_sticker_length` CHECK (((length(btrim(sticker)) >= 1) AND (length(btrim(sticker)) <= 32)))
 
 ### cardio_checkpoints
 
@@ -280,6 +298,32 @@ Created in migration 002.
 
 Constraints: `unique_user_date` UNIQUE (user_id, summary_date)
 
+### craving_logs
+
+Created in migration 038. Craving log, "SAS" (Phase 1B-2): a food and portion the user craved. Values (calories, fat, sugar, with the user's override) are copied in when saved. avoided defaults to true; false = "had it". log_date is the user's calendar date of logged_at.
+
+|Column|Type|Notes|
+|---|---|---|
+|id|serial PK|migration 038|
+|user_id|integer FK → users (cascade) not null|migration 038|
+|food_id|integer FK → foods (set null)|migration 038|
+|food_name|text not null|migration 038; copy of the food's name|
+|barcode|varchar(20)|migration 038|
+|amount|numeric(10,2) not null|migration 038|
+|unit|varchar(20) not null|migration 038; default 'g' (g, ml, oz, lb, kg, serving)|
+|grams|numeric(10,2)|migration 038|
+|calories|numeric(10,2)|migration 038|
+|fat_g|numeric(10,2)|migration 038|
+|sugar_g|numeric(10,2)|migration 038|
+|note|text|migration 038|
+|logged_at|timestamptz not null|migration 038; default now()|
+|log_date|date not null|migration 038|
+|avoided|boolean not null|migration 038; default true|
+|created_at|timestamptz|migration 038; default now()|
+|updated_at|timestamptz|migration 038; default now()|
+
+Constraints: `craving_logs_amount_positive` CHECK ((amount > (0)::numeric)); `craving_logs_values_nonneg` CHECK ((((grams IS NULL) OR (grams >= (0)::numeric)) AND ((calories IS NULL) OR (calories >= (0)::numeric)) AND ((fat_g IS NULL) OR (fat_g >= (0)::numeric)) AND ((sugar_g IS NULL) OR (sugar_g >= (0)::numeric))))
+
 ### error_logs
 
 Created in migration 013.
@@ -399,6 +443,44 @@ Created in migration 001.
 |instructions|text[]|migration 021|
 |source|varchar|migration 027; default 'admin'|
 
+### food_label_photos
+
+Created in migration 038. Temporary label photos (Phase 1B-2), at most 3 per submission (checked by the API). Rows are deleted when the submission is approved, rejected or expires.
+
+|Column|Type|Notes|
+|---|---|---|
+|id|serial PK|migration 038|
+|submission_id|integer FK → food_label_submissions (cascade) not null|migration 038|
+|content_type|text not null|migration 038|
+|byte_size|integer not null|migration 038|
+|data|bytea not null|migration 038|
+|created_at|timestamptz|migration 038; default now()|
+
+Constraints: `food_label_photos_size_range` CHECK (((byte_size >= 1) AND (byte_size <= 2097152))); `food_label_photos_type_allowed` CHECK ((content_type = ANY (ARRAY['image/jpeg'::text, 'image/png'::text, 'image/webp'::text])))
+
+### food_label_submissions
+
+Created in migration 038. Label-submission queue (Phase 1B-2): a new food or a correction to food_id, reviewed by an admin. Pending submissions older than 60 days become 'expired' when the queue is next read.
+
+|Column|Type|Notes|
+|---|---|---|
+|id|serial PK|migration 038|
+|user_id|integer FK → users (cascade) not null|migration 038|
+|kind|text not null|migration 038; new_food, correction|
+|food_id|integer FK → foods (set null)|migration 038|
+|barcode|varchar(20)|migration 038|
+|proposed|jsonb not null|migration 038; default '{}'|
+|note|text|migration 038|
+|status|text not null|migration 038; default 'pending'|
+|reject_reason|text|migration 038|
+|reviewed_by_user_id|integer FK → users (set null)|migration 038|
+|reviewed_at|timestamptz|migration 038|
+|result_food_id|integer FK → foods (set null)|migration 038|
+|created_at|timestamptz|migration 038; default now()|
+|updated_at|timestamptz|migration 038; default now()|
+
+Constraints: `food_label_submissions_kind_allowed` CHECK ((kind = ANY (ARRAY['new_food'::text, 'correction'::text]))); `food_label_submissions_status_allowed` CHECK ((status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text, 'expired'::text])))
+
 ### food_nutrients
 
 Created in migration 037. Extra nutrients per food, per 100 g (Phase 1B-1). Nutrients that have a foods column (nutrients.food_column) stay in that column.
@@ -443,8 +525,12 @@ Created in migration 002.
 |is_verified|boolean|migration 003; default true|
 |usda_fdc_id|integer|migration 003|
 |archived_at|timestamptz|migration 037|
+|forked_from_food_id|integer FK → foods (set null)|migration 038; trainer fork (schema only)|
+|forked_by_user_id|integer FK → users (set null)|migration 038|
+|forked_at|timestamptz|migration 038|
+|fork_visibility|text|migration 038; private, clients, public; NULL = not a fork|
 
-Constraints: `positive_calories` CHECK ((calories_per_100g >= (0)::numeric)); `positive_macros` CHECK (((protein_per_100g >= (0)::numeric) AND (carbs_per_100g >= (0)::numeric) AND (fat_per_100g >= (0)::numeric)))
+Constraints: `foods_fork_visibility_allowed` CHECK (((fork_visibility IS NULL) OR (fork_visibility = ANY (ARRAY['private'::text, 'clients'::text, 'public'::text])))); `positive_calories` CHECK ((calories_per_100g >= (0)::numeric)); `positive_macros` CHECK (((protein_per_100g >= (0)::numeric) AND (carbs_per_100g >= (0)::numeric) AND (fat_per_100g >= (0)::numeric)))
 
 ### habit_logs
 
@@ -1100,7 +1186,7 @@ Constraints: `user_export_preferences_export_destination_check` CHECK (((export_
 
 ### user_food_overrides
 
-Created in migration 004.
+Created in migration 004. Used since Phase 1B-2 for barcode food overrides: one per user and food, values per 100 g, NULL = the food's own value; only that user sees it.
 
 |Column|Type|Notes|
 |---|---|---|
@@ -1134,7 +1220,7 @@ Constraints: `user_meal_slots_name_not_blank` CHECK ((length(btrim(name)) > 0));
 
 ### user_metrics
 
-Created in migration 001.
+Created in migration 001. Body measurements since migration 038 (Phase 1B-2): stored metric (kg, cm); the API reads and writes them in the user's units. `body_composition` keeps older free-form data.
 
 |Column|Type|Notes|
 |---|---|---|
@@ -1145,6 +1231,23 @@ Created in migration 001.
 |body_composition|jsonb|migration 001|
 |notes|text|migration 001|
 |created_at|timestamp|migration 001; default CURRENT_TIMESTAMP|
+|weight_kg|numeric(7,3)|migration 038|
+|body_fat_pct|numeric(5,2)|migration 038|
+|neck_cm|numeric(7,3)|migration 038|
+|shoulders_cm|numeric(7,3)|migration 038|
+|chest_cm|numeric(7,3)|migration 038|
+|waist_cm|numeric(7,3)|migration 038|
+|hips_cm|numeric(7,3)|migration 038|
+|arm_left_cm|numeric(7,3)|migration 038|
+|arm_right_cm|numeric(7,3)|migration 038|
+|thigh_left_cm|numeric(7,3)|migration 038|
+|thigh_right_cm|numeric(7,3)|migration 038|
+|calf_left_cm|numeric(7,3)|migration 038|
+|calf_right_cm|numeric(7,3)|migration 038|
+|measured_at|timestamptz|migration 038|
+|updated_at|timestamptz|migration 038|
+
+Constraints: `user_metrics_values_range` CHECK ((((weight_kg IS NULL) OR (weight_kg > (0)::numeric)) AND ((body_fat_pct IS NULL) OR ((body_fat_pct >= (0)::numeric) AND (body_fat_pct <= (100)::numeric))) AND ((neck_cm IS NULL) OR (neck_cm > (0)::numeric)) AND ((shoulders_cm IS NULL) OR (shoulders_cm > (0)::numeric)) AND ((chest_cm IS NULL) OR (chest_cm > (0)::numeric)) AND ((waist_cm IS NULL) OR (waist_cm > (0)::numeric)) AND ((hips_cm IS NULL) OR (hips_cm > (0)::numeric)) AND ((arm_left_cm IS NULL) OR (arm_left_cm > (0)::numeric)) AND ((arm_right_cm IS NULL) OR (arm_right_cm > (0)::numeric)) AND ((thigh_left_cm IS NULL) OR (thigh_left_cm > (0)::numeric)) AND ((thigh_right_cm IS NULL) OR (thigh_right_cm > (0)::numeric)) AND ((calf_left_cm IS NULL) OR (calf_left_cm > (0)::numeric)) AND ((calf_right_cm IS NULL) OR (calf_right_cm > (0)::numeric))))
 
 ### users
 
@@ -1196,10 +1299,17 @@ Created in migration 001.
 |overconsumption_threshold_pct|numeric(5,2) not null|migration 037; default 10|
 |water_goal_oz|numeric(6,1)|migration 037|
 |water_preset_oz|numeric(6,1)|migration 037|
+|weight_reminder_mode|text not null|migration 038; default 'off' (off, every_n_days, weekdays)|
+|weight_reminder_every_days|smallint|migration 038; 1-90|
+|weight_reminder_weekdays|smallint[]|migration 038; 0 = Mon … 6 = Sun|
+|weight_reminder_anchor|date|migration 038; the date the schedule was saved|
+|weight_reminder_dismissed_on|date|migration 038|
 
 Constraints: `oauth_unique` UNIQUE (oauth_provider, oauth_id); `users_email_key` UNIQUE (email); `users_previous_notes_scope_check` CHECK (((previous_notes_scope)::text = ANY ((ARRAY['all'::character varying, 'program'::character varying, 'non_program'::character varying])::text[]))); `users_reorder_mode_check` CHECK (((reorder_mode)::text = ANY ((ARRAY['drag'::character varying, 'arrows'::character varying])::text[]))); `users_username_key` UNIQUE (username); `users_workout_age_limit_hours_allowed` CHECK (workout_age_limit_hours IN (1,2,3,4,5,6,7,8,9,10,11,12,24,36,48)); `users_pause_note_minutes_allowed` CHECK (pause_note_minutes IN (5,10,15,20,25,30,35,40,45,50,55,60)); `users_log_set_button_position_allowed` CHECK (log_set_button_position IN ('inline','pinned')); `users_tempo_countdown_beeps_allowed` CHECK (tempo_countdown_beeps BETWEEN 0 AND 5)
 
 Added constraints (Phase 1A): `users_bmr_formula_allowed` CHECK ((bmr_formula = ANY (ARRAY['mifflin_st_jeor'::text, 'harris_benedict'::text, 'katch_mcardle'::text]))); `users_diet_type_allowed` CHECK ((diet_type = ANY (ARRAY['standard'::text, 'vegetarian'::text, 'vegan'::text, 'keto'::text, 'low_carb'::text, 'high_protein'::text, 'custom'::text]))); `users_overconsumption_threshold_range` CHECK (((overconsumption_threshold_pct >= (0)::numeric) AND (overconsumption_threshold_pct <= (100)::numeric)))
+
+Added constraints (Phase 1B-2): `users_weight_reminder_every_days_range` CHECK (((weight_reminder_every_days IS NULL) OR ((weight_reminder_every_days >= 1) AND (weight_reminder_every_days <= 90)))); `users_weight_reminder_mode_allowed` CHECK ((weight_reminder_mode = ANY (ARRAY['off'::text, 'every_n_days'::text, 'weekdays'::text]))); `users_weight_reminder_weekdays_range` CHECK (((weight_reminder_weekdays IS NULL) OR (weight_reminder_weekdays <@ ARRAY[(0)::smallint, (1)::smallint, (2)::smallint, (3)::smallint, (4)::smallint, (5)::smallint, (6)::smallint])))
 
 ### water_logs
 
